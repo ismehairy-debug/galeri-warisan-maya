@@ -36,6 +36,25 @@
     cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
   }
   #vr-button:disabled { opacity:.5; cursor:default; }
+  #gyro-button {
+    pointer-events:auto;
+    margin-top:8px; padding:10px 20px; border-radius:999px;
+    background: linear-gradient(135deg,#2a9d8f,#1a5f57);
+    color:#eafffb; border:1px solid #7adfd0; font-weight:700;
+    letter-spacing:1px; font-family: Georgia, serif; font-size:13px;
+    cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
+    display:none;
+  }
+  #joystick-base {
+    position:fixed; left:26px; bottom:26px; width:120px; height:120px;
+    border-radius:50%; background:rgba(30,18,8,0.45); border:2px solid rgba(201,162,39,0.6);
+    z-index:15; display:none; touch-action:none;
+  }
+  #joystick-knob {
+    position:absolute; left:50%; top:50%; width:52px; height:52px; margin:-26px 0 0 -26px;
+    border-radius:50%; background:rgba(201,162,39,0.85); border:2px solid #f2e2b6;
+    transition: transform 0.05s linear;
+  }
   #startScreen {
     position:fixed; inset:0; z-index:20; background:radial-gradient(ellipse at center, #1a1206 0%, #150c07 70%);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -66,11 +85,15 @@
     <p>The Living Heritage Gallery — Tema: Warisan</p>
   </div>
   <div id="hint">
-    <div>WASD — jalan &nbsp;|&nbsp; Click — lihat sekeliling</div>
+    <div id="hintText">WASD — jalan &nbsp;|&nbsp; Click — lihat sekeliling</div>
     <div>Berjalan dekat setiap pameran untuk mengaktifkannya</div>
     <button id="vr-button" disabled>MEMERIKSA VR…</button>
+    <br>
+    <button id="gyro-button">GUNA GYRO / ENABLE GYRO</button>
   </div>
 </div>
+
+<div id="joystick-base"><div id="joystick-knob"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -102,6 +125,14 @@
   const keys = {};
   let yaw = 0, pitch = 0;
   let audioReady = false;
+
+  const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  let gyroActive = false;
+  let deviceAlpha = 0, deviceBeta = 0, deviceGamma = 0;
+  let alphaOffset = null;
+  const joyState = { x: 0, y: 0 };
+  let joyTouchId = null;
+  let lookTouchId = null, lastTouchX = 0, lastTouchY = 0;
 
   const ROOM = { width: 16, depth: 16, height: 4.5 };
 
@@ -142,10 +173,11 @@
     document.addEventListener('keyup', e => keys[e.code] = false);
 
     renderer.domElement.addEventListener('click', () => {
-      if (!renderer.xr.isPresenting) renderer.domElement.requestPointerLock();
+      if (!renderer.xr.isPresenting && !isTouchDevice) renderer.domElement.requestPointerLock();
     });
     document.addEventListener('mousemove', onMouseMove);
 
+    setupTouchControls();
     setupVRButton();
     setupStartScreen(listener);
 
@@ -154,13 +186,143 @@
 
   // ---------- start / audio unlock ----------
   function setupStartScreen(listener){
+    if (isTouchDevice){
+      document.getElementById('hintText').textContent = 'Tilt telefon untuk lihat • Guna joystick untuk jalan';
+      document.querySelector('#startScreen small').textContent =
+        'Phone: tap Enable Gyro if prompted, tilt your phone to look around, use the joystick (bottom-left) to walk. On a Meta Quest browser, use the ENTER VR button that appears once you\'re inside.';
+      document.getElementById('gyro-button').style.display = 'inline-block';
+      document.getElementById('joystick-base').style.display = 'block';
+    }
     document.getElementById('enterBtn').addEventListener('click', () => {
       document.getElementById('startScreen').style.display = 'none';
       document.getElementById('overlay').style.display = 'flex';
       if (listener.context.state === 'suspended') listener.context.resume();
       audioReady = true;
-      renderer.domElement.requestPointerLock();
+      if (isTouchDevice) requestGyroPermission();
+      else renderer.domElement.requestPointerLock();
     });
+    document.getElementById('gyro-button').addEventListener('click', requestGyroPermission);
+  }
+
+  // ---------- gyro look ----------
+  function requestGyroPermission(){
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+      DeviceOrientationEvent.requestPermission().then(state => {
+        if (state === 'granted') enableGyro();
+      }).catch(() => {});
+    } else if ('DeviceOrientationEvent' in window){
+      enableGyro();
+    }
+  }
+
+  function enableGyro(){
+    alphaOffset = null;
+    player.rotation.set(0,0,0);
+    window.addEventListener('deviceorientation', onDeviceOrientation);
+    gyroActive = true;
+    document.getElementById('gyro-button').textContent = 'GYRO ON';
+  }
+
+  function onDeviceOrientation(e){
+    if (e.alpha === null) return;
+    if (alphaOffset === null) alphaOffset = e.alpha;
+    deviceAlpha = THREE.MathUtils.degToRad(e.alpha - alphaOffset);
+    deviceBeta  = THREE.MathUtils.degToRad(e.beta || 0);
+    deviceGamma = THREE.MathUtils.degToRad(e.gamma || 0);
+  }
+
+  const gyroEuler = new THREE.Euler();
+  const gyroQ0 = new THREE.Quaternion();
+  const gyroQ1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+  const gyroZ = new THREE.Vector3(0,0,1);
+  function getScreenAngle(){
+    if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+    if (typeof window.orientation === 'number') return window.orientation;
+    return 0;
+  }
+  function applyGyroToCamera(){
+    const screenAngle = THREE.MathUtils.degToRad(getScreenAngle());
+    gyroEuler.set(deviceBeta, deviceAlpha, -deviceGamma, 'YXZ');
+    camera.quaternion.setFromEuler(gyroEuler);
+    camera.quaternion.multiply(gyroQ1);
+    camera.quaternion.multiply(gyroQ0.setFromAxisAngle(gyroZ, -screenAngle));
+  }
+
+  // ---------- touch joystick (movement) + drag-look fallback ----------
+  function setupTouchControls(){
+    if (!isTouchDevice) return;
+    const joyBase = document.getElementById('joystick-base');
+    const joyKnob = document.getElementById('joystick-knob');
+
+    function updateJoy(t){
+      const rect = joyBase.getBoundingClientRect();
+      const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+      let dx = t.clientX - cx, dy = t.clientY - cy;
+      const max = rect.width/2;
+      const dist = Math.min(Math.hypot(dx,dy), max);
+      const ang = Math.atan2(dy,dx);
+      dx = Math.cos(ang)*dist; dy = Math.sin(ang)*dist;
+      joyState.x = dx/max; joyState.y = dy/max;
+      joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    }
+    function resetJoy(){
+      joyState.x = 0; joyState.y = 0;
+      joyKnob.style.transform = 'translate(-50%,-50%)';
+    }
+
+    joyBase.addEventListener('touchstart', e => {
+      const t = e.changedTouches[0];
+      joyTouchId = t.identifier;
+      updateJoy(t);
+      e.preventDefault();
+    }, { passive:false });
+
+    document.addEventListener('touchmove', e => {
+      for (const t of e.changedTouches){
+        if (t.identifier === joyTouchId){ updateJoy(t); e.preventDefault(); }
+      }
+    }, { passive:false });
+
+    document.addEventListener('touchend', e => {
+      for (const t of e.changedTouches){ if (t.identifier === joyTouchId){ joyTouchId = null; resetJoy(); } }
+    });
+
+    // drag-to-look fallback for when gyro isn't active/granted
+    document.addEventListener('touchstart', e => {
+      if (gyroActive) return;
+      const rect = joyBase.getBoundingClientRect();
+      for (const t of e.changedTouches){
+        const inJoy = t.clientX>=rect.left && t.clientX<=rect.right && t.clientY>=rect.top && t.clientY<=rect.bottom;
+        if (inJoy || lookTouchId !== null) continue;
+        lookTouchId = t.identifier; lastTouchX = t.clientX; lastTouchY = t.clientY;
+      }
+    });
+    document.addEventListener('touchmove', e => {
+      if (gyroActive) return;
+      for (const t of e.changedTouches){
+        if (t.identifier !== lookTouchId) continue;
+        const dx = t.clientX - lastTouchX, dy = t.clientY - lastTouchY;
+        lastTouchX = t.clientX; lastTouchY = t.clientY;
+        yaw -= dx*0.004; pitch -= dy*0.004;
+        pitch = Math.max(-1.3, Math.min(1.3, pitch));
+        player.rotation.y = yaw; camera.rotation.x = pitch;
+        e.preventDefault();
+      }
+    }, { passive:false });
+    document.addEventListener('touchend', e => {
+      for (const t of e.changedTouches){ if (t.identifier === lookTouchId) lookTouchId = null; }
+    });
+  }
+
+  function joystickMove(dt){
+    if (Math.abs(joyState.x) < 0.05 && Math.abs(joyState.y) < 0.05) return;
+    camera.getWorldDirection(tmp);
+    tmp.y = 0; tmp.normalize();
+    const r = new THREE.Vector3(tmp.z, 0, -tmp.x);
+    const speed = 2.8*dt;
+    player.position.addScaledVector(tmp, -joyState.y*speed);
+    player.position.addScaledVector(r, joyState.x*speed);
+    clampToRoom();
   }
 
   // ---------- lights ----------
@@ -545,7 +707,7 @@
 
   const fwd = new THREE.Vector3(), right = new THREE.Vector3(), tmp = new THREE.Vector3();
   function desktopMove(dt){
-    if (renderer.xr.isPresenting) return;
+    if (renderer.xr.isPresenting || gyroActive) return;
     fwd.set(Math.sin(yaw), 0, Math.cos(yaw)).multiplyScalar(-1);
     right.set(fwd.z, 0, -fwd.x);
     const speed = 3.2 * dt;
@@ -630,6 +792,8 @@
 
     desktopMove(dt);
     vrMove(dt);
+    if (!renderer.xr.isPresenting) joystickMove(dt);
+    if (gyroActive && !renderer.xr.isPresenting) applyGyroToCamera();
 
     const camWorld = new THREE.Vector3();
     camera.getWorldPosition(camWorld);
