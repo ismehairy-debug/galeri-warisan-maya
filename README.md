@@ -1,85 +1,36 @@
-# Galeri Warisan Maya (The Living Heritage Gallery)
+# Assets
 
-> *"Walking through time, stepping into culture."*
+This folder is where real content replaces the current placeholders. Keep it organized
+by type so the swap-in later is a quick, obvious job.
 
-A WebXR virtual reality gallery experience built for **Digital Innovation Creativepreneur (DICE) 4.0**,
-Category 3: Interaktif Media (AR/VR) — Tema: **Warisan**.
+## /videos
+Real footage or looping animation clips for each showcase (Tarian, Nyanyian, Silat).
+Recommended: short (10-30s) looping clips, MP4/H.264, 1080p or lower for smooth
+playback on the Quest 2's browser. Loaded in code via `THREE.VideoTexture`.
 
-Anjuran: Kementerian Pendidikan Tinggi (KPT) & Universiti Sultan Zainal Abidin (UniSZA)
-Diwakili oleh: Pasukan DICE 4.0 UniMAP
+## /audio
+Real recorded music, narration, or sound effects per showcase, to replace the
+placeholder oscillator tones. MP3 or OGG recommended. Loaded via
+`THREE.AudioLoader` + `THREE.PositionalAudio`.
 
-## Concept
+## /textures
+Any real photographed or licensed textile/wall textures (batik, songket, etc.) to
+replace the current procedurally-drawn placeholder pattern. PNG/JPG, ideally
+seamless/tileable, 512x512 or 1024x1024.
 
-An immersive VR exhibition hall where visitors physically walk through a virtual gallery.
-Interactive showcases around the room bring three pillars of Malaysian performance heritage
-to life through proximity-triggered spatial audio and visuals:
+## Naming convention
 
-- **Tarian** — Traditional Dance
-- **Nyanyian** — Traditional Singing
-- **Silat** — Martial Arts
+Use the station key as a prefix so it's obvious what maps to what:
 
-By using VR proximity triggers and spatial audio, this project turns passive video-viewing
-into an active, intimate cultural encounter — proving that heritage doesn't belong in the
-past, it lives in the future.
-
-## Live Demo
-
-🔗 **[Open the gallery](https://ismehairy-debug.github.io/Galeri-Warisan-Maya-The-Living-Heritage-Gallery-/)**
-
-- **Desktop:** click to enable mouse-look, then use WASD to walk
-- **Meta Quest 2 (or any WebXR headset):** open the link above in the built-in browser,
-  tap "Masuk Galeri," then tap "Enter VR"
-
-No app install, no developer mode, no Unity build required — it runs straight from the browser.
-
-## Project Status
-
-🚧 **Prototype stage.** The current build uses placeholder geometric "performers" and
-synthesized placeholder audio tones to prove out the interaction design (room-scale
-locomotion, proximity triggers, spatial audio falloff, WebXR support). Real content is
-the next milestone — see Roadmap below.
-
-## Team — Pasukan DICE 4.0 UniMAP
-
-| Nama | Peranan |
-|---|---|
-| Anas Zuhairi bin Zullkeffle | Ketua Pasukan |
-| Ahmad Haziq bin Ariff | Ahli Pasukan |
-| Muhammad Afifi bin Muhd Shukri | Ahli Pasukan |
-
-Mentor Akademik: Dr. Mohd Hafiz Ismail, Fakulti Kejuruteraan Elektronik, UniMAP
-
-## Tech Stack
-
-- [Three.js](https://threejs.org/) (r128) — 3D rendering
-- [WebXR Device API](https://immersiveweb.dev/) — VR headset support
-- Vanilla HTML/CSS/JS — no build step, no dependencies to install
-
-## Running Locally
-
-No build tools needed:
-
-```bash
-git clone https://github.com/ismehairy-debug/Galeri-Warisan-Maya-The-Living-Heritage-Gallery-.git
-cd Galeri-Warisan-Maya-The-Living-Heritage-Gallery-
-# then just open index.html in a browser
+```
+tarian_clip.mp4       tarian_audio.mp3       tarian_texture.jpg
+nyanyian_clip.mp4      nyanyian_audio.mp3     nyanyian_texture.jpg
+silat_clip.mp4          silat_audio.mp3         silat_texture.jpg
 ```
 
-Desktop preview works by double-clicking `index.html` directly. **VR mode requires HTTPS**
-(a secure context) — use the GitHub Pages link above, or serve locally with something like
-`npx serve` and access it over `https://localhost` / an ngrok tunnel if testing VR before pushing.
+## Licensing note
 
-## Roadmap
-
-- [ ] Replace placeholder "performer" geometry with real dance/silat footage or 3D character animation
-- [ ] Replace synthesized oscillator tones with real recorded music/narration (`assets/audio/`)
-- [ ] Replace procedural batik wall texture with photographed/licensed textile textures (`assets/textures/`)
-- [ ] Add a fourth showcase if scope allows
-- [ ] Add snap-turn / comfort options for VR locomotion
-- [ ] Record a 30–60s presentation walkthrough video for judging
-
-See `assets/README.md` for where new content files should go.
-
-## License
-
-Educational/competition project — Pasukan DICE 4.0 UniMAP, 2026.
+Since this is a competition submission, make sure any footage/audio/textures you
+add here are either originally created by the team, properly licensed, or royalty-free
+with attribution given where required — this matters for judging and for avoiding
+copyright issues down the line.
