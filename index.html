@@ -68,9 +68,37 @@
     border:1px solid #f2d98a; font-weight:700; letter-spacing:1px; cursor:pointer;
   }
   #startScreen small { margin-top:18px; color:#8a7a5a; max-width:420px; font-size:11px; line-height:1.6; }
+  #introScreen {
+    position:fixed; inset:0; z-index:30; background:#000;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #introScreen video { width:100%; height:100%; object-fit:contain; background:#000; }
+  #introControls {
+    position:fixed; right:22px; bottom:22px; z-index:31; display:flex; gap:10px;
+  }
+  #introControls button {
+    padding:10px 18px; border-radius:999px; font-size:12px; letter-spacing:1px;
+    background:rgba(20,14,6,0.65); color:#f2e2b6; border:1px solid rgba(242,217,138,0.6);
+    font-family: Georgia, serif; font-weight:700; cursor:pointer;
+  }
+  #logoRow {
+    display:flex; align-items:center; gap:10px; margin-bottom:10px; pointer-events:none;
+  }
+  #logoRow img {
+    height:46px; width:auto; background:rgba(242,230,200,0.92); padding:4px;
+    border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.5);
+  }
 </style>
 </head>
 <body>
+
+<div id="introScreen">
+  <video id="introVideo" src="assets/videos/intro_opening.mp4" autoplay muted playsinline></video>
+</div>
+<div id="introControls">
+  <button id="unmuteBtn">🔇 UNMUTE</button>
+  <button id="skipIntroBtn">SKIP ▶</button>
+</div>
 
 <div id="startScreen">
   <h1>GALERI WARISAN MAYA</h1>
@@ -80,9 +108,15 @@
 </div>
 
 <div id="overlay" style="display:none;">
-  <div id="titleblock">
-    <h1>GALERI WARISAN MAYA</h1>
-    <p>The Living Heritage Gallery — Tema: Warisan</p>
+  <div id="leftPanel">
+    <div id="logoRow">
+      <img src="assets/images/fcoee_logo.png" alt="FCoEE logo">
+      <img src="assets/images/unimap_logo.png" alt="UniMAP logo">
+    </div>
+    <div id="titleblock">
+      <h1>GALERI WARISAN MAYA</h1>
+      <p>The Living Heritage Gallery — Tema: Warisan</p>
+    </div>
   </div>
   <div id="hint">
     <div id="hintText">WASD — jalan &nbsp;|&nbsp; Click — lihat sekeliling</div>
@@ -179,9 +213,33 @@
 
     setupTouchControls();
     setupVRButton();
+    setupIntroScreen();
     setupStartScreen(listener);
 
     renderer.setAnimationLoop(() => animate(stations));
+  }
+
+  // ---------- intro video ----------
+  function setupIntroScreen(){
+    const introScreen = document.getElementById('introScreen');
+    const introControls = document.getElementById('introControls');
+    const video = document.getElementById('introVideo');
+    const unmuteBtn = document.getElementById('unmuteBtn');
+    const skipBtn = document.getElementById('skipIntroBtn');
+
+    function endIntro(){
+      introScreen.style.display = 'none';
+      introControls.style.display = 'none';
+      video.pause();
+    }
+
+    video.addEventListener('ended', endIntro);
+    video.addEventListener('error', endIntro);
+    unmuteBtn.addEventListener('click', () => {
+      video.muted = !video.muted;
+      unmuteBtn.textContent = video.muted ? '🔇 UNMUTE' : '🔊 MUTE';
+    });
+    skipBtn.addEventListener('click', endIntro);
   }
 
   // ---------- start / audio unlock ----------
