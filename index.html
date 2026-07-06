@@ -172,9 +172,14 @@
      Environment: modeled as a "balai" — an open-sided traditional Malay
      pavilion hall — with tiang seri (timber posts), a bumbung panjang
      pitched roof, carved kerawang fretwork trim, and a gerbang entrance
-     gateway with a tebar layar-style gable finial. Wall/floor/trim
-     textures are procedurally drawn (see makeWoodPlankTexture and
-     makeKerawangTexture) as stand-ins for real photographed textures.
+     gateway with a tebar layar-style gable finial. Walls are built with
+     real open window gaps (see buildSegmentedWall) so the surrounding
+     kampung — coconut palms, banana plants, bamboo, distant huts — is
+     visible from inside, and walkable once you step outside. A few
+     decorative villagers (buildVillager) share the hall so it doesn't
+     feel like a solo exhibit. Wall/floor/trim textures are procedurally
+     drawn (see makeWoodPlankTexture and makeKerawangTexture) as
+     stand-ins for real photographed textures.
   ------------------------------------------------------------------- */
 
   let camera, scene, renderer, player;
@@ -184,6 +189,7 @@
   let yaw = 0, pitch = 0;
   let audioReady = false;
   let stationsRef = [];
+  let villagerGroups = [];
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   let gyroActive = false;
@@ -199,6 +205,7 @@
 
   function init(){
     scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xcf9f68);
     scene.fog = new THREE.FogExp2(0x120a06, 0.04);
 
     camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.05, 60);
@@ -221,6 +228,9 @@
     buildRoom();
     buildRoof();
     buildGateway();
+    buildExteriorGround();
+    scatterVegetation();
+    villagerGroups = buildVillagers();
     const stations = buildStations();
     stationsRef = stations;
     const hotspots = buildArchitectureHotspots();
@@ -544,6 +554,189 @@
     return new THREE.CanvasTexture(c);
   }
 
+  // ---------- helpers: build a wall with real open window gaps ----------
+  function computeWallSegments(totalWidth, mullionW, windowW){
+    const segments = [];
+    let x = -totalWidth/2;
+    let solid = true;
+    while (x < totalWidth/2 - 0.01){
+      const w = solid ? mullionW : windowW;
+      const actualW = Math.min(w, totalWidth/2 - x);
+      segments.push({ start: x, width: actualW, solid });
+      x += actualW;
+      solid = !solid;
+    }
+    return segments;
+  }
+
+  function buildSegmentedWall(totalWidth, height, thickness, mat, mullionW, windowW){
+    const group = new THREE.Group();
+    const segs = computeWallSegments(totalWidth, mullionW, windowW);
+    segs.forEach(s => {
+      if (!s.solid) return; // leave this span open — that's the window
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(s.width, height, thickness), mat);
+      seg.position.set(s.start + s.width/2, height/2, 0);
+      group.add(seg);
+    });
+    // low sill wall beneath every window opening, like a real balai's half-wall
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(totalWidth, 0.7, thickness), mat);
+    sill.position.set(0, 0.35, 0);
+    group.add(sill);
+    return group;
+  }
+
+  // ---------- exterior: village ground, vegetation, distant huts ----------
+  function buildExteriorGround(){
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#3a4a1e';
+    ctx.fillRect(0,0,256,256);
+    for (let i=0;i<700;i++){
+      const x = Math.random()*256, y = Math.random()*256;
+      const g = 55 + Math.floor(Math.random()*55);
+      ctx.fillStyle = `rgba(${g-20},${g+25},${g-45},0.5)`;
+      ctx.fillRect(x,y,2,2);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(24,24);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(96,96),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 1 }));
+    ground.rotation.x = -Math.PI/2;
+    ground.position.y = -0.02;
+    scene.add(ground);
+  }
+
+  function buildCoconutPalm(x,z){
+    const group = new THREE.Group();
+    group.position.set(x,0,z);
+    const trunkH = 3.2 + Math.random()*1.3;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.18,trunkH,8),
+      new THREE.MeshStandardMaterial({ color:0x6b4a2a, roughness:0.9 }));
+    trunk.position.y = trunkH/2;
+    trunk.rotation.z = (Math.random()-0.5)*0.15;
+    group.add(trunk);
+    const frondMat = new THREE.MeshStandardMaterial({ color:0x3f7d3a, roughness:0.8, side:THREE.DoubleSide });
+    for (let i=0;i<6;i++){
+      const frond = new THREE.Mesh(new THREE.ConeGeometry(0.18,1.6,4), frondMat);
+      const ang = (i/6)*Math.PI*2;
+      frond.position.set(Math.cos(ang)*0.4, trunkH, Math.sin(ang)*0.4);
+      frond.rotation.x = Math.PI/2.3;
+      frond.rotation.y = ang;
+      group.add(frond);
+    }
+    for (let i=0;i<3;i++){
+      const nut = new THREE.Mesh(new THREE.SphereGeometry(0.13,8,8), new THREE.MeshStandardMaterial({ color:0x5c3a1e }));
+      nut.position.set((Math.random()-0.5)*0.3, trunkH-0.15, (Math.random()-0.5)*0.3);
+      group.add(nut);
+    }
+    scene.add(group);
+  }
+
+  function buildBananaPlant(x,z){
+    const group = new THREE.Group();
+    group.position.set(x,0,z);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.2,1.4,8),
+      new THREE.MeshStandardMaterial({ color:0x7a9450, roughness:0.8 }));
+    trunk.position.y = 0.7;
+    group.add(trunk);
+    const leafMat = new THREE.MeshStandardMaterial({ color:0x4a8a3a, roughness:0.8, side:THREE.DoubleSide });
+    for (let i=0;i<5;i++){
+      const leaf = new THREE.Mesh(new THREE.PlaneGeometry(0.5,1.6), leafMat);
+      leaf.position.y = 1.4;
+      leaf.rotation.y = (i/5)*Math.PI*2;
+      leaf.rotation.x = -0.6;
+      leaf.translateZ(0.5);
+      group.add(leaf);
+    }
+    scene.add(group);
+  }
+
+  function buildBambooCluster(x,z){
+    const group = new THREE.Group();
+    group.position.set(x,0,z);
+    const stalkMat = new THREE.MeshStandardMaterial({ color:0x9fae4a, roughness:0.6 });
+    const tuftMat = new THREE.MeshStandardMaterial({ color:0x5a8a3a, roughness:0.8 });
+    for (let i=0;i<5;i++){
+      const h = 2.6 + Math.random()*1.4;
+      const sx = (Math.random()-0.5)*0.4, sz = (Math.random()-0.5)*0.4;
+      const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,h,6), stalkMat);
+      stalk.position.set(sx, h/2, sz);
+      group.add(stalk);
+      const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.18,0.4,4), tuftMat);
+      tuft.position.set(sx, h, sz);
+      group.add(tuft);
+    }
+    scene.add(group);
+  }
+
+  function buildKampungHut(x,z){
+    const group = new THREE.Group();
+    group.position.set(x,0,z);
+    const wallMat = new THREE.MeshStandardMaterial({ color:0x4a3018, roughness:0.9 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.4,1.6,2.0), wallMat);
+    body.position.y = 1.5;
+    group.add(body);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(2.0,1.2,4),
+      new THREE.MeshStandardMaterial({ color:0x1d130a, roughness:0.9 }));
+    roof.rotation.y = Math.PI/4;
+    roof.position.y = 2.9;
+    group.add(roof);
+    const stiltMat = new THREE.MeshStandardMaterial({ color:0x3a2410 });
+    [[-0.9,-0.8],[0.9,-0.8],[-0.9,0.8],[0.9,0.8]].forEach(p => {
+      const stilt = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,0.7,6), stiltMat);
+      stilt.position.set(p[0], 0.35, p[1]);
+      group.add(stilt);
+    });
+    scene.add(group);
+  }
+
+  function scatterVegetation(){
+    const halfW = ROOM.width/2, halfD = ROOM.depth/2;
+    for (let i=0;i<18;i++){
+      const angle = Math.random()*Math.PI*2;
+      const radius = Math.max(halfW,halfD) + 4 + Math.random()*20;
+      const x = Math.cos(angle)*radius, z = Math.sin(angle)*radius;
+      if (Math.abs(x) < 4 && z > 0) continue; // keep the entrance approach clear
+      const r = Math.random();
+      if (r < 0.4) buildCoconutPalm(x,z);
+      else if (r < 0.7) buildBananaPlant(x,z);
+      else buildBambooCluster(x,z);
+    }
+    buildKampungHut(-24, -8);
+    buildKampungHut(22, -14);
+  }
+
+  // ---------- villagers: a few decorative kampung folk sharing the hall ----------
+  function buildVillager(x,z,color){
+    const group = new THREE.Group();
+    group.position.set(x,0,z);
+    const skinMat = new THREE.MeshStandardMaterial({ color:0xd9a066, roughness:0.6 });
+    const clothMat = new THREE.MeshStandardMaterial({ color, roughness:0.7 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.22,0.9,10), clothMat);
+    body.position.y = 0.55;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.14,12,12), skinMat);
+    head.position.y = 1.1;
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.15,0.12,10), clothMat);
+    hat.position.y = 1.24;
+    const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.5,6), clothMat);
+    armL.position.set(-0.2,0.65,0); armL.rotation.z = 0.3;
+    const armR = armL.clone();
+    armR.position.x = 0.2; armR.rotation.z = -0.3;
+    group.add(body, head, hat, armL, armR);
+    scene.add(group);
+    return group;
+  }
+
+  function buildVillagers(){
+    return [
+      buildVillager(-3, 3.5, 0x3a6ea5),
+      buildVillager(3, 1.5, 0x5c8a3a),
+      buildVillager(0, -4.5, 0x9c4a3a),
+    ];
+  }
+
   // ---------- room: a balai (open-sided traditional Malay pavilion hall) ----------
   function buildRoom(){
     const floorMat = new THREE.MeshStandardMaterial({ map: makeWoodPlankTexture(), roughness: 0.85, metalness: 0.05 });
@@ -553,15 +746,20 @@
 
     // plain chengal-wood wall panels — restrained, so the carved trim reads as deliberate
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x3b2415, roughness: 0.88 });
-    const north = new THREE.Mesh(new THREE.BoxGeometry(ROOM.width, ROOM.height, 0.25), wallMat);
-    north.position.set(0, ROOM.height/2, -ROOM.depth/2);
-    scene.add(north);
-    const west = new THREE.Mesh(new THREE.BoxGeometry(0.25, ROOM.height, ROOM.depth), wallMat);
-    west.position.set(-ROOM.width/2, ROOM.height/2, 0);
-    scene.add(west);
-    const east = west.clone();
-    east.position.set(ROOM.width/2, ROOM.height/2, 0);
-    scene.add(east);
+
+    const northWall = buildSegmentedWall(ROOM.width, ROOM.height, 0.25, wallMat, 2.6, 2.8);
+    northWall.position.set(0, 0, -ROOM.depth/2);
+    scene.add(northWall);
+
+    const westWall = buildSegmentedWall(ROOM.depth, ROOM.height, 0.25, wallMat, 2.6, 2.8);
+    westWall.rotation.y = Math.PI/2;
+    westWall.position.set(-ROOM.width/2, 0, 0);
+    scene.add(westWall);
+
+    const eastWall = buildSegmentedWall(ROOM.depth, ROOM.height, 0.25, wallMat, 2.6, 2.8);
+    eastWall.rotation.y = -Math.PI/2;
+    eastWall.position.set(ROOM.width/2, 0, 0);
+    scene.add(eastWall);
 
     // kerawang carved fretwork trim band, like a ventilation panel under the eaves
     const kerawangTex = makeKerawangTexture('#2a160c', '#c9a227', 8, 1);
@@ -970,9 +1168,9 @@
   }
 
   function clampToRoom(){
-    const m = 0.8;
-    player.position.x = Math.max(-ROOM.width/2+m, Math.min(ROOM.width/2-m, player.position.x));
-    player.position.z = Math.max(-ROOM.depth/2+m, Math.min(ROOM.depth/2+1.7, player.position.z));
+    const m = 40;
+    player.position.x = Math.max(-m, Math.min(m, player.position.x));
+    player.position.z = Math.max(-m, Math.min(m, player.position.z));
   }
 
   // ---------- VR button ----------
@@ -1029,6 +1227,8 @@
 
     const camWorld = new THREE.Vector3();
     camera.getWorldPosition(camWorld);
+
+    villagerGroups.forEach((v,i) => { v.rotation.y = Math.sin(t*0.3 + i*2)*0.15; });
 
     points.forEach(st => {
       st.group.getWorldPosition(st.worldPos);
@@ -1088,4 +1288,3 @@
 </script>
 </body>
 </html>
-
