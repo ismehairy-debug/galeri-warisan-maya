@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Galeri Warisan Maya — VR Prototype</title>
 <style>
-  html, body { margin:0; padding:0; overflow:hidden; height:100%; background:#0a0e1a; }
+  html, body { margin:0; padding:0; overflow:hidden; height:100%; background:#150c07; }
   canvas { display:block; }
   #overlay {
     position:fixed; top:0; left:0; right:0; z-index:10;
@@ -37,7 +37,7 @@
   }
   #vr-button:disabled { opacity:.5; cursor:default; }
   #startScreen {
-    position:fixed; inset:0; z-index:20; background:radial-gradient(ellipse at center, #1a1206 0%, #0a0e1a 70%);
+    position:fixed; inset:0; z-index:20; background:radial-gradient(ellipse at center, #1a1206 0%, #150c07 70%);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     color:#f2e2b6; font-family: Georgia, serif; text-align:center; padding:20px;
   }
@@ -87,6 +87,13 @@
        - Swap the procedural batik wall texture for real texture photos.
      Everything else (proximity triggers, spatial audio falloff,
      room-scale locomotion, WebXR support) is functional as-is.
+
+     Environment: modeled as a "balai" — an open-sided traditional Malay
+     pavilion hall — with tiang seri (timber posts), a bumbung panjang
+     pitched roof, carved kerawang fretwork trim, and a gerbang entrance
+     gateway with a tebar layar-style gable finial. Wall/floor/trim
+     textures are procedurally drawn (see makeWoodPlankTexture and
+     makeKerawangTexture) as stand-ins for real photographed textures.
   ------------------------------------------------------------------- */
 
   let camera, scene, renderer, player;
@@ -102,13 +109,13 @@
 
   function init(){
     scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x0a0e1a, 0.045);
+    scene.fog = new THREE.FogExp2(0x120a06, 0.04);
 
     camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.05, 60);
     camera.position.set(0, 1.6, 0);
 
     player = new THREE.Group();
-    player.position.set(0, 0, 6.5);
+    player.position.set(0, 0, 7.6);
     player.add(camera);
     scene.add(player);
 
@@ -122,6 +129,8 @@
 
     buildLights();
     buildRoom();
+    buildRoof();
+    buildGateway();
     const stations = buildStations();
     const listener = new THREE.AudioListener();
     camera.add(listener);
@@ -156,74 +165,231 @@
 
   // ---------- lights ----------
   function buildLights(){
-    scene.add(new THREE.HemisphereLight(0x8899bb, 0x0a0603, 0.55));
-    const warm = new THREE.PointLight(0xffcf8a, 1.1, 14, 2);
-    warm.position.set(0, 3.6, 3);
-    scene.add(warm);
+    // warm dusk sky bounce, like late-afternoon light filtering into an open-sided balai
+    scene.add(new THREE.HemisphereLight(0xffb877, 0x2a1608, 0.6));
+    const entranceGlow = new THREE.PointLight(0xffcf8a, 1.3, 12, 2);
+    entranceGlow.position.set(0, 3.2, 6.5);
+    scene.add(entranceGlow);
     [[-5,0,-3],[5,0,-3],[0,0,-7]].forEach(p => {
       const spot = new THREE.PointLight(0xffe3b0, 0.9, 8, 2);
       spot.position.set(p[0], 3.2, p[2]+1.5);
       scene.add(spot);
     });
+    // pelita-style warm glow beneath the roof ridge
+    const ridgeGlow = new THREE.PointLight(0xffd9a0, 0.5, 16, 2);
+    ridgeGlow.position.set(0, ROOM.height + 1.2, -2);
+    scene.add(ridgeGlow);
   }
 
-  // ---------- procedural batik-style wall texture ----------
-  function makeBatikTexture(bg, line){
+  // ---------- procedural chengal-wood plank texture (floor) ----------
+  function makeWoodPlankTexture(){
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    const planks = 8, pw = c.width/planks;
+    for (let i=0;i<planks;i++){
+      const shade = 46 + Math.floor(Math.random()*16);
+      ctx.fillStyle = `rgb(${shade+34},${shade+16},${shade})`;
+      ctx.fillRect(i*pw, 0, pw-2, c.height);
+      ctx.strokeStyle = 'rgba(20,10,4,0.25)';
+      ctx.lineWidth = 1;
+      for (let g=0; g<4; g++){
+        const gx = i*pw + 6 + Math.random()*(pw-12);
+        ctx.beginPath();
+        ctx.moveTo(gx, 0);
+        ctx.bezierCurveTo(gx+4,64, gx-4,128, gx+3,256);
+        ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = 'rgba(10,5,2,0.55)';
+    ctx.lineWidth = 2;
+    for (let i=0;i<=planks;i++){ ctx.beginPath(); ctx.moveTo(i*pw,0); ctx.lineTo(i*pw,c.height); ctx.stroke(); }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(ROOM.width/3, ROOM.depth/3);
+    return tex;
+  }
+
+  // ---------- procedural kerawang (carved lattice fretwork) texture ----------
+  function makeKerawangTexture(bg, line, repeatX, repeatY){
     const c = document.createElement('canvas');
     c.width = c.height = 256;
     const ctx = c.getContext('2d');
     ctx.fillStyle = bg;
     ctx.fillRect(0,0,256,256);
     ctx.strokeStyle = line;
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.65;
-    for (let y = -256; y < 512; y += 32){
+    ctx.lineWidth = 3;
+    const step = 32;
+    // repeating pucuk rebung (bamboo-shoot) motif
+    for (let x=-step; x<256+step; x+=step){
+      ctx.globalAlpha = 0.6;
       ctx.beginPath();
-      for (let x = 0; x <= 256; x += 32){
-        ctx.moveTo(x, y + (x%64===0?0:16));
-        ctx.lineTo(x+16, y+16 + (x%64===0?0:16));
-        ctx.lineTo(x+32, y + (x%64===0?0:16));
-      }
+      ctx.moveTo(x, 256);
+      ctx.lineTo(x+step/2, 256-96);
+      ctx.lineTo(x+step, 256);
       ctx.stroke();
     }
-    ctx.globalAlpha = 0.35;
-    for (let i=0;i<40;i++){
-      const x = Math.random()*256, y = Math.random()*256, r = 2+Math.random()*3;
-      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle = line; ctx.fill();
+    // small floral roundels along the top edge
+    ctx.globalAlpha = 0.75;
+    for (let x=step/2; x<256; x+=step){
+      ctx.beginPath(); ctx.arc(x, 34, 7, 0, Math.PI*2); ctx.stroke();
+      for (let a=0;a<6;a++){
+        const ang = a*Math.PI/3;
+        ctx.beginPath();
+        ctx.moveTo(x,34);
+        ctx.lineTo(x+Math.cos(ang)*13, 34+Math.sin(ang)*13);
+        ctx.stroke();
+      }
     }
     const tex = new THREE.CanvasTexture(c);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(4,2);
+    tex.repeat.set(repeatX || 4, repeatY || 1);
     return tex;
   }
 
-  // ---------- room ----------
+  // ---------- room: a balai (open-sided traditional Malay pavilion hall) ----------
   function buildRoom(){
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x241810, roughness: 0.85, metalness: 0.05 });
+    const floorMat = new THREE.MeshStandardMaterial({ map: makeWoodPlankTexture(), roughness: 0.85, metalness: 0.05 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, ROOM.depth), floorMat);
     floor.rotation.x = -Math.PI/2;
     scene.add(floor);
 
-    const ceilMat = new THREE.MeshStandardMaterial({ color: 0x0a0e1a, roughness: 1 });
-    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, ROOM.depth), ceilMat);
-    ceiling.rotation.x = Math.PI/2;
-    ceiling.position.y = ROOM.height;
-    scene.add(ceiling);
-
-    const wallTex = makeBatikTexture('#3a1420', '#c9a227');
-    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9 });
-
-    const north = new THREE.Mesh(new THREE.BoxGeometry(ROOM.width, ROOM.height, 0.3), wallMat);
+    // plain chengal-wood wall panels — restrained, so the carved trim reads as deliberate
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3b2415, roughness: 0.88 });
+    const north = new THREE.Mesh(new THREE.BoxGeometry(ROOM.width, ROOM.height, 0.25), wallMat);
     north.position.set(0, ROOM.height/2, -ROOM.depth/2);
     scene.add(north);
-
-    const west = new THREE.Mesh(new THREE.BoxGeometry(0.3, ROOM.height, ROOM.depth), wallMat);
+    const west = new THREE.Mesh(new THREE.BoxGeometry(0.25, ROOM.height, ROOM.depth), wallMat);
     west.position.set(-ROOM.width/2, ROOM.height/2, 0);
     scene.add(west);
-
     const east = west.clone();
     east.position.set(ROOM.width/2, ROOM.height/2, 0);
     scene.add(east);
+
+    // kerawang carved fretwork trim band, like a ventilation panel under the eaves
+    const kerawangTex = makeKerawangTexture('#2a160c', '#c9a227', 8, 1);
+    const trimMat = new THREE.MeshStandardMaterial({ map: kerawangTex, roughness: 0.8, side: THREE.DoubleSide });
+    const trimY = ROOM.height - 0.4;
+
+    const northTrim = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, 0.7), trimMat);
+    northTrim.position.set(0, trimY, -ROOM.depth/2 + 0.14);
+    scene.add(northTrim);
+
+    const westKerawang = makeKerawangTexture('#2a160c', '#c9a227', 8, 1);
+    const westTrimMat = new THREE.MeshStandardMaterial({ map: westKerawang, roughness: 0.8, side: THREE.DoubleSide });
+    const westTrim = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.depth, 0.7), westTrimMat);
+    westTrim.rotation.y = Math.PI/2;
+    westTrim.position.set(-ROOM.width/2 + 0.14, trimY, 0);
+    scene.add(westTrim);
+
+    const eastTrim = westTrim.clone();
+    eastTrim.rotation.y = -Math.PI/2;
+    eastTrim.position.set(ROOM.width/2 - 0.14, trimY, 0);
+    scene.add(eastTrim);
+
+    buildPillars();
+  }
+
+  // ---------- tiang seri (structural timber posts) ----------
+  function buildPillars(){
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.75, metalness: 0.05 });
+    const capMat = new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0x6a4a10, emissiveIntensity: 0.3, roughness: 0.4, metalness: 0.5 });
+    const positions = [[-8,-5],[-8,2],[8,-5],[8,2]];
+    positions.forEach(p => {
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, ROOM.height, 12), woodMat);
+      pillar.position.set(p[0], ROOM.height/2, p[1]);
+      scene.add(pillar);
+      const cap = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 20), capMat);
+      cap.rotation.x = Math.PI/2;
+      cap.position.set(p[0], ROOM.height - 0.35, p[1]);
+      scene.add(cap);
+    });
+  }
+
+  // ---------- bumbung panjang: pitched gable roof ----------
+  function buildRoof(){
+    const eaveY = ROOM.height;
+    const rise = 2.5;
+    const ridgeY = eaveY + rise;
+    const halfSpan = ROOM.width/2;
+    const zSpan = ROOM.depth + 1.6; // eave overhang
+    const L = Math.sqrt(halfSpan*halfSpan + rise*rise);
+    const theta = Math.atan2(rise, halfSpan);
+
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x1d130a, roughness: 0.85 });
+    const eastRoof = new THREE.Mesh(new THREE.BoxGeometry(L, 0.15, zSpan), roofMat);
+    eastRoof.rotation.z = -theta;
+    eastRoof.position.set((L/2)*Math.cos(theta), ridgeY - (L/2)*Math.sin(theta), 0);
+    scene.add(eastRoof);
+
+    const westRoof = eastRoof.clone();
+    westRoof.rotation.z = theta;
+    westRoof.position.set(-(L/2)*Math.cos(theta), ridgeY - (L/2)*Math.sin(theta), 0);
+    scene.add(westRoof);
+
+    const ridgeBeam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.12, zSpan, 12),
+      new THREE.MeshStandardMaterial({ color: 0x2a1a0e, roughness: 0.7 })
+    );
+    ridgeBeam.rotation.x = Math.PI/2;
+    ridgeBeam.position.set(0, ridgeY, 0);
+    scene.add(ridgeBeam);
+
+    // tebar layar — carved triangular gable end boards, facing the entrance and the back wall
+    const gableTex = makeKerawangTexture('#2a160c', '#c9a227', 1, 1);
+    const gableMat = new THREE.MeshStandardMaterial({ map: gableTex, side: THREE.DoubleSide, roughness: 0.8 });
+    const gableShape = new THREE.Shape();
+    gableShape.moveTo(-halfSpan, 0);
+    gableShape.lineTo(halfSpan, 0);
+    gableShape.lineTo(0, rise);
+    gableShape.lineTo(-halfSpan, 0);
+    const gableGeo = new THREE.ShapeGeometry(gableShape);
+
+    const frontGable = new THREE.Mesh(gableGeo, gableMat);
+    frontGable.position.set(0, eaveY, zSpan/2 - 0.1);
+    scene.add(frontGable);
+
+    const backGable = new THREE.Mesh(gableGeo, gableMat);
+    backGable.position.set(0, eaveY, -zSpan/2 + 0.1);
+    scene.add(backGable);
+
+    // pucuk rebung finial at the roof peak, glowing gold above the entrance
+    const finial = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16, 0.55, 8),
+      new THREE.MeshStandardMaterial({ color: 0xf2d98a, emissive: 0xc9a227, emissiveIntensity: 0.5, roughness: 0.4 })
+    );
+    finial.position.set(0, ridgeY + 0.3, zSpan/2 - 0.1);
+    scene.add(finial);
+  }
+
+  // ---------- gerbang: the entrance gateway you walk through ----------
+  function buildGateway(){
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.75 });
+    const gateZ = 7.4;
+    [-1.7, 1.7].forEach(x => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 4.4, 12), woodMat);
+      post.position.set(x, 2.2, gateZ);
+      scene.add(post);
+    });
+
+    const beamTex = makeKerawangTexture('#2a160c', '#c9a227', 2, 1);
+    const beam = new THREE.Mesh(
+      new THREE.BoxGeometry(3.8, 0.35, 0.3),
+      new THREE.MeshStandardMaterial({ map: beamTex, roughness: 0.8 })
+    );
+    beam.position.set(0, 4.3, gateZ);
+    scene.add(beam);
+
+    const finial = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16, 0.5, 8),
+      new THREE.MeshStandardMaterial({ color: 0xf2d98a, emissive: 0xc9a227, emissiveIntensity: 0.6, roughness: 0.4 })
+    );
+    finial.position.set(0, 4.75, gateZ);
+    scene.add(finial);
+
+    const gateLight = new THREE.PointLight(0xffd9a0, 1.0, 8, 2);
+    gateLight.position.set(0, 3.6, gateZ);
+    scene.add(gateLight);
   }
 
   // ---------- text sprite ----------
@@ -413,7 +579,7 @@
   function clampToRoom(){
     const m = 0.8;
     player.position.x = Math.max(-ROOM.width/2+m, Math.min(ROOM.width/2-m, player.position.x));
-    player.position.z = Math.max(-ROOM.depth/2+m, Math.min(ROOM.depth/2-m, player.position.z));
+    player.position.z = Math.max(-ROOM.depth/2+m, Math.min(ROOM.depth/2+1.7, player.position.z));
   }
 
   // ---------- VR button ----------
