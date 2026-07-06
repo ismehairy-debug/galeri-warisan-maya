@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Galeri Warisan Maya — VR Prototype</title>
+<link rel="icon" type="image/png" href="assets/images/unimap_logo.png">
 <style>
   html, body { margin:0; padding:0; overflow:hidden; height:100%; background:#150c07; }
   canvas { display:block; }
@@ -68,6 +69,23 @@
     border:1px solid #f2d98a; font-weight:700; letter-spacing:1px; cursor:pointer;
   }
   #startScreen small { margin-top:18px; color:#8a7a5a; max-width:420px; font-size:11px; line-height:1.6; }
+  #loadingScreen {
+    position:fixed; inset:0; z-index:40; background:#150c07;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#f2e2b6; font-family: Georgia, serif;
+  }
+  #loadingScreen img {
+    width:96px; height:96px; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.5);
+  }
+  #loadingSpinner {
+    margin-top:26px; width:38px; height:38px; border-radius:50%;
+    border:3px solid rgba(242,226,182,0.25); border-top-color:#c9a227;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loadingScreen p {
+    margin-top:16px; font-size:13px; letter-spacing:2px; color:#c9a961;
+  }
   #introScreen {
     position:fixed; inset:0; z-index:30; background:#000;
     display:flex; align-items:center; justify-content:center;
@@ -91,6 +109,12 @@
 </style>
 </head>
 <body>
+
+<div id="loadingScreen">
+  <img src="assets/images/unimap_logo.png" alt="UniMAP logo">
+  <div id="loadingSpinner"></div>
+  <p>MEMUATKAN GALERI / LOADING GALLERY…</p>
+</div>
 
 <div id="introScreen">
   <video id="introVideo" src="assets/videos/intro_opening.mp4" autoplay muted playsinline></video>
@@ -213,10 +237,29 @@
 
     setupTouchControls();
     setupVRButton();
+    setupLoadingScreen();
     setupIntroScreen();
     setupStartScreen(listener);
 
     renderer.setAnimationLoop(() => animate(stations));
+  }
+
+  // ---------- loading screen ----------
+  function setupLoadingScreen(){
+    const loadingScreen = document.getElementById('loadingScreen');
+    const video = document.getElementById('introVideo');
+
+    function hideLoading(){
+      loadingScreen.style.display = 'none';
+    }
+
+    if (video.readyState >= 3){ // HAVE_FUTURE_DATA — autoplay may have already reached this before we attached listeners
+      hideLoading();
+      return;
+    }
+    video.addEventListener('canplay', hideLoading, { once:true });
+    video.addEventListener('error', hideLoading, { once:true });
+    setTimeout(hideLoading, 6000); // fallback if the video stalls
   }
 
   // ---------- intro video ----------
