@@ -175,11 +175,9 @@
      gateway with a tebar layar-style gable finial. Walls are built with
      real open window gaps (see buildSegmentedWall) so the surrounding
      kampung — coconut palms, banana plants, bamboo, distant huts — is
-     visible from inside, and walkable once you step outside. A few
-     decorative villagers (buildVillager) share the hall so it doesn't
-     feel like a solo exhibit. Wall/floor/trim textures are procedurally
-     drawn (see makeWoodPlankTexture and makeKerawangTexture) as
-     stand-ins for real photographed textures.
+     visible from inside, and walkable once you step outside. Wall/floor/
+     trim textures are procedurally drawn (see makeWoodPlankTexture and
+     makeKerawangTexture) as stand-ins for real photographed textures.
   ------------------------------------------------------------------- */
 
   let camera, scene, renderer, player;
@@ -189,7 +187,6 @@
   let yaw = 0, pitch = 0;
   let audioReady = false;
   let stationsRef = [];
-  let villagerGroups = [];
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   let gyroActive = false;
@@ -205,8 +202,10 @@
 
   function init(){
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xcf9f68);
-    scene.fog = new THREE.FogExp2(0x120a06, 0.04);
+    // background and fog share one warm dusk tone so distant objects fade
+    // seamlessly into the sky instead of hitting a hard, mismatched edge
+    scene.background = new THREE.Color(0x8a6a45);
+    scene.fog = new THREE.FogExp2(0x8a6a45, 0.025);
 
     camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.05, 60);
     camera.position.set(0, 1.6, 0);
@@ -230,7 +229,6 @@
     buildGateway();
     buildExteriorGround();
     scatterVegetation();
-    villagerGroups = buildVillagers();
     const stations = buildStations();
     stationsRef = stations;
     const hotspots = buildArchitectureHotspots();
@@ -456,6 +454,11 @@
   function buildLights(){
     // warm dusk sky bounce, like late-afternoon light filtering into an open-sided balai
     scene.add(new THREE.HemisphereLight(0xffb877, 0x2a1608, 0.6));
+    // low sun so the exterior kampung (palms, huts) isn't lit only by the
+    // hall's interior point lights and doesn't render as flat black silhouettes
+    const sun = new THREE.DirectionalLight(0xffd9a0, 0.7);
+    sun.position.set(30, 40, 20);
+    scene.add(sun);
     const entranceGlow = new THREE.PointLight(0xffcf8a, 1.3, 12, 2);
     entranceGlow.position.set(0, 3.2, 6.5);
     scene.add(entranceGlow);
@@ -600,8 +603,11 @@
     }
     const tex = new THREE.CanvasTexture(c);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(24,24);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(96,96),
+    tex.repeat.set(65,65);
+    // sized so its edge stays beyond the camera's far plane (60) from any point
+    // within the walkable world bounds (+-40) — otherwise the edge shows as a
+    // hard line cutting across the horizon once you walk far enough outside
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(260,260),
       new THREE.MeshStandardMaterial({ map: tex, roughness: 1 }));
     ground.rotation.x = -Math.PI/2;
     ground.position.y = -0.02;
@@ -709,34 +715,6 @@
   }
 
   // ---------- villagers: a few decorative kampung folk sharing the hall ----------
-  function buildVillager(x,z,color){
-    const group = new THREE.Group();
-    group.position.set(x,0,z);
-    const skinMat = new THREE.MeshStandardMaterial({ color:0xd9a066, roughness:0.6 });
-    const clothMat = new THREE.MeshStandardMaterial({ color, roughness:0.7 });
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.22,0.9,10), clothMat);
-    body.position.y = 0.55;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.14,12,12), skinMat);
-    head.position.y = 1.1;
-    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.15,0.12,10), clothMat);
-    hat.position.y = 1.24;
-    const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.5,6), clothMat);
-    armL.position.set(-0.2,0.65,0); armL.rotation.z = 0.3;
-    const armR = armL.clone();
-    armR.position.x = 0.2; armR.rotation.z = -0.3;
-    group.add(body, head, hat, armL, armR);
-    scene.add(group);
-    return group;
-  }
-
-  function buildVillagers(){
-    return [
-      buildVillager(-3, 3.5, 0x3a6ea5),
-      buildVillager(3, 1.5, 0x5c8a3a),
-      buildVillager(0, -4.5, 0x9c4a3a),
-    ];
-  }
-
   // ---------- room: a balai (open-sided traditional Malay pavilion hall) ----------
   function buildRoom(){
     const floorMat = new THREE.MeshStandardMaterial({ map: makeWoodPlankTexture(), roughness: 0.85, metalness: 0.05 });
@@ -972,6 +950,28 @@
     return { def, group, marker, label, active: 0, worldPos: new THREE.Vector3() };
   }
 
+  // ---------- shared helper: a looping video panel used by video-backed stations ----------
+  function buildVideoScreen(performer, def, videoSrc){
+    const video = document.createElement('video');
+    video.src = videoSrc;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.play().catch(() => {});
+
+    const videoTex = new THREE.VideoTexture(video);
+    const bezel = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.76, 1.02),
+      new THREE.MeshStandardMaterial({ color: 0x1a1206, emissive: def.color, emissiveIntensity: 0.15, roughness:0.6 })
+    );
+    bezel.position.set(0, 0.3, -0.02);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex }));
+    screen.position.set(0, 0.3, 0);
+    performer.add(bezel, screen);
+    performer.userData.videoEl = video;
+    performer.userData.screen = screen;
+  }
+
   function buildStation(def){
     const group = new THREE.Group();
     group.position.set(def.pos[0], 0, def.pos[2]);
@@ -1002,15 +1002,7 @@
     const partsMat = new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.25, roughness:0.35, metalness:0.4 });
 
     if (def.key === 'tarian'){
-      const body = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.1, 16), partsMat);
-      body.position.y = 0.2;
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), partsMat);
-      head.position.y = 0.95;
-      const skirt = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 8, 32), partsMat);
-      skirt.position.y = -0.35;
-      skirt.rotation.x = Math.PI/2;
-      performer.add(body, head, skirt);
-      performer.userData.skirt = skirt;
+      buildVideoScreen(performer, def, 'assets/videos/tarian_clip.mp4');
     } else if (def.key === 'nyanyian'){
       const bars = [];
       for (let i=-3;i<=3;i++){
@@ -1021,24 +1013,7 @@
       }
       performer.userData.bars = bars;
     } else if (def.key === 'silat'){
-      const video = document.createElement('video');
-      video.src = 'assets/videos/silat_clip.mp4';
-      video.loop = true;
-      video.muted = true;
-      video.playsInline = true;
-      video.play().catch(() => {});
-
-      const videoTex = new THREE.VideoTexture(video);
-      const bezel = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.76, 1.02),
-        new THREE.MeshStandardMaterial({ color: 0x1a1206, emissive: def.color, emissiveIntensity: 0.15, roughness:0.6 })
-      );
-      bezel.position.set(0, 0.3, -0.02);
-      const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex }));
-      screen.position.set(0, 0.3, 0);
-      performer.add(bezel, screen);
-      performer.userData.videoEl = video;
-      performer.userData.screen = screen;
+      buildVideoScreen(performer, def, 'assets/videos/silat_clip.mp4');
     } else if (def.key === 'pakaian'){
       const clothTex = makeKerawangTexture('#5c2a1f', '#e8c468', 3, 4);
       const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.3),
@@ -1228,8 +1203,6 @@
     const camWorld = new THREE.Vector3();
     camera.getWorldPosition(camWorld);
 
-    villagerGroups.forEach((v,i) => { v.rotation.y = Math.sin(t*0.3 + i*2)*0.15; });
-
     points.forEach(st => {
       st.group.getWorldPosition(st.worldPos);
       const dist = camWorld.distanceTo(st.worldPos);
@@ -1251,17 +1224,14 @@
 
       // idle + active animation per type (stations only — hotspots have no performer)
       if (st.performer){
-        if (st.def.key === 'tarian'){
-          st.performer.rotation.y = t*0.5;
-          if (st.performer.userData.skirt) st.performer.userData.skirt.rotation.z = Math.sin(t*3)*0.15*(0.3+st.active);
+        if (st.def.key === 'tarian' || st.def.key === 'silat'){
+          const pulse = 1 + Math.sin(t*2)*0.02*(0.3+st.active);
+          st.performer.userData.screen.scale.setScalar(pulse);
         } else if (st.def.key === 'nyanyian'){
           st.performer.userData.bars.forEach((b,i) => {
             const h = 0.4 + Math.abs(Math.sin(t*4 + i))*0.5*(0.25+st.active);
             b.scale.y = h/0.4;
           });
-        } else if (st.def.key === 'silat'){
-          const pulse = 1 + Math.sin(t*2)*0.02*(0.3+st.active);
-          st.performer.userData.screen.scale.setScalar(pulse);
         } else if (st.def.key === 'pakaian'){
           st.performer.rotation.y = Math.sin(t*0.6)*0.2;
         } else if (st.def.key === 'kraf'){
