@@ -99,6 +99,11 @@
     background:rgba(20,14,6,0.65); color:#f2e2b6; border:1px solid rgba(242,217,138,0.6);
     font-family: Georgia, serif; font-weight:700; cursor:pointer;
   }
+  #tapForSoundHint {
+    position:fixed; left:0; right:0; bottom:80px; z-index:31; text-align:center;
+    font-family: Georgia, serif; font-size:13px; letter-spacing:1px; color:#f2e2b6;
+    text-shadow:0 2px 8px rgba(0,0,0,.8); pointer-events:none;
+  }
   #logoRow {
     display:flex; align-items:center; gap:10px; margin-bottom:10px; pointer-events:none;
   }
@@ -119,6 +124,7 @@
 <div id="introScreen">
   <video id="introVideo" src="assets/videos/intro_opening.mp4" autoplay muted playsinline></video>
 </div>
+<div id="tapForSoundHint">🔊 KETIK SKRIN UNTUK BUNYI / TAP SCREEN FOR SOUND</div>
 <div id="introControls">
   <button id="skipIntroBtn">SKIP ▶</button>
 </div>
@@ -206,7 +212,7 @@
     scene = new THREE.Scene();
     // fog matches the sky dome's horizon tone so distant objects fade
     // seamlessly into the sky instead of hitting a hard, mismatched edge
-    scene.fog = new THREE.FogExp2(0x8a6a45, 0.025);
+    scene.fog = new THREE.FogExp2(0xbcdcf0, 0.025);
 
     camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.05, 60);
     camera.position.set(0, 1.6, 0);
@@ -282,12 +288,14 @@
   function setupIntroScreen(){
     const introScreen = document.getElementById('introScreen');
     const introControls = document.getElementById('introControls');
+    const soundHint = document.getElementById('tapForSoundHint');
     const video = document.getElementById('introVideo');
     const skipBtn = document.getElementById('skipIntroBtn');
 
     function endIntro(){
       introScreen.style.display = 'none';
       introControls.style.display = 'none';
+      soundHint.style.display = 'none';
       video.pause();
     }
 
@@ -295,9 +303,13 @@
     video.addEventListener('error', endIntro);
     skipBtn.addEventListener('click', endIntro);
 
-    // autoplay policy requires the intro to start muted -- there's no
-    // separate unmute button, so the very first click anywhere unmutes it
-    document.addEventListener('click', () => { video.muted = false; }, { once:true, capture:true });
+    // autoplay policy requires the intro to start muted -- tapping the video
+    // itself (not Skip, a sibling element so this won't fire for that click)
+    // unmutes it without ending the intro
+    introScreen.addEventListener('click', () => {
+      video.muted = false;
+      soundHint.style.display = 'none';
+    }, { once:true });
   }
 
   // ---------- ambient background music ----------
@@ -606,9 +618,9 @@
     c.width = 2; c.height = 256;
     const ctx = c.getContext('2d');
     const grad = ctx.createLinearGradient(0,0,0,256);
-    grad.addColorStop(0, '#3a2a1a');
-    grad.addColorStop(0.55, '#6b4f34');
-    grad.addColorStop(1, '#8a6a45'); // matches the fog color at the horizon
+    grad.addColorStop(0, '#1e5fa8');
+    grad.addColorStop(0.55, '#4f9bdb');
+    grad.addColorStop(1, '#bcdcf0'); // matches the fog color at the horizon
     ctx.fillStyle = grad;
     ctx.fillRect(0,0,2,256);
     const tex = new THREE.CanvasTexture(c);
