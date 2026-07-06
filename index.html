@@ -120,7 +120,6 @@
   <video id="introVideo" src="assets/videos/intro_opening.mp4" autoplay muted playsinline></video>
 </div>
 <div id="introControls">
-  <button id="unmuteBtn">🔇 UNMUTE</button>
   <button id="skipIntroBtn">SKIP ▶</button>
 </div>
 
@@ -284,7 +283,6 @@
     const introScreen = document.getElementById('introScreen');
     const introControls = document.getElementById('introControls');
     const video = document.getElementById('introVideo');
-    const unmuteBtn = document.getElementById('unmuteBtn');
     const skipBtn = document.getElementById('skipIntroBtn');
 
     function endIntro(){
@@ -295,11 +293,11 @@
 
     video.addEventListener('ended', endIntro);
     video.addEventListener('error', endIntro);
-    unmuteBtn.addEventListener('click', () => {
-      video.muted = !video.muted;
-      unmuteBtn.textContent = video.muted ? '🔇 UNMUTE' : '🔊 MUTE';
-    });
     skipBtn.addEventListener('click', endIntro);
+
+    // autoplay policy requires the intro to start muted -- there's no
+    // separate unmute button, so the very first click anywhere unmutes it
+    document.addEventListener('click', () => { video.muted = false; }, { once:true, capture:true });
   }
 
   // ---------- ambient background music ----------
