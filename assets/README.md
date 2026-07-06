@@ -18,7 +18,7 @@ Any real photographed or licensed textile/wall textures (batik, songket, etc.) t
 replace the current procedurally-drawn placeholder pattern. PNG/JPG, ideally
 seamless/tileable, 512x512 or 1024x1024.
 
-## Naming conventio
+## Naming convention
 
 Use the station key as a prefix so it's obvious what maps to what:
 
