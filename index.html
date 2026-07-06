@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galeri Warisan Maya — VR Prototype</title>
+<style>
+  html, body { margin:0; padding:0; overflow:hidden; height:100%; background:#0a0e1a; }
+  canvas { display:block; }
+  #overlay {
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:18px 22px; pointer-events:none;
+    font-family: Georgia, 'Times New Roman', serif;
+    color:#f2e2b6;
+  }
+  #titleblock { pointer-events:none; }
+  #titleblock h1 {
+    margin:0; font-size:20px; letter-spacing:2px; font-weight:700;
+    text-shadow: 0 2px 8px rgba(0,0,0,.7);
+  }
+  #titleblock p {
+    margin:4px 0 0; font-size:12px; font-style:italic; color:#c9a961;
+    text-shadow: 0 2px 6px rgba(0,0,0,.7);
+  }
+  #hint {
+    max-width:260px; font-size:12px; line-height:1.5; text-align:right;
+    color:#e8d9ad; text-shadow:0 2px 6px rgba(0,0,0,.8);
+  }
+  #vr-button {
+    pointer-events:auto;
+    margin-top:10px; padding:10px 20px; border-radius:999px;
+    background: linear-gradient(135deg,#c9a227,#8a6a10);
+    color:#1a1206; border:1px solid #f2d98a; font-weight:700;
+    letter-spacing:1px; font-family: Georgia, serif; font-size:13px;
+    cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+  #vr-button:disabled { opacity:.5; cursor:default; }
+  #startScreen {
+    position:fixed; inset:0; z-index:20; background:radial-gradient(ellipse at center, #1a1206 0%, #0a0e1a 70%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#f2e2b6; font-family: Georgia, serif; text-align:center; padding:20px;
+  }
+  #startScreen h1 { font-size:32px; letter-spacing:3px; margin-bottom:6px; }
+  #startScreen p { color:#c9a961; font-style:italic; margin-top:0; }
+  #startScreen button {
+    margin-top:28px; padding:14px 36px; border-radius:999px; font-size:15px;
+    background: linear-gradient(135deg,#c9a227,#8a6a10); color:#1a1206;
+    border:1px solid #f2d98a; font-weight:700; letter-spacing:1px; cursor:pointer;
+  }
+  #startScreen small { margin-top:18px; color:#8a7a5a; max-width:420px; font-size:11px; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<div id="startScreen">
+  <h1>GALERI WARISAN MAYA</h1>
+  <p>"Walking through time, stepping into culture."</p>
+  <button id="enterBtn">MASUK GALERI / ENTER GALLERY</button>
+  <small>Desktop: click to enable mouse-look, then WASD to walk. On a Meta Quest browser, use the ENTER VR button that appears top-right once you're inside.</small>
+</div>
+
+<div id="overlay" style="display:none;">
+  <div id="titleblock">
+    <h1>GALERI WARISAN MAYA</h1>
+    <p>The Living Heritage Gallery — Tema: Warisan</p>
+  </div>
+  <div id="hint">
+    <div>WASD — jalan &nbsp;|&nbsp; Click — lihat sekeliling</div>
+    <div>Berjalan dekat setiap pameran untuk mengaktifkannya</div>
+    <button id="vr-button" disabled>MEMERIKSA VR…</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+
+  /* ------------------------------------------------------------------
+     GALERI WARISAN MAYA — WebXR prototype
+     This is a placeholder / proof-of-concept, not the final asset set.
+     To upgrade toward the final build:
+       - Swap the abstract geometric "performers" below for real 3D
+         character animations or 360 video panels (THREE.VideoTexture).
+       - Swap the oscillator tones for real recorded music/narration
+         using THREE.PositionalAudio with an AudioLoader + audio files.
+       - Swap the procedural batik wall texture for real texture photos.
+     Everything else (proximity triggers, spatial audio falloff,
+     room-scale locomotion, WebXR support) is functional as-is.
+  ------------------------------------------------------------------- */
+
+  let camera, scene, renderer, player;
+  let raf;
+  const clock = new THREE.Clock();
+  const keys = {};
+  let yaw = 0, pitch = 0;
+  let audioReady = false;
+
+  const ROOM = { width: 16, depth: 16, height: 4.5 };
+
+  init();
+
+  function init(){
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0a0e1a, 0.045);
+
+    camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.05, 60);
+    camera.position.set(0, 1.6, 0);
+
+    player = new THREE.Group();
+    player.position.set(0, 0, 6.5);
+    player.add(camera);
+    scene.add(player);
+
+    renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.xr.enabled = true;
+    if (renderer.xr.setReferenceSpaceType) renderer.xr.setReferenceSpaceType('local-floor');
+    document.body.appendChild(renderer.domElement);
+
+    buildLights();
+    buildRoom();
+    const stations = buildStations();
+    const listener = new THREE.AudioListener();
+    camera.add(listener);
+    stations.forEach(s => attachAudio(s, listener));
+    buildTitleSprite();
+
+    window.addEventListener('resize', onResize);
+    document.addEventListener('keydown', e => keys[e.code] = true);
+    document.addEventListener('keyup', e => keys[e.code] = false);
+
+    renderer.domElement.addEventListener('click', () => {
+      if (!renderer.xr.isPresenting) renderer.domElement.requestPointerLock();
+    });
+    document.addEventListener('mousemove', onMouseMove);
+
+    setupVRButton();
+    setupStartScreen(listener);
+
+    renderer.setAnimationLoop(() => animate(stations));
+  }
+
+  // ---------- start / audio unlock ----------
+  function setupStartScreen(listener){
+    document.getElementById('enterBtn').addEventListener('click', () => {
+      document.getElementById('startScreen').style.display = 'none';
+      document.getElementById('overlay').style.display = 'flex';
+      if (listener.context.state === 'suspended') listener.context.resume();
+      audioReady = true;
+      renderer.domElement.requestPointerLock();
+    });
+  }
+
+  // ---------- lights ----------
+  function buildLights(){
+    scene.add(new THREE.HemisphereLight(0x8899bb, 0x0a0603, 0.55));
+    const warm = new THREE.PointLight(0xffcf8a, 1.1, 14, 2);
+    warm.position.set(0, 3.6, 3);
+    scene.add(warm);
+    [[-5,0,-3],[5,0,-3],[0,0,-7]].forEach(p => {
+      const spot = new THREE.PointLight(0xffe3b0, 0.9, 8, 2);
+      spot.position.set(p[0], 3.2, p[2]+1.5);
+      scene.add(spot);
+    });
+  }
+
+  // ---------- procedural batik-style wall texture ----------
+  function makeBatikTexture(bg, line){
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,256,256);
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.65;
+    for (let y = -256; y < 512; y += 32){
+      ctx.beginPath();
+      for (let x = 0; x <= 256; x += 32){
+        ctx.moveTo(x, y + (x%64===0?0:16));
+        ctx.lineTo(x+16, y+16 + (x%64===0?0:16));
+        ctx.lineTo(x+32, y + (x%64===0?0:16));
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.35;
+    for (let i=0;i<40;i++){
+      const x = Math.random()*256, y = Math.random()*256, r = 2+Math.random()*3;
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle = line; ctx.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(4,2);
+    return tex;
+  }
+
+  // ---------- room ----------
+  function buildRoom(){
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x241810, roughness: 0.85, metalness: 0.05 });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, ROOM.depth), floorMat);
+    floor.rotation.x = -Math.PI/2;
+    scene.add(floor);
+
+    const ceilMat = new THREE.MeshStandardMaterial({ color: 0x0a0e1a, roughness: 1 });
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, ROOM.depth), ceilMat);
+    ceiling.rotation.x = Math.PI/2;
+    ceiling.position.y = ROOM.height;
+    scene.add(ceiling);
+
+    const wallTex = makeBatikTexture('#3a1420', '#c9a227');
+    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9 });
+
+    const north = new THREE.Mesh(new THREE.BoxGeometry(ROOM.width, ROOM.height, 0.3), wallMat);
+    north.position.set(0, ROOM.height/2, -ROOM.depth/2);
+    scene.add(north);
+
+    const west = new THREE.Mesh(new THREE.BoxGeometry(0.3, ROOM.height, ROOM.depth), wallMat);
+    west.position.set(-ROOM.width/2, ROOM.height/2, 0);
+    scene.add(west);
+
+    const east = west.clone();
+    east.position.set(ROOM.width/2, ROOM.height/2, 0);
+    scene.add(east);
+  }
+
+  // ---------- text sprite ----------
+  function makeLabel(text, sub){
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 160;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = 'rgba(10,8,4,0.72)';
+    roundRect(ctx, 4,4, 504,152, 18); ctx.fill();
+    ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 3;
+    roundRect(ctx, 4,4, 504,152, 18); ctx.stroke();
+    ctx.fillStyle = '#f2e2b6';
+    ctx.font = '700 42px Georgia';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, 256, 76);
+    ctx.font = 'italic 22px Georgia';
+    ctx.fillStyle = '#c9a961';
+    ctx.fillText(sub || '', 256, 116);
+    const tex = new THREE.CanvasTexture(c);
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0 });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(2.4, 0.75, 1);
+    return sprite;
+  }
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  function buildTitleSprite(){
+    const s = makeLabel('GALERI WARISAN MAYA', 'Walking through time, stepping into culture');
+    s.position.set(0, 3.1, 2.5);
+    s.material.opacity = 1;
+    scene.add(s);
+  }
+
+  // ---------- stations ----------
+  function buildStations(){
+    const defs = [
+      { key:'tarian',   name:'TARIAN',   sub:'Traditional Dance',  color:0xd4a017, pos:[-5,0,-3], freq:220, wave:'sine' },
+      { key:'nyanyian', name:'NYANYIAN', sub:'Traditional Singing',color:0x2a9d8f, pos:[5,0,-3],  freq:330, wave:'triangle' },
+      { key:'silat',    name:'SILAT',    sub:'Martial Arts',       color:0xa1273d, pos:[0,0,-7],  freq:110, wave:'sawtooth' },
+    ];
+    return defs.map(buildStation);
+  }
+
+  function buildStation(def){
+    const group = new THREE.Group();
+    group.position.set(def.pos[0], 0, def.pos[2]);
+    scene.add(group);
+
+    // base pedestal
+    const base = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.9, 1.05, 0.4, 24),
+      new THREE.MeshStandardMaterial({ color: 0x1a1206, roughness:0.6, metalness:0.3 })
+    );
+    base.position.y = 0.2;
+    group.add(base);
+
+    // glowing ring (proximity indicator)
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.15, 0.04, 12, 48),
+      new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.15, roughness:0.4 })
+    );
+    ring.rotation.x = Math.PI/2;
+    ring.position.y = 0.02;
+    group.add(ring);
+
+    // abstract "performer" sculpture, unique per art form
+    const performer = new THREE.Group();
+    performer.position.y = 0.9;
+    group.add(performer);
+
+    const partsMat = new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.25, roughness:0.35, metalness:0.4 });
+
+    if (def.key === 'tarian'){
+      const body = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.1, 16), partsMat);
+      body.position.y = 0.2;
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), partsMat);
+      head.position.y = 0.95;
+      const skirt = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 8, 32), partsMat);
+      skirt.position.y = -0.35;
+      skirt.rotation.x = Math.PI/2;
+      performer.add(body, head, skirt);
+      performer.userData.skirt = skirt;
+    } else if (def.key === 'nyanyian'){
+      const bars = [];
+      for (let i=-3;i<=3;i++){
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.4, 0.14), partsMat);
+        bar.position.set(i*0.18, 0, 0);
+        performer.add(bar);
+        bars.push(bar);
+      }
+      performer.userData.bars = bars;
+    } else {
+      const blade1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.08), partsMat);
+      const blade2 = blade1.clone();
+      blade2.rotation.z = Math.PI/2;
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16),
+        new THREE.MeshStandardMaterial({ color: 0xffe3b0, emissive: 0xffcf8a, emissiveIntensity: 0.6 }));
+      performer.add(blade1, blade2, core);
+      performer.userData.blades = [blade1, blade2];
+      performer.userData.core = core;
+    }
+
+    const label = makeLabel(def.name, def.sub);
+    label.position.set(0, 2.1, 0);
+    group.add(label);
+
+    return {
+      def, group, ring, performer, label,
+      active: 0, // 0..1 smoothed activation
+      worldPos: new THREE.Vector3()
+    };
+  }
+
+  // ---------- audio ----------
+  function attachAudio(station, listener){
+    const sound = new THREE.PositionalAudio(listener);
+    sound.setRefDistance(1);
+    sound.setRolloffFactor(2.2);
+    sound.setDistanceModel('exponential');
+    sound.setVolume(0);
+    station.group.add(sound);
+    station.sound = sound;
+    station.oscStarted = false;
+  }
+
+  function ensureOscillator(station, ctx){
+    if (station.oscStarted) return;
+    const osc = ctx.createOscillator();
+    osc.type = station.def.wave;
+    osc.frequency.value = station.def.freq;
+    osc.start();
+    station.sound.setNodeSource(osc);
+    station.oscStarted = true;
+  }
+
+  // ---------- input ----------
+  function onMouseMove(e){
+    if (document.pointerLockElement !== renderer.domElement) return;
+    yaw   -= e.movementX * 0.0025;
+    pitch -= e.movementY * 0.0025;
+    pitch = Math.max(-1.3, Math.min(1.3, pitch));
+    player.rotation.y = yaw;
+    camera.rotation.x = pitch;
+  }
+
+  const fwd = new THREE.Vector3(), right = new THREE.Vector3(), tmp = new THREE.Vector3();
+  function desktopMove(dt){
+    if (renderer.xr.isPresenting) return;
+    fwd.set(Math.sin(yaw), 0, Math.cos(yaw)).multiplyScalar(-1);
+    right.set(fwd.z, 0, -fwd.x);
+    const speed = 3.2 * dt;
+    if (keys['KeyW']||keys['ArrowUp'])    player.position.addScaledVector(fwd, speed);
+    if (keys['KeyS']||keys['ArrowDown'])  player.position.addScaledVector(fwd, -speed);
+    if (keys['KeyA']||keys['ArrowLeft'])  player.position.addScaledVector(right, -speed);
+    if (keys['KeyD']||keys['ArrowRight']) player.position.addScaledVector(right, speed);
+    clampToRoom();
+  }
+
+  function vrMove(dt){
+    if (!renderer.xr.isPresenting) return;
+    const session = renderer.xr.getSession();
+    if (!session) return;
+    for (const src of session.inputSources){
+      if (!src.gamepad) continue;
+      const axes = src.gamepad.axes;
+      const ax = axes.length >= 4 ? axes[2] : axes[0];
+      const ay = axes.length >= 4 ? axes[3] : axes[1];
+      if (Math.abs(ax) < 0.12 && Math.abs(ay) < 0.12) continue;
+      camera.getWorldDirection(tmp);
+      tmp.y = 0; tmp.normalize();
+      const r = new THREE.Vector3(tmp.z, 0, -tmp.x);
+      const speed = 2.6 * dt;
+      player.position.addScaledVector(tmp, -ay * speed);
+      player.position.addScaledVector(r, ax * speed);
+    }
+    clampToRoom();
+  }
+
+  function clampToRoom(){
+    const m = 0.8;
+    player.position.x = Math.max(-ROOM.width/2+m, Math.min(ROOM.width/2-m, player.position.x));
+    player.position.z = Math.max(-ROOM.depth/2+m, Math.min(ROOM.depth/2-m, player.position.z));
+  }
+
+  // ---------- VR button ----------
+  function setupVRButton(){
+    const button = document.getElementById('vr-button');
+    if (!('xr' in navigator)){
+      button.textContent = 'VR TIDAK DISOKONG';
+      button.disabled = true;
+      return;
+    }
+    navigator.xr.isSessionSupported('immersive-vr').then(supported => {
+      if (!supported){ button.textContent = 'VR TIDAK DISOKONG'; button.disabled = true; return; }
+      button.disabled = false;
+      button.textContent = 'ENTER VR';
+      let currentSession = null;
+      button.onclick = () => {
+        if (!currentSession){
+          navigator.xr.requestSession('immersive-vr', { optionalFeatures:['local-floor','bounded-floor'] })
+            .then(session => {
+              session.addEventListener('end', () => { currentSession = null; button.textContent = 'ENTER VR'; });
+              renderer.xr.setSession(session);
+              currentSession = session;
+              button.textContent = 'EXIT VR';
+              if (!audioReady){
+                document.getElementById('startScreen').style.display = 'none';
+                document.getElementById('overlay').style.display = 'flex';
+                audioReady = true;
+              }
+            });
+        } else {
+          currentSession.end();
+        }
+      };
+    }).catch(() => { button.textContent = 'VR TIDAK DISOKONG'; button.disabled = true; });
+  }
+
+  // ---------- resize ----------
+  function onResize(){
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  // ---------- animate ----------
+  function animate(stations){
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t = clock.elapsedTime;
+
+    desktopMove(dt);
+    vrMove(dt);
+
+    const camWorld = new THREE.Vector3();
+    camera.getWorldPosition(camWorld);
+
+    stations.forEach(st => {
+      st.group.getWorldPosition(st.worldPos);
+      const dist = camWorld.distanceTo(st.worldPos);
+      const targetActive = dist < 2.6 ? 1 : 0;
+      st.active += (targetActive - st.active) * Math.min(1, dt*4);
+
+      // ring glow
+      st.ring.material.emissiveIntensity = 0.15 + st.active * 1.4;
+      st.ring.scale.setScalar(1 + st.active*0.08 + Math.sin(t*2)*0.01);
+
+      // label fade
+      st.label.material.opacity = st.active;
+      st.label.position.y = 2.1 + st.active*0.15;
+
+      // idle + active animation per type
+      if (st.def.key === 'tarian'){
+        st.performer.rotation.y = t*0.5;
+        if (st.performer.userData.skirt) st.performer.userData.skirt.rotation.z = Math.sin(t*3)*0.15*(0.3+st.active);
+      } else if (st.def.key === 'nyanyian'){
+        st.performer.userData.bars.forEach((b,i) => {
+          const h = 0.4 + Math.abs(Math.sin(t*4 + i))*0.5*(0.25+st.active);
+          b.scale.y = h/0.4;
+        });
+      } else {
+        st.performer.rotation.y = t*0.8;
+        st.performer.userData.blades.forEach((b,i) => b.rotation.x = t*(1+i*0.3));
+        const pulse = 1 + Math.sin(t*6)*0.15*(0.3+st.active);
+        st.performer.userData.core.scale.setScalar(pulse);
+      }
+
+      // audio
+      if (audioReady && st.sound && st.sound.context.state === 'running'){
+        ensureOscillator(st, st.sound.context);
+        st.sound.setVolume(st.active * 0.35);
+      }
+    });
+
+    renderer.render(scene, camera);
+  }
+
+})();
+</script>
+</body>
+</html>
