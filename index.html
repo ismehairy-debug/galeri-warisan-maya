@@ -183,6 +183,7 @@
   const keys = {};
   let yaw = 0, pitch = 0;
   let audioReady = false;
+  let stationsRef = [];
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   let gyroActive = false;
@@ -221,6 +222,7 @@
     buildRoof();
     buildGateway();
     const stations = buildStations();
+    stationsRef = stations;
     const hotspots = buildArchitectureHotspots();
     const allPoints = stations.concat(hotspots);
     const listener = new THREE.AudioListener();
@@ -287,6 +289,17 @@
     skipBtn.addEventListener('click', endIntro);
   }
 
+  // ---------- unmute station video audio (needs a user gesture) ----------
+  function unlockStationMedia(){
+    stationsRef.forEach(st => {
+      const video = st.performer && st.performer.userData && st.performer.userData.videoEl;
+      if (video){
+        video.muted = false;
+        video.play().catch(() => {});
+      }
+    });
+  }
+
   // ---------- start / audio unlock ----------
   function setupStartScreen(listener){
     if (isTouchDevice){
@@ -301,6 +314,7 @@
       document.getElementById('overlay').style.display = 'flex';
       if (listener.context.state === 'suspended') listener.context.resume();
       audioReady = true;
+      unlockStationMedia();
       if (isTouchDevice) requestGyroPermission();
       else renderer.domElement.requestPointerLock();
     });
@@ -897,13 +911,18 @@
     station.oscStarted = false;
   }
 
-  function ensureOscillator(station, ctx){
+  function ensureStationAudio(station, ctx){
     if (station.oscStarted) return;
-    const osc = ctx.createOscillator();
-    osc.type = station.def.wave;
-    osc.frequency.value = station.def.freq;
-    osc.start();
-    station.sound.setNodeSource(osc);
+    const videoEl = station.performer && station.performer.userData && station.performer.userData.videoEl;
+    if (videoEl){
+      station.sound.setMediaElementSource(videoEl);
+    } else {
+      const osc = ctx.createOscillator();
+      osc.type = station.def.wave;
+      osc.frequency.value = station.def.freq;
+      osc.start();
+      station.sound.setNodeSource(osc);
+    }
     station.oscStarted = true;
   }
 
@@ -982,6 +1001,7 @@
                 document.getElementById('overlay').style.display = 'flex';
                 audioReady = true;
               }
+              unlockStationMedia();
             });
         } else {
           currentSession.end();
@@ -1056,7 +1076,7 @@
 
       // audio (stations only — hotspots carry no sound source)
       if (audioReady && st.sound && st.sound.context.state === 'running'){
-        ensureOscillator(st, st.sound.context);
+        ensureStationAudio(st, st.sound.context);
         st.sound.setVolume(st.active * 0.35);
       }
     });
@@ -1068,3 +1088,4 @@
 </script>
 </body>
 </html>
+
