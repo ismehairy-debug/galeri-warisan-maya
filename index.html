@@ -46,6 +46,14 @@
     cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
     display:none;
   }
+  #bgm-button {
+    pointer-events:auto;
+    margin-top:8px; padding:10px 20px; border-radius:999px;
+    background: linear-gradient(135deg,#8a5fae,#4a2f6a);
+    color:#f2e6ff; border:1px solid #c9a7ea; font-weight:700;
+    letter-spacing:1px; font-family: Georgia, serif; font-size:13px;
+    cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
   #joystick-base {
     position:fixed; left:26px; bottom:26px; width:120px; height:120px;
     border-radius:50%; background:rgba(30,18,8,0.45); border:2px solid rgba(201,162,39,0.6);
@@ -148,11 +156,16 @@
     <button id="vr-button" disabled>MEMERIKSA VR…</button>
     <br>
     <button id="gyro-button">GUNA GYRO / ENABLE GYRO</button>
+    <br>
+    <button id="bgm-button">🎵 MUTE MUSIC (M)</button>
   </div>
 </div>
 
 <div id="joystick-base"><div id="joystick-knob"></div></div>
 
+<div id="bgMusicPlayer" style="position:fixed; width:1px; height:1px; opacity:0; pointer-events:none; overflow:hidden;"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
@@ -187,6 +200,9 @@
   let yaw = 0, pitch = 0;
   let audioReady = false;
   let stationsRef = [];
+  let bgMusicPlayer = null;
+  let bgMusicReady = false;
+  let bgMusicShouldPlay = false;
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   let gyroActive = false;
@@ -251,6 +267,7 @@
     setupVRButton();
     setupLoadingScreen();
     setupIntroScreen();
+    setupBackgroundMusic();
     setupStartScreen(listener);
 
     renderer.setAnimationLoop(() => animate(allPoints));
@@ -297,6 +314,41 @@
     skipBtn.addEventListener('click', endIntro);
   }
 
+  // ---------- ambient background music (YouTube embed, audio only) ----------
+  function setupBackgroundMusic(){
+    window.onYouTubeIframeAPIReady = () => {
+      bgMusicPlayer = new YT.Player('bgMusicPlayer', {
+        videoId: 'iR13QDfpZ1U',
+        playerVars: { autoplay:0, controls:0, disablekb:1, loop:1, playlist:'iR13QDfpZ1U', playsinline:1 },
+        events: {
+          onReady: () => {
+            bgMusicReady = true;
+            bgMusicPlayer.setVolume(30);
+            if (bgMusicShouldPlay) bgMusicPlayer.playVideo();
+          }
+        }
+      });
+    };
+
+    document.getElementById('bgm-button').addEventListener('click', toggleBackgroundMusic);
+    // pointer lock (engaged on desktop after entering) freezes click targeting for any
+    // on-screen button, so the M key is the reliable way to toggle music on desktop
+    document.addEventListener('keydown', e => { if (e.code === 'KeyM') toggleBackgroundMusic(); });
+  }
+
+  function toggleBackgroundMusic(){
+    bgMusicShouldPlay = !bgMusicShouldPlay;
+    document.getElementById('bgm-button').textContent = bgMusicShouldPlay ? '🎵 MUTE MUSIC (M)' : '🎵 PLAY MUSIC (M)';
+    if (!bgMusicReady) return;
+    if (bgMusicShouldPlay) bgMusicPlayer.playVideo();
+    else bgMusicPlayer.pauseVideo();
+  }
+
+  function startBackgroundMusic(){
+    bgMusicShouldPlay = true;
+    if (bgMusicReady) bgMusicPlayer.playVideo();
+  }
+
   // ---------- unmute station video audio (needs a user gesture) ----------
   function unlockStationMedia(){
     stationsRef.forEach(st => {
@@ -323,6 +375,7 @@
       if (listener.context.state === 'suspended') listener.context.resume();
       audioReady = true;
       unlockStationMedia();
+      startBackgroundMusic();
       if (isTouchDevice) requestGyroPermission();
       else renderer.domElement.requestPointerLock();
     });
@@ -1175,6 +1228,7 @@
                 audioReady = true;
               }
               unlockStationMedia();
+              startBackgroundMusic();
             });
         } else {
           currentSession.end();
