@@ -192,7 +192,7 @@
   let joyTouchId = null;
   let lookTouchId = null, lastTouchX = 0, lastTouchY = 0;
 
-  const ROOM = { width: 16, depth: 16, height: 4.5 };
+  const ROOM = { width: 20, depth: 18, height: 4.5 };
 
   init();
 
@@ -204,7 +204,7 @@
     camera.position.set(0, 1.6, 0);
 
     player = new THREE.Group();
-    player.position.set(0, 0, 7.6);
+    player.position.set(0, 0, 8.6);
     player.add(camera);
     scene.add(player);
 
@@ -221,6 +221,8 @@
     buildRoof();
     buildGateway();
     const stations = buildStations();
+    const hotspots = buildArchitectureHotspots();
+    const allPoints = stations.concat(hotspots);
     const listener = new THREE.AudioListener();
     camera.add(listener);
     stations.forEach(s => attachAudio(s, listener));
@@ -241,7 +243,7 @@
     setupIntroScreen();
     setupStartScreen(listener);
 
-    renderer.setAnimationLoop(() => animate(stations));
+    renderer.setAnimationLoop(() => animate(allPoints));
   }
 
   // ---------- loading screen ----------
@@ -510,6 +512,24 @@
     return tex;
   }
 
+  // ---------- procedural aged-manuscript texture (Adat & Kesusasteraan) ----------
+  function makeManuscriptTexture(){
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#e8d9ad';
+    ctx.fillRect(0,0,256,256);
+    ctx.strokeStyle = 'rgba(60,40,20,0.55)';
+    ctx.lineWidth = 2;
+    for (let y=22; y<240; y+=17){
+      ctx.beginPath();
+      ctx.moveTo(14,y);
+      for (let x=14; x<242; x+=8) ctx.lineTo(x, y + Math.sin(x*0.3+y)*3);
+      ctx.stroke();
+    }
+    return new THREE.CanvasTexture(c);
+  }
+
   // ---------- room: a balai (open-sided traditional Malay pavilion hall) ----------
   function buildRoom(){
     const floorMat = new THREE.MeshStandardMaterial({ map: makeWoodPlankTexture(), roughness: 0.85, metalness: 0.05 });
@@ -557,7 +577,8 @@
   function buildPillars(){
     const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.75, metalness: 0.05 });
     const capMat = new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0x6a4a10, emissiveIntensity: 0.3, roughness: 0.4, metalness: 0.5 });
-    const positions = [[-8,-5],[-8,2],[8,-5],[8,2]];
+    const halfW = ROOM.width/2 - 0.4;
+    const positions = [[-halfW,-6],[-halfW,4],[halfW,-6],[halfW,4]];
     positions.forEach(p => {
       const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, ROOM.height, 12), woodMat);
       pillar.position.set(p[0], ROOM.height/2, p[1]);
@@ -628,7 +649,7 @@
   // ---------- gerbang: the entrance gateway you walk through ----------
   function buildGateway(){
     const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.75 });
-    const gateZ = 7.4;
+    const gateZ = ROOM.depth/2 - 0.6;
     [-1.7, 1.7].forEach(x => {
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 4.4, 12), woodMat);
       post.position.set(x, 2.2, gateZ);
@@ -694,14 +715,49 @@
     scene.add(s);
   }
 
-  // ---------- stations ----------
+  // ---------- stations: the six branches of Warisan Melayu ----------
   function buildStations(){
     const defs = [
-      { key:'tarian',   name:'TARIAN',   sub:'Traditional Dance',  color:0xd4a017, pos:[-5,0,-3], freq:220, wave:'sine' },
-      { key:'nyanyian', name:'NYANYIAN', sub:'Traditional Singing',color:0x2a9d8f, pos:[5,0,-3],  freq:330, wave:'triangle' },
-      { key:'silat',    name:'SILAT',    sub:'Martial Arts',       color:0xa1273d, pos:[0,0,-7],  freq:110, wave:'sawtooth' },
+      { key:'tarian',   name:'TARIAN',           sub:'Seni Persembahan',        color:0xd4a017, pos:[-6,0,-7], freq:220, wave:'sine' },
+      { key:'nyanyian', name:'NYANYIAN',         sub:'Seni Persembahan',        color:0x2a9d8f, pos:[6,0,-7],  freq:330, wave:'triangle' },
+      { key:'silat',    name:'SILAT',            sub:'Seni Persembahan',        color:0xa1273d, pos:[0,0,-8],  freq:110, wave:'sawtooth' },
+      { key:'pakaian',  name:'SONGKET & BATIK',  sub:'Pakaian & Tekstil',       color:0xb5892f, pos:[-8,0,-2], freq:262, wave:'sine' },
+      { key:'kraf',     name:'KERIS & ANYAMAN',  sub:'Kraf Tangan & Persenjataan', color:0x8a8f99, pos:[-8,0,5], freq:196, wave:'triangle' },
+      { key:'makanan',  name:'HIDANGAN WARISAN', sub:'Makanan Warisan',         color:0xc9622a, pos:[8,0,-2],  freq:294, wave:'sine' },
+      { key:'adat',     name:'PANTUN & ADAT',    sub:'Adat Resam & Kesusasteraan', color:0x6a4fae, pos:[8,0,5], freq:174, wave:'triangle' },
     ];
     return defs.map(buildStation);
+  }
+
+  // ---------- architecture hotspots: Seni Bina, built into the hall itself ----------
+  function buildArchitectureHotspots(){
+    const halfW = ROOM.width/2 - 0.4;
+    const defs = [
+      { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-halfW, 1.3, -6] },
+      { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1] },
+      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 4.1, ROOM.depth/2-0.6] },
+    ];
+    return defs.map(buildHotspot);
+  }
+
+  function buildHotspot(def){
+    const group = new THREE.Group();
+    group.position.set(def.pos[0], 0, def.pos[2]);
+    scene.add(group);
+
+    const marker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.12, 16, 16),
+      new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.5, roughness: 0.4 })
+    );
+    marker.position.y = def.pos[1];
+    group.add(marker);
+
+    const label = makeLabel(def.name, def.sub);
+    label.scale.set(2.2, 0.7, 1);
+    label.position.set(0, def.pos[1] + 0.5, 0);
+    group.add(label);
+
+    return { def, group, marker, label, active: 0, worldPos: new THREE.Vector3() };
   }
 
   function buildStation(def){
@@ -752,7 +808,7 @@
         bars.push(bar);
       }
       performer.userData.bars = bars;
-    } else {
+    } else if (def.key === 'silat'){
       const video = document.createElement('video');
       video.src = 'assets/videos/silat_clip.mp4';
       video.loop = true;
@@ -771,6 +827,51 @@
       performer.add(bezel, screen);
       performer.userData.videoEl = video;
       performer.userData.screen = screen;
+    } else if (def.key === 'pakaian'){
+      const clothTex = makeKerawangTexture('#5c2a1f', '#e8c468', 3, 4);
+      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.3),
+        new THREE.MeshStandardMaterial({ map: clothTex, side: THREE.DoubleSide, roughness: 0.7 }));
+      cloth.rotation.y = 0.2;
+      performer.add(cloth);
+      performer.userData.cloth = cloth;
+    } else if (def.key === 'kraf'){
+      const bladeShape = new THREE.Shape();
+      bladeShape.moveTo(0,-0.6);
+      bladeShape.quadraticCurveTo(0.12,-0.3, 0,-0.05);
+      bladeShape.quadraticCurveTo(-0.12,0.2, 0,0.45);
+      bladeShape.quadraticCurveTo(0.1,0.65, 0,0.85);
+      bladeShape.lineTo(-0.06,0.85);
+      bladeShape.quadraticCurveTo(0.02,0.6,-0.08,0.4);
+      bladeShape.quadraticCurveTo(0.1,0.15,-0.06,-0.1);
+      bladeShape.quadraticCurveTo(0.08,-0.35,-0.05,-0.6);
+      bladeShape.closePath();
+      const keris = new THREE.Mesh(new THREE.ShapeGeometry(bladeShape), partsMat);
+      performer.add(keris);
+      performer.userData.keris = keris;
+    } else if (def.key === 'makanan'){
+      const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.06, 24),
+        new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.6 }));
+      tray.position.y = -0.3;
+      const dish1 = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.22, 10), partsMat);
+      dish1.position.set(-0.22, -0.15, 0);
+      const dish2 = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.05, 8, 16), partsMat);
+      dish2.rotation.x = Math.PI/2;
+      dish2.position.set(0.05, -0.2, 0.15);
+      const dish3 = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), partsMat);
+      dish3.scale.y = 0.6;
+      dish3.position.set(0.2, -0.18, -0.15);
+      performer.add(tray, dish1, dish2, dish3);
+      performer.userData.dishes = [dish1, dish2, dish3];
+    } else if (def.key === 'adat'){
+      const page = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.65),
+        new THREE.MeshStandardMaterial({ map: makeManuscriptTexture(), side: THREE.DoubleSide, roughness: 0.8 }));
+      page.rotation.x = -0.5;
+      page.position.y = -0.1;
+      const quill = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.5, 6), partsMat);
+      quill.rotation.z = 0.6;
+      quill.position.set(0.3, 0.15, 0.1);
+      performer.add(page, quill);
+      performer.userData.page = page;
     }
 
     const label = makeLabel(def.name, def.sub);
@@ -897,7 +998,7 @@
   }
 
   // ---------- animate ----------
-  function animate(stations){
+  function animate(points){
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
 
@@ -909,35 +1010,51 @@
     const camWorld = new THREE.Vector3();
     camera.getWorldPosition(camWorld);
 
-    stations.forEach(st => {
+    points.forEach(st => {
       st.group.getWorldPosition(st.worldPos);
       const dist = camWorld.distanceTo(st.worldPos);
-      const targetActive = dist < 2.6 ? 1 : 0;
+      const targetActive = dist < 3.0 ? 1 : 0;
       st.active += (targetActive - st.active) * Math.min(1, dt*4);
 
-      // ring glow
-      st.ring.material.emissiveIntensity = 0.15 + st.active * 1.4;
-      st.ring.scale.setScalar(1 + st.active*0.08 + Math.sin(t*2)*0.01);
+      // glow (ring for stations, marker for architecture hotspots)
+      if (st.ring){
+        st.ring.material.emissiveIntensity = 0.15 + st.active * 1.4;
+        st.ring.scale.setScalar(1 + st.active*0.08 + Math.sin(t*2)*0.01);
+      }
+      if (st.marker){
+        st.marker.material.emissiveIntensity = 0.3 + st.active * 1.3;
+      }
 
       // label fade
       st.label.material.opacity = st.active;
-      st.label.position.y = 2.1 + st.active*0.15;
+      if (st.ring) st.label.position.y = 2.1 + st.active*0.15;
 
-      // idle + active animation per type
-      if (st.def.key === 'tarian'){
-        st.performer.rotation.y = t*0.5;
-        if (st.performer.userData.skirt) st.performer.userData.skirt.rotation.z = Math.sin(t*3)*0.15*(0.3+st.active);
-      } else if (st.def.key === 'nyanyian'){
-        st.performer.userData.bars.forEach((b,i) => {
-          const h = 0.4 + Math.abs(Math.sin(t*4 + i))*0.5*(0.25+st.active);
-          b.scale.y = h/0.4;
-        });
-      } else {
-        const pulse = 1 + Math.sin(t*2)*0.02*(0.3+st.active);
-        st.performer.userData.screen.scale.setScalar(pulse);
+      // idle + active animation per type (stations only — hotspots have no performer)
+      if (st.performer){
+        if (st.def.key === 'tarian'){
+          st.performer.rotation.y = t*0.5;
+          if (st.performer.userData.skirt) st.performer.userData.skirt.rotation.z = Math.sin(t*3)*0.15*(0.3+st.active);
+        } else if (st.def.key === 'nyanyian'){
+          st.performer.userData.bars.forEach((b,i) => {
+            const h = 0.4 + Math.abs(Math.sin(t*4 + i))*0.5*(0.25+st.active);
+            b.scale.y = h/0.4;
+          });
+        } else if (st.def.key === 'silat'){
+          const pulse = 1 + Math.sin(t*2)*0.02*(0.3+st.active);
+          st.performer.userData.screen.scale.setScalar(pulse);
+        } else if (st.def.key === 'pakaian'){
+          st.performer.rotation.y = Math.sin(t*0.6)*0.2;
+        } else if (st.def.key === 'kraf'){
+          st.performer.rotation.z = Math.sin(t*1.2)*0.08;
+          st.performer.rotation.y = t*0.3;
+        } else if (st.def.key === 'makanan'){
+          st.performer.userData.dishes.forEach((d,i) => { d.position.y = -0.15 - 0.03*i + Math.sin(t*2+i)*0.01; });
+        } else if (st.def.key === 'adat'){
+          st.performer.rotation.y = Math.sin(t*0.4)*0.15;
+        }
       }
 
-      // audio
+      // audio (stations only — hotspots carry no sound source)
       if (audioReady && st.sound && st.sound.context.state === 'running'){
         ensureOscillator(st, st.sound.context);
         st.sound.setVolume(st.active * 0.35);
