@@ -435,7 +435,7 @@
     if (Math.abs(joyState.x) < 0.05 && Math.abs(joyState.y) < 0.05) return;
     camera.getWorldDirection(tmp);
     tmp.y = 0; tmp.normalize();
-    const r = new THREE.Vector3(tmp.z, 0, -tmp.x);
+    const r = new THREE.Vector3(-tmp.z, 0, tmp.x);
     const speed = 2.8*dt;
     player.position.addScaledVector(tmp, -joyState.y*speed);
     player.position.addScaledVector(r, joyState.x*speed);
@@ -902,7 +902,7 @@
   // ---------- audio ----------
   function attachAudio(station, listener){
     const sound = new THREE.PositionalAudio(listener);
-    sound.setRefDistance(1);
+    sound.setRefDistance(3); // matches the proximity activation radius below, so the panner doesn't double-attenuate on top of our own active-based fade
     sound.setRolloffFactor(2.2);
     sound.setDistanceModel('exponential');
     sound.setVolume(0);
@@ -940,7 +940,7 @@
   function desktopMove(dt){
     if (renderer.xr.isPresenting || gyroActive) return;
     fwd.set(Math.sin(yaw), 0, Math.cos(yaw)).multiplyScalar(-1);
-    right.set(fwd.z, 0, -fwd.x);
+    right.set(-fwd.z, 0, fwd.x);
     const speed = 3.2 * dt;
     if (keys['KeyW']||keys['ArrowUp'])    player.position.addScaledVector(fwd, speed);
     if (keys['KeyS']||keys['ArrowDown'])  player.position.addScaledVector(fwd, -speed);
@@ -961,7 +961,7 @@
       if (Math.abs(ax) < 0.12 && Math.abs(ay) < 0.12) continue;
       camera.getWorldDirection(tmp);
       tmp.y = 0; tmp.normalize();
-      const r = new THREE.Vector3(tmp.z, 0, -tmp.x);
+      const r = new THREE.Vector3(-tmp.z, 0, tmp.x);
       const speed = 2.6 * dt;
       player.position.addScaledVector(tmp, -ay * speed);
       player.position.addScaledVector(r, ax * speed);
