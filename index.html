@@ -153,9 +153,8 @@
 
 <div id="joystick-base"><div id="joystick-knob"></div></div>
 
-<div id="bgMusicPlayer" style="position:fixed; width:1px; height:1px; opacity:0; pointer-events:none; overflow:hidden;"></div>
+<audio id="bgMusic" src="assets/audio/anak_ayam.mp3" loop></audio>
 
-<script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
@@ -191,9 +190,6 @@
   let yaw = 0, pitch = 0;
   let audioReady = false;
   let stationsRef = [];
-  let bgMusicPlayer = null;
-  let bgMusicReady = false;
-  let bgMusicShouldPlay = false;
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   let gyroActive = false;
@@ -260,7 +256,6 @@
     setupVRButton();
     setupLoadingScreen();
     setupIntroScreen();
-    setupBackgroundMusic();
     setupStartScreen(listener);
 
     renderer.setAnimationLoop(() => animate(allPoints, clouds, birds));
@@ -307,30 +302,11 @@
     skipBtn.addEventListener('click', endIntro);
   }
 
-  // ---------- ambient background music (YouTube embed, audio only) ----------
-  function setupBackgroundMusic(){
-    window.onYouTubeIframeAPIReady = () => {
-      bgMusicPlayer = new YT.Player('bgMusicPlayer', {
-        videoId: 'iR13QDfpZ1U',
-        playerVars: { autoplay:0, controls:0, disablekb:1, loop:1, playlist:'iR13QDfpZ1U', playsinline:1 },
-        events: {
-          onReady: () => {
-            bgMusicReady = true;
-            bgMusicPlayer.setVolume(30);
-            bgMusicPlayer.unMute();
-            if (bgMusicShouldPlay) bgMusicPlayer.playVideo();
-          }
-        }
-      });
-    };
-  }
-
+  // ---------- ambient background music ----------
   function startBackgroundMusic(){
-    bgMusicShouldPlay = true;
-    if (bgMusicReady){
-      bgMusicPlayer.unMute();
-      bgMusicPlayer.playVideo();
-    }
+    const audio = document.getElementById('bgMusic');
+    audio.volume = 0.4;
+    audio.play().catch(() => {});
   }
 
   // ---------- unmute station video audio (needs a user gesture) ----------
@@ -1075,6 +1051,11 @@
     video.loop = true;
     video.muted = true;
     video.playsInline = true;
+    video.setAttribute('webkit-playsinline', 'true');
+    // many mobile browsers won't reliably decode frames for a video element
+    // that's never attached to the DOM, even when only used as a texture source
+    video.style.cssText = 'position:fixed; width:1px; height:1px; opacity:0; pointer-events:none;';
+    document.body.appendChild(video);
     video.play().catch(() => {});
 
     const videoTex = new THREE.VideoTexture(video);
