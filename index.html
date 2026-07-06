@@ -753,14 +753,24 @@
       }
       performer.userData.bars = bars;
     } else {
-      const blade1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.08), partsMat);
-      const blade2 = blade1.clone();
-      blade2.rotation.z = Math.PI/2;
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16),
-        new THREE.MeshStandardMaterial({ color: 0xffe3b0, emissive: 0xffcf8a, emissiveIntensity: 0.6 }));
-      performer.add(blade1, blade2, core);
-      performer.userData.blades = [blade1, blade2];
-      performer.userData.core = core;
+      const video = document.createElement('video');
+      video.src = 'assets/videos/silat_clip.mp4';
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.play().catch(() => {});
+
+      const videoTex = new THREE.VideoTexture(video);
+      const bezel = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.76, 1.02),
+        new THREE.MeshStandardMaterial({ color: 0x1a1206, emissive: def.color, emissiveIntensity: 0.15, roughness:0.6 })
+      );
+      bezel.position.set(0, 0.3, -0.02);
+      const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex }));
+      screen.position.set(0, 0.3, 0);
+      performer.add(bezel, screen);
+      performer.userData.videoEl = video;
+      performer.userData.screen = screen;
     }
 
     const label = makeLabel(def.name, def.sub);
@@ -923,10 +933,8 @@
           b.scale.y = h/0.4;
         });
       } else {
-        st.performer.rotation.y = t*0.8;
-        st.performer.userData.blades.forEach((b,i) => b.rotation.x = t*(1+i*0.3));
-        const pulse = 1 + Math.sin(t*6)*0.15*(0.3+st.active);
-        st.performer.userData.core.scale.setScalar(pulse);
+        const pulse = 1 + Math.sin(t*2)*0.02*(0.3+st.active);
+        st.performer.userData.screen.scale.setScalar(pulse);
       }
 
       // audio
