@@ -1072,6 +1072,51 @@
     return group;
   }
 
+  // ---------- a simple pitched gable-roof wing, ridge running front-to-back,
+  // with a pointed triangular gable end (and gilded "tunjuk langit" finial)
+  // facing forward -- the real Istana's roofline is a tall central bertingkat
+  // tower flanked by lower gable wings like this, not three matching towers ----------
+  function buildGableRoofWing(width, height, depth, darkWoodMat, goldMat){
+    const group = new THREE.Group();
+    const halfW = width/2;
+    const slopeLen = Math.sqrt(halfW*halfW + height*height);
+    const angle = Math.atan2(height, halfW);
+    [-1, 1].forEach(side => {
+      const slope = new THREE.Mesh(new THREE.BoxGeometry(slopeLen, 0.08, depth), darkWoodMat);
+      slope.position.set(side*halfW/2, height/2, 0);
+      slope.rotation.z = side > 0 ? -angle : angle;
+      group.add(slope);
+    });
+
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, depth + 0.05), goldMat);
+    ridge.position.y = height;
+    group.add(ridge);
+
+    // triangular gable-end caps, double-sided so both the outward and
+    // inward faces render without worrying about winding direction
+    const gableShape = new THREE.Shape();
+    gableShape.moveTo(-halfW, 0);
+    gableShape.lineTo(halfW, 0);
+    gableShape.lineTo(0, height);
+    gableShape.closePath();
+    const gableGeo = new THREE.ShapeGeometry(gableShape);
+    const gableMat = darkWoodMat.clone();
+    gableMat.side = THREE.DoubleSide;
+    [-1, 1].forEach(zSide => {
+      const gable = new THREE.Mesh(gableGeo, gableMat);
+      gable.position.z = zSide * depth/2;
+      group.add(gable);
+
+      const finial = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.42, 4), goldMat);
+      finial.rotation.y = Math.PI/4;
+      finial.position.set(0, height + 0.21, zSide*depth/2);
+      group.add(finial);
+    });
+
+    group.userData.topY = height + 0.42;
+    return group;
+  }
+
   // ---------- a simple seated courtier, cartoon-primitive style, lining the
   // throne hall the way the real audience-hall diorama does ----------
   function buildCourtierFigure(clothColor){
@@ -1220,19 +1265,21 @@
       group.add(flag);
     });
 
-    // bertingkat roof: three separate stacked-tier clusters along the facade --
-    // the real building's signature silhouette, distinct from a single tower
+    // roofline matched to the real building's reference photo: one tall
+    // central bertingkat (stepped pyramidal) tower over the entrance,
+    // flanked by two lower pitched gable wings running the rest of the
+    // facade's width -- not three matching pyramid towers side by side
     const roofBaseY = wallH;
-    const clusters = [
-      buildTieredRoofCluster(3.0, 3, roofBaseY, darkWoodMat, goldMat),
-      buildTieredRoofCluster(4.2, 4, roofBaseY, darkWoodMat, goldMat),
-      buildTieredRoofCluster(3.0, 3, roofBaseY, darkWoodMat, goldMat),
-    ];
-    let topY = roofBaseY;
-    [-5, 0, 5].forEach((cx, i) => {
-      clusters[i].position.x = cx;
-      group.add(clusters[i]);
-      topY = Math.max(topY, clusters[i].userData.topY);
+    const centerTower = buildTieredRoofCluster(4.2, 4, roofBaseY, darkWoodMat, goldMat);
+    group.add(centerTower);
+    let topY = centerTower.userData.topY;
+
+    const wingWidth = 3.6, wingHeight = 1.7, wingDepth = innerD*0.7;
+    [-1, 1].forEach(side => {
+      const wing = buildGableRoofWing(wingWidth, wingHeight, wingDepth, darkWoodMat, goldMat);
+      wing.position.set(side*5.7, roofBaseY, 0);
+      group.add(wing);
+      topY = Math.max(topY, roofBaseY + wing.userData.topY);
     });
 
     // warm glow so the palace reads clearly against the dusk sky at a distance
