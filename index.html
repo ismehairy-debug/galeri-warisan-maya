@@ -700,24 +700,6 @@
     return tex;
   }
 
-  // ---------- procedural aged-manuscript texture (Adat & Kesusasteraan) ----------
-  function makeManuscriptTexture(){
-    const c = document.createElement('canvas');
-    c.width = c.height = 256;
-    const ctx = c.getContext('2d');
-    ctx.fillStyle = '#e8d9ad';
-    ctx.fillRect(0,0,256,256);
-    ctx.strokeStyle = 'rgba(60,40,20,0.55)';
-    ctx.lineWidth = 2;
-    for (let y=22; y<240; y+=17){
-      ctx.beginPath();
-      ctx.moveTo(14,y);
-      for (let x=14; x<242; x+=8) ctx.lineTo(x, y + Math.sin(x*0.3+y)*3);
-      ctx.stroke();
-    }
-    return new THREE.CanvasTexture(c);
-  }
-
   // ---------- helpers: build a wall with real open window gaps ----------
   function computeWallSegments(totalWidth, mullionW, windowW){
     const segments = [];
@@ -1525,10 +1507,9 @@
   }
 
   // ---------- shared helper: a looping video panel used by video-backed stations ----------
-  function buildVideoScreen(performer, def, videoSrc){
+  function buildVideoScreen(performer, def, videoSrc, startTime){
     const video = document.createElement('video');
     video.src = videoSrc;
-    video.loop = true;
     video.muted = true;
     video.playsInline = true;
     video.setAttribute('webkit-playsinline', 'true');
@@ -1536,6 +1517,18 @@
     // that's never attached to the DOM, even when only used as a texture source
     video.style.cssText = 'position:fixed; width:1px; height:1px; opacity:0; pointer-events:none;';
     document.body.appendChild(video);
+
+    if (startTime){
+      // crop a dead intro/logo cut off the front of the clip -- native
+      // loop=true always restarts at 0, so loop back to startTime manually
+      video.addEventListener('loadedmetadata', () => { video.currentTime = startTime; });
+      video.addEventListener('ended', () => {
+        video.currentTime = startTime;
+        video.play().catch(() => {});
+      });
+    } else {
+      video.loop = true;
+    }
     video.play().catch(() => {});
 
     const videoTex = new THREE.VideoTexture(video);
@@ -1927,15 +1920,8 @@
       performer.add(tray, dish1, dish2, dish3);
       performer.userData.dishes = [dish1, dish2, dish3];
     } else if (def.key === 'adat'){
-      const page = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.65),
-        new THREE.MeshStandardMaterial({ map: makeManuscriptTexture(), side: THREE.DoubleSide, roughness: 0.8 }));
-      page.rotation.x = -0.5;
-      page.position.y = -0.1;
-      const quill = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.5, 6), partsMat);
-      quill.rotation.z = 0.6;
-      quill.position.set(0.3, 0.15, 0.1);
-      performer.add(page, quill);
-      performer.userData.page = page;
+      // 0.57s crops a dead intro cut off the front of the clip
+      buildVideoScreen(performer, def, 'assets/videos/pantun_budi.mp4', 0.57);
     } else if (def.key === 'filem'){
       const cinema = buildFilemMelayu();
       performer.add(cinema);
@@ -2165,7 +2151,7 @@
 
       // idle + active animation per type (stations only — hotspots have no performer)
       if (st.performer){
-        if (st.def.key === 'tarian' || st.def.key === 'silat'){
+        if (st.def.key === 'tarian' || st.def.key === 'silat' || st.def.key === 'adat'){
           const pulse = 1 + Math.sin(t*2)*0.02*(0.3+st.active);
           st.performer.userData.screen.scale.setScalar(pulse);
         } else if (st.def.key === 'alatmuzik'){
@@ -2188,8 +2174,6 @@
           st.performer.rotation.y = t*0.3;
         } else if (st.def.key === 'makanan'){
           st.performer.userData.dishes.forEach((d,i) => { d.position.y = -0.15 - 0.03*i + Math.sin(t*2+i)*0.01; });
-        } else if (st.def.key === 'adat'){
-          st.performer.rotation.y = Math.sin(t*0.4)*0.15;
         } else if (st.def.key === 'filem'){
           // spotlight cycles through the 3 posters in year order (title,
           // then director, then year fade in like a film credits roll),
