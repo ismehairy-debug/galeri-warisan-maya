@@ -1277,7 +1277,7 @@
         desc:'Malay heritage dishes such as rendang, nasi lemak and an array of kuih-muih reflect centuries of spice trade with India, China and the Middle East, absorbed into local ingredients and cooking methods. They are served at kenduri (feasts), weddings and Hari Raya celebrations, where cooking and sharing food is itself a communal, festive act.' },
       { key:'adat', name:'PANTUN & ADAT', sub:'Adat Resam & Kesusasteraan', color:0x6a4fae, pos:[8,0,5], freq:174, wave:'triangle',
         desc:'Pantun is a traditional oral poetry form built from rhyming quatrains, historically used in courtship, ceremonies and everyday social exchange to convey wit and wisdom indirectly. Adat resam refers to the customary practices and unwritten laws -- such as adat perpatih and adat temenggong -- that have long governed Malay social conduct, ceremonies and inheritance.' },
-      { key:'filem', name:'FILEM MELAYU', sub:'Zaman Kesultanan Melayu', color:0xc9a227, pos:[0,0,0], freq:100, wave:'sine',
+      { key:'filem', name:'FILEM MELAYU', sub:'Zaman Kesultanan Melayu', color:0xc9a227, pos:[0,0,0], freq:100, wave:'sine', labelY:2.9,
         desc:'Three Malay films set in the Melaka Sultanate era, arranged left to right in order of release so the story of that world unfolds across the decades: Hang Tuah (1956, dir. Phani Majumdar), Puteri Gunung Ledang (1961, dir. S. Roomai Noor), and Puteri Gunung Ledang (2004, dir. Saw Teong Hin).' },
     ];
     return defs.map(buildStation);
@@ -1726,7 +1726,7 @@
     }
 
     const label = makeLabel(def.name, def.sub);
-    label.position.set(0, 2.1, 0);
+    label.position.set(0, def.labelY || 2.1, 0);
     group.add(label);
 
     return {
@@ -1944,7 +1944,7 @@
 
       // label fade
       st.label.material.opacity = st.active;
-      if (st.ring) st.label.position.y = 2.1 + st.active*0.15;
+      if (st.ring) st.label.position.y = (st.def.labelY || 2.1) + st.active*0.15;
 
       // idle + active animation per type (stations only — hotspots have no performer)
       if (st.performer){
