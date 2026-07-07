@@ -2030,6 +2030,12 @@
             card.dirSprite.material.opacity = dirOp * st.active;
             card.yearSprite.material.opacity = yearOp * st.active;
             card.frame.material.emissiveIntensity = glow;
+
+            // each poster floats independently -- gentle bob + tilt, out of
+            // phase per card so they don't all hover in unison
+            card.group.position.y = 0.08 + Math.sin(t*0.8 + i*2.1) * 0.07;
+            card.group.rotation.z = Math.sin(t*0.55 + i*1.4) * 0.035;
+            card.group.rotation.y = Math.sin(t*0.4 + i*1.1) * 0.05;
           });
         }
       }
