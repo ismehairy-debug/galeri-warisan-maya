@@ -1661,12 +1661,19 @@
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
     }
 
-    const captionH = h*0.22;
-    const vignette = ctx.createLinearGradient(0, h-captionH, 0, h);
-    vignette.addColorStop(0, 'rgba(10,7,3,0)');
-    vignette.addColorStop(1, 'rgba(10,7,3,0.92)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, h-captionH, w, captionH);
+    // solid dark backing (not a fade-to-transparent gradient) so the title/
+    // director/year text stays legible regardless of how busy or high-
+    // contrast the poster photo behind it is -- only a thin sliver at the
+    // very top edge softens into the artwork above
+    const captionH = h*0.26;
+    const fadeH = captionH*0.2;
+    const fade = ctx.createLinearGradient(0, h-captionH, 0, h-captionH+fadeH);
+    fade.addColorStop(0, 'rgba(8,5,2,0)');
+    fade.addColorStop(1, 'rgba(8,5,2,0.9)');
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, h-captionH, w, fadeH);
+    ctx.fillStyle = 'rgba(8,5,2,0.9)';
+    ctx.fillRect(0, h-captionH+fadeH, w, captionH-fadeH);
 
     ctx.strokeStyle = '#c9a227';
     ctx.lineWidth = 10;
