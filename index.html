@@ -1656,52 +1656,8 @@
     return group;
   }
 
-  // ---------- shared helper: a looping video panel used by video-backed stations ----------
-  function buildVideoScreen(performer, def, videoSrc, startTime){
-    const video = document.createElement('video');
-    video.src = videoSrc;
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'auto';
-    video.setAttribute('webkit-playsinline', 'true');
-    // many mobile browsers won't reliably decode frames for a video element
-    // that's never attached to the DOM, even when only used as a texture source
-    video.style.cssText = 'position:fixed; width:1px; height:1px; opacity:0; pointer-events:none;';
-    document.body.appendChild(video);
-
-    if (startTime){
-      // crop a dead intro/logo cut off the front of the clip -- native
-      // loop=true always restarts at 0, so loop back to startTime manually
-      video.addEventListener('loadedmetadata', () => { video.currentTime = startTime; });
-      video.addEventListener('ended', () => {
-        video.currentTime = startTime;
-        video.play().catch(() => {});
-      });
-    } else {
-      video.loop = true;
-    }
-    // don't autoplay here -- left paused until the proximity logic in
-    // animate() actually plays it, so idle stations aren't all decoding
-    // video simultaneously in the background (multiple concurrent video
-    // decodes is what caused the iPhone-specific lag; Android GPUs tend to
-    // have more spare hardware decode capacity so it went unnoticed there)
-
-    const videoTex = new THREE.VideoTexture(video);
-    const bezel = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.76, 1.02),
-      new THREE.MeshStandardMaterial({ color: 0x1a1206, emissive: def.color, emissiveIntensity: 0.15, roughness:0.6 })
-    );
-    bezel.position.set(0, 0.3, -0.02);
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex }));
-    screen.position.set(0, 0.3, 0);
-    performer.add(bezel, screen);
-    performer.userData.videoEl = video;
-    performer.userData.screen = screen;
-  }
-
   // ---------- a rectangular picture-frame mesh (outer rect with a rectangular
-  // hole cut for the artwork), used to mount a video like a framed poster
-  // rather than flush in a TV-style bezel ----------
+  // hole cut for the artwork), used to mount a video like a framed poster ----------
   function buildPictureFrame(outerW, outerH, innerW, innerH, depth, mat){
     const shape = new THREE.Shape();
     shape.moveTo(-outerW/2, -outerH/2);
@@ -1720,10 +1676,9 @@
     return new THREE.Mesh(geo, mat);
   }
 
-  // ---------- PANTUN & ADAT's video, mounted as a static framed poster (like
-  // the FILEM MELAYU cards) instead of the pulsing TV-bezel the other video
-  // stations use -- the video still plays, but the card itself never scales
-  // or breathes, so it reads as a fixed piece on the wall ----------
+  // ---------- shared helper: a looping video mounted as a static gold-framed
+  // poster, used by every video-backed station (tarian, silat, pakaian's
+  // songket & batik, adat) so they all share one visual frame language ----------
   function buildVideoPosterCard(performer, def, videoSrc, startTime){
     const video = document.createElement('video');
     video.src = videoSrc;
@@ -1743,7 +1698,11 @@
     } else {
       video.loop = true;
     }
-    // don't autoplay here -- see buildVideoScreen's matching comment
+    // don't autoplay here -- left paused until the proximity logic in
+    // animate() actually plays it, so idle stations aren't all decoding
+    // video simultaneously in the background (multiple concurrent video
+    // decodes is what caused the iPhone-specific lag; Android GPUs tend to
+    // have more spare hardware decode capacity so it went unnoticed there)
 
     const videoTex = new THREE.VideoTexture(video);
 
@@ -2051,7 +2010,7 @@
     const partsMat = new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.25, roughness:0.35, metalness:0.4 });
 
     if (def.key === 'tarian'){
-      buildVideoScreen(performer, def, 'assets/videos/tarian_clip.mp4');
+      buildVideoPosterCard(performer, def, 'assets/videos/tarian_clip.mp4');
     } else if (def.key === 'alatmuzik'){
       const gamelan = buildGamelanPlayer();
       performer.add(gamelan);
@@ -2059,17 +2018,17 @@
       performer.userData.malletPivot = gamelan.userData.malletPivot;
       performer.userData.malletBaseY = gamelan.userData.malletBaseY;
     } else if (def.key === 'silat'){
-      buildVideoScreen(performer, def, 'assets/videos/silat_clip.mp4');
+      buildVideoPosterCard(performer, def, 'assets/videos/silat_clip.mp4');
     } else if (def.key === 'pakaian'){
-      // two real process clips side by side, shrunk from buildVideoScreen's
-      // single-screen size to fit -- both stay muted, silent visual-only
-      // loops (see ensureStationAudio's 'pakaian' skip), so anak ayam is
-      // the only audio heard at this station
+      // two real process clips side by side, shrunk from the gold
+      // picture-frame's single-card size to fit -- both stay muted, silent
+      // visual-only loops (see ensureStationAudio's 'pakaian' skip), so
+      // anak ayam is the only audio heard at this station
       const songketGroup = new THREE.Group();
       songketGroup.position.set(-0.85, 0.535, 0);
       songketGroup.scale.setScalar(0.55);
       performer.add(songketGroup);
-      buildVideoScreen(songketGroup, def, 'assets/videos/songket_clip.mp4');
+      buildVideoPosterCard(songketGroup, def, 'assets/videos/songket_clip.mp4');
       const songketSwatch = buildFabricSwatch('assets/images/songket_pattern.jpg');
       songketSwatch.position.set(0, -0.55, 0.05);
       songketGroup.add(songketSwatch);
@@ -2078,7 +2037,7 @@
       batikGroup.position.set(0.85, 0.535, 0);
       batikGroup.scale.setScalar(0.55);
       performer.add(batikGroup);
-      buildVideoScreen(batikGroup, def, 'assets/videos/batik_clip.mp4');
+      buildVideoPosterCard(batikGroup, def, 'assets/videos/batik_clip.mp4');
       const batikSwatch = buildFabricSwatch('assets/images/batik_pattern.jpg');
       batikSwatch.position.set(0, -0.55, 0.05);
       batikGroup.add(batikSwatch);
@@ -2394,10 +2353,7 @@
 
       // idle + active animation per type (stations only — hotspots have no performer)
       if (st.performer){
-        if (st.def.key === 'tarian' || st.def.key === 'silat'){
-          const pulse = 1 + Math.sin(t*2)*0.02*(0.3+st.active);
-          st.performer.userData.screen.scale.setScalar(pulse);
-        } else if (st.def.key === 'alatmuzik'){
+        if (st.def.key === 'alatmuzik'){
           st.performer.userData.bars.forEach((b,i) => {
             const h = 0.4 + Math.abs(Math.sin(t*4 + i))*0.5*(0.25+st.active);
             b.scale.y = h/0.4;
