@@ -1189,8 +1189,15 @@
       // same real-photo reference plaque, but here on the front-facing
       // flanking walls either side of the entrance -- the first thing a
       // visitor actually sees walking up through the gateway, unlike the
-      // west/east plaques above which sit on the far outside faces
-      const frontPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', refPhotoW, refPhotoH);
+      // west/east plaques above which sit on the far outside faces.
+      // A visitor facing into the gateway (+Z) has world +X on their left
+      // and -X on their right, so side<0 (west, negative x) is the wall on
+      // their RIGHT. Right shows the real interior throne hall this
+      // build's own audience-hall diorama is modelled after; left keeps
+      // the real exterior, so visitors can compare both against the source.
+      const frontPhotoSrc = side < 0 ? 'assets/images/istana_melaka_interior.jpg' : 'assets/images/istana_melaka_exterior.jpg';
+      const frontPhotoH = side < 0 ? refPhotoW * (600/800) : refPhotoH; // interior photo is 4:3, not the exterior's 3:2
+      const frontPhoto = buildExteriorPhotoPlaque(frontPhotoSrc, refPhotoW, frontPhotoH);
       frontPhoto.position.set(side*(doorHalf + frontPieceW/2), wallH*0.55, -innerD/2 - 0.145);
       frontPhoto.rotation.y = Math.PI;
       group.add(frontPhoto);
