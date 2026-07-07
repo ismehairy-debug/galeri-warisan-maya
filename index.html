@@ -1865,7 +1865,12 @@
       // audio (stations only — hotspots carry no sound source)
       if (audioReady && st.sound && st.sound.context.state === 'running'){
         ensureStationAudio(st, st.sound.context);
-        st.sound.setVolume(st.active * 0.35);
+        // stations with real recorded audio (video clips, the gamelan
+        // track) read as noticeably quieter than the synthesized tones,
+        // especially on phone speakers -- boost just those
+        const hasRealAudio = (st.performer && st.performer.userData && st.performer.userData.videoEl) || st.def.audioSrc;
+        const volBoost = hasRealAudio ? 1.8 : 1;
+        st.sound.setVolume(Math.min(1, st.active * 0.35 * volBoost));
       }
 
       // some mobile browsers silently pause an off-screen <video> used only
