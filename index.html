@@ -1395,10 +1395,13 @@
     // plain chengal-wood wall panels — restrained, so the carved trim reads as deliberate
     const wallMat = new THREE.MeshStandardMaterial({ color: 0x3b2415, roughness: 0.88 });
 
-    const northWall = buildSegmentedWall(ROOM.width, ROOM.height, 0.25, wallMat, 2.6, 2.8);
+    // 2.9/2.8 tiles the 20-wide wall as solid-window-solid-window-solid-window-solid
+    // with no leftover partial segment (2.6 left a sliced-off partial window at
+    // the far edge) -- exactly 3 full windows, symmetric about the centre
+    const northWall = buildSegmentedWall(ROOM.width, ROOM.height, 0.25, wallMat, 2.9, 2.8);
     northWall.position.set(0, 0, -ROOM.depth/2);
     scene.add(northWall);
-    registerWallColliders(ROOM.width, 0.25, 2.6, 2.8, 0, 0, -ROOM.depth/2);
+    registerWallColliders(ROOM.width, 0.25, 2.9, 2.8, 0, 0, -ROOM.depth/2);
 
     const westWall = buildSegmentedWall(ROOM.depth, ROOM.height, 0.25, wallMat, 2.6, 2.8);
     westWall.rotation.y = Math.PI/2;
