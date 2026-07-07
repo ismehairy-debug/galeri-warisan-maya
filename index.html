@@ -1589,6 +1589,20 @@
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
 
+    // three.js only schedules the next animation frame after this callback
+    // returns, so any uncaught error in here would permanently freeze the
+    // whole scene (and whatever audio volume happened to be set at that
+    // instant). Contain per-frame errors so one bad frame can't kill the loop.
+    try {
+      updateFrame(points, clouds, birds, dt, t);
+    } catch (err){
+      console.error('animate() frame error (recovered):', err);
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  function updateFrame(points, clouds, birds, dt, t){
     desktopMove(dt);
     vrMove(dt);
     if (!renderer.xr.isPresenting) joystickMove(dt);
@@ -1668,6 +1682,14 @@
         ensureStationAudio(st, st.sound.context);
         st.sound.setVolume(st.active * 0.35);
       }
+
+      // some mobile browsers silently pause an off-screen <video> used only
+      // as a texture source (power saving / visibility heuristics) -- nudge
+      // it back into play rather than leaving the station frozen
+      const videoEl = st.performer && st.performer.userData && st.performer.userData.videoEl;
+      if (videoEl && audioReady && videoEl.paused && document.visibilityState === 'visible'){
+        videoEl.play().catch(() => {});
+      }
     });
 
     // anak ayam only plays inside the balai, and fades out while near any
@@ -1679,9 +1701,13 @@
       const bgMusic = document.getElementById('bgMusic');
       const targetBgVol = BG_BASE_VOL * insideSmooth * (1 - maxActive);
       bgVolCurrent += (targetBgVol - bgVolCurrent) * Math.min(1, dt*3);
-      bgMusic.volume = Math.max(0, Math.min(1, bgVolCurrent));
+      const safeVol = Math.max(0, Math.min(1, bgVolCurrent));
+      bgMusic.volume = Number.isFinite(safeVol) ? safeVol : 0;
 
-      if (ambienceRef){
+      // the AudioContext can be suspended/interrupted on mobile (screen lock,
+      // notification, incoming call) -- touching its nodes while it isn't
+      // 'running' can throw, so mirror the same guard the station audio uses
+      if (ambienceRef && ambienceRef.wind.context.state === 'running'){
         const outsideAmount = 1 - insideSmooth;
         ambienceRef.wind.setVolume(outsideAmount * 0.22);
         ambienceRef.nextChirpIn -= dt;
@@ -1691,8 +1717,6 @@
         }
       }
     }
-
-    renderer.render(scene, camera);
   }
 
 })();
