@@ -262,6 +262,13 @@
 
   const ROOM = { width: 20, depth: 18, height: 4.5 };
 
+  // ground-plane (XZ) obstacles the player can't walk through -- populated
+  // as the scene is built. Each is either { type:'circle', x,z,r } for
+  // posts/trunks/pedestals or { type:'box', x,z,hw,hd } (axis-aligned
+  // half-width/half-depth) for walls and buildings.
+  const colliders = [];
+  const PLAYER_RADIUS = 0.35;
+
   init();
 
   function init(){
@@ -764,6 +771,27 @@
     return group;
   }
 
+  // ---------- ground-plane collider registration ----------
+  function addCircleCollider(x, z, r){ colliders.push({ type:'circle', x, z, r }); }
+  function addBoxCollider(x, z, hw, hd){ colliders.push({ type:'box', x, z, hw, hd }); }
+
+  // registers a box collider for every solid segment of a buildSegmentedWall,
+  // given the same params plus the world rotation/position the wall group
+  // was actually placed at (rotY must be a multiple of PI/2, matching every
+  // wall in this scene, so the resulting box stays axis-aligned)
+  function registerWallColliders(totalWidth, thickness, mullionW, windowW, rotY, centerX, centerZ){
+    const segs = computeWallSegments(totalWidth, mullionW, windowW);
+    const cos = Math.round(Math.cos(rotY)), sin = Math.round(Math.sin(rotY));
+    segs.forEach(s => {
+      if (!s.solid) return;
+      const mid = s.start + s.width/2;
+      const cx = centerX + mid*cos;
+      const cz = centerZ - mid*sin;
+      if (cos !== 0) addBoxCollider(cx, cz, s.width/2, thickness/2);
+      else addBoxCollider(cx, cz, thickness/2, s.width/2);
+    });
+  }
+
   // ---------- sky dome: re-centered on the camera every frame so it always
   // reads as an unreachable, infinite backdrop no matter how far you walk ----------
   function buildSky(){
@@ -897,6 +925,7 @@
       group.add(nut);
     }
     scene.add(group);
+    addCircleCollider(x, z, 0.18);
   }
 
   function buildBananaPlant(x,z){
@@ -906,6 +935,7 @@
       new THREE.MeshStandardMaterial({ color:0x7a9450, roughness:0.8 }));
     trunk.position.y = 0.7;
     group.add(trunk);
+    addCircleCollider(x, z, 0.2);
     const leafMat = new THREE.MeshStandardMaterial({ color:0x4a8a3a, roughness:0.8, side:THREE.DoubleSide });
     for (let i=0;i<5;i++){
       const leaf = new THREE.Mesh(new THREE.PlaneGeometry(0.5,1.6), leafMat);
@@ -934,6 +964,7 @@
       group.add(tuft);
     }
     scene.add(group);
+    addCircleCollider(x, z, 0.35);
   }
 
   function buildKampungHut(x,z){
@@ -955,6 +986,7 @@
       group.add(stilt);
     });
     scene.add(group);
+    addBoxCollider(x, z, 1.2, 1.0);
   }
 
   function scatterVegetation(){
@@ -1103,15 +1135,18 @@
     westWall.rotation.y = Math.PI/2;
     westWall.position.set(-innerW/2, 0, 0);
     group.add(westWall);
+    registerWallColliders(innerD, 0.25, 2.2, 1.6, Math.PI/2, x - innerW/2, z);
 
     const eastWall = buildSegmentedWall(innerD, wallH, 0.25, wallMat, 2.2, 1.6);
     eastWall.rotation.y = -Math.PI/2;
     eastWall.position.set(innerW/2, 0, 0);
     group.add(eastWall);
+    registerWallColliders(innerD, 0.25, 2.2, 1.6, -Math.PI/2, x + innerW/2, z);
 
     const backWall = buildSegmentedWall(innerW, wallH, 0.25, wallMat, 2.6, 1.8);
     backWall.position.set(0, 0, innerD/2);
     group.add(backWall);
+    registerWallColliders(innerW, 0.25, 2.6, 1.8, 0, x, z + innerD/2);
 
     const doorHalf = 1.9;
     const frontPieceW = innerW/2 - doorHalf;
@@ -1119,6 +1154,7 @@
       const piece = new THREE.Mesh(new THREE.BoxGeometry(frontPieceW, wallH, 0.25), wallMat);
       piece.position.set(side*(doorHalf + frontPieceW/2), wallH/2, -innerD/2);
       group.add(piece);
+      addBoxCollider(x + side*(doorHalf + frontPieceW/2), z - innerD/2, frontPieceW/2, 0.25);
     });
 
     const kerawangTex = makeKerawangTexture('#2a160c', '#c9a227', 10, 1);
@@ -1243,6 +1279,9 @@
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 2.6, 10), postMat);
       post.position.set(px, 1.3, 0);
       group.add(post);
+      // group is rotated 180 deg but the posts are symmetric, so the
+      // world-space collider positions are the same set either way
+      addCircleCollider(x + px, z, 0.11);
     });
 
     const canvas = document.createElement('canvas');
@@ -1298,16 +1337,19 @@
     const northWall = buildSegmentedWall(ROOM.width, ROOM.height, 0.25, wallMat, 2.6, 2.8);
     northWall.position.set(0, 0, -ROOM.depth/2);
     scene.add(northWall);
+    registerWallColliders(ROOM.width, 0.25, 2.6, 2.8, 0, 0, -ROOM.depth/2);
 
     const westWall = buildSegmentedWall(ROOM.depth, ROOM.height, 0.25, wallMat, 2.6, 2.8);
     westWall.rotation.y = Math.PI/2;
     westWall.position.set(-ROOM.width/2, 0, 0);
     scene.add(westWall);
+    registerWallColliders(ROOM.depth, 0.25, 2.6, 2.8, Math.PI/2, -ROOM.width/2, 0);
 
     const eastWall = buildSegmentedWall(ROOM.depth, ROOM.height, 0.25, wallMat, 2.6, 2.8);
     eastWall.rotation.y = -Math.PI/2;
     eastWall.position.set(ROOM.width/2, 0, 0);
     scene.add(eastWall);
+    registerWallColliders(ROOM.depth, 0.25, 2.6, 2.8, -Math.PI/2, ROOM.width/2, 0);
 
     // kerawang carved fretwork trim band, like a ventilation panel under the eaves
     const kerawangTex = makeKerawangTexture('#2a160c', '#c9a227', 8, 1);
@@ -1347,6 +1389,7 @@
       cap.rotation.x = Math.PI/2;
       cap.position.set(p[0], ROOM.height - 0.35, p[1]);
       scene.add(cap);
+      addCircleCollider(p[0], p[1], 0.28);
     });
   }
 
@@ -1414,6 +1457,7 @@
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 4.4, 12), woodMat);
       post.position.set(x, 2.2, gateZ);
       scene.add(post);
+      addCircleCollider(x, gateZ, 0.24);
     });
 
     const beamTex = makeKerawangTexture('#2a160c', '#c9a227', 2, 1);
@@ -1935,6 +1979,7 @@
     );
     base.position.y = 0.2;
     group.add(base);
+    addCircleCollider(def.pos[0], def.pos[2], 1.0);
 
     // glowing ring (proximity indicator)
     const ring = new THREE.Mesh(
@@ -2128,6 +2173,39 @@
     const m = 40;
     player.position.x = Math.max(-m, Math.min(m, player.position.x));
     player.position.z = Math.max(-m, Math.min(m, player.position.z));
+    resolveCollisions();
+  }
+
+  // ---------- push the player back out of any obstacle they've walked into
+  // (ground-plane only -- ignores height entirely, which is fine since
+  // nothing in the scene is walkable underneath) ----------
+  function resolveCollisions(){
+    for (const c of colliders){
+      const dx = player.position.x - c.x;
+      const dz = player.position.z - c.z;
+      let px, pz, dist;
+      if (c.type === 'circle'){
+        dist = Math.hypot(dx, dz);
+        if (dist >= PLAYER_RADIUS + c.r) continue;
+        px = dx; pz = dz;
+      } else {
+        const closestX = Math.max(-c.hw, Math.min(dx, c.hw));
+        const closestZ = Math.max(-c.hd, Math.min(dz, c.hd));
+        px = dx - closestX; pz = dz - closestZ;
+        dist = Math.hypot(px, pz);
+        if (dist >= PLAYER_RADIUS) continue;
+      }
+      const minDist = c.type === 'circle' ? PLAYER_RADIUS + c.r : PLAYER_RADIUS;
+      if (dist > 0.0001){
+        const push = (minDist - dist) / dist;
+        player.position.x += px * push;
+        player.position.z += pz * push;
+      } else {
+        // player's center landed exactly on the obstacle (rare) -- shove
+        // them out along whichever axis has the shallower overlap
+        player.position.x += minDist;
+      }
+    }
   }
 
   // ---------- VR button ----------
