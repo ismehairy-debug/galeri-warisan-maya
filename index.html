@@ -256,6 +256,9 @@
   let gyroActive = false;
   let deviceAlpha = 0, deviceBeta = 0, deviceGamma = 0;
   let alphaOffset = null;
+  // manual drag-look nudge applied on top of the gyro's own rotation, so
+  // touch-dragging still pans the view in any direction while tilt-look is active
+  let gyroYawOffset = 0, gyroPitchOffset = 0;
   const joyState = { x: 0, y: 0 };
   let joyTouchId = null;
   let lookTouchId = null, lastTouchX = 0, lastTouchY = 0;
@@ -546,6 +549,7 @@
 
   function enableGyro(){
     alphaOffset = null;
+    gyroYawOffset = 0; gyroPitchOffset = 0;
     player.rotation.set(0,0,0);
     window.addEventListener('deviceorientation', onDeviceOrientation);
     gyroActive = true;
@@ -571,7 +575,7 @@
   }
   function applyGyroToCamera(){
     const screenAngle = THREE.MathUtils.degToRad(getScreenAngle());
-    gyroEuler.set(deviceBeta, deviceAlpha, -deviceGamma, 'YXZ');
+    gyroEuler.set(deviceBeta + gyroPitchOffset, deviceAlpha + gyroYawOffset, -deviceGamma, 'YXZ');
     camera.quaternion.setFromEuler(gyroEuler);
     camera.quaternion.multiply(gyroQ1);
     camera.quaternion.multiply(gyroQ0.setFromAxisAngle(gyroZ, -screenAngle));
@@ -620,9 +624,11 @@
       for (const t of e.changedTouches){ if (t.identifier === joyTouchId){ joyTouchId = null; resetJoy(); } }
     }));
 
-    // drag-to-look fallback for when gyro isn't active/granted
+    // drag-to-look: lets a finger drag pan the view in any direction on
+    // both iPhone and Android, whether or not gyro tilt-look is active --
+    // without gyro it drives yaw/pitch directly, with gyro it nudges a
+    // persistent offset on top of the tilt (see applyGyroToCamera)
     document.addEventListener('touchstart', e => {
-      if (gyroActive) return;
       const rect = joyBase.getBoundingClientRect();
       for (const t of e.changedTouches){
         const inJoy = t.clientX>=rect.left && t.clientX<=rect.right && t.clientY>=rect.top && t.clientY<=rect.bottom;
@@ -631,14 +637,18 @@
       }
     });
     document.addEventListener('touchmove', e => {
-      if (gyroActive) return;
       for (const t of e.changedTouches){
         if (t.identifier !== lookTouchId) continue;
         const dx = t.clientX - lastTouchX, dy = t.clientY - lastTouchY;
         lastTouchX = t.clientX; lastTouchY = t.clientY;
-        yaw -= dx*0.004; pitch -= dy*0.004;
-        pitch = Math.max(-1.3, Math.min(1.3, pitch));
-        player.rotation.y = yaw; camera.rotation.x = pitch;
+        if (gyroActive){
+          gyroYawOffset -= dx*0.004; gyroPitchOffset -= dy*0.004;
+          gyroPitchOffset = Math.max(-1.3, Math.min(1.3, gyroPitchOffset));
+        } else {
+          yaw -= dx*0.004; pitch -= dy*0.004;
+          pitch = Math.max(-1.3, Math.min(1.3, pitch));
+          player.rotation.y = yaw; camera.rotation.x = pitch;
+        }
         e.preventDefault();
       }
     }, { passive:false });
