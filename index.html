@@ -1625,7 +1625,10 @@
     ]; // already sorted ascending by year
     const cards = films.map((f, i) => {
       const card = buildFilemCard(f.title, f.director, f.year, f.poster);
-      card.group.position.set((i-1)*1.3, 0, 0);
+      // 0.7 local = world y 1.6 (performer sits at y=0.9), matching the
+      // camera's own eye height so the posters read straight-on, not
+      // looking up/down at them
+      card.group.position.set((i-1)*1.3, 0.7, 0);
       group.add(card.group);
       return card;
     });
@@ -1996,12 +1999,6 @@
             card.dirSprite.material.opacity = dirOp * st.active;
             card.yearSprite.material.opacity = yearOp * st.active;
             card.frame.material.emissiveIntensity = glow;
-
-            // each poster floats independently -- gentle bob + tilt, out of
-            // phase per card so they don't all hover in unison
-            card.group.position.y = 0.08 + Math.sin(t*0.8 + i*2.1) * 0.07;
-            card.group.rotation.z = Math.sin(t*0.55 + i*1.4) * 0.035;
-            card.group.rotation.y = Math.sin(t*0.4 + i*1.1) * 0.05;
           });
         }
       }
