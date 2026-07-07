@@ -1930,51 +1930,17 @@
     return tex;
   }
 
-  // ---------- 3D keris model: wavy pamor blade + ganja + carved hulu hilt ----------
-  function buildKeris(){
-    const group = new THREE.Group();
-
-    const bladeShape = new THREE.Shape();
-    bladeShape.moveTo(0,-0.6);
-    bladeShape.quadraticCurveTo(0.12,-0.3, 0,-0.05);
-    bladeShape.quadraticCurveTo(-0.12,0.2, 0,0.45);
-    bladeShape.quadraticCurveTo(0.1,0.65, 0,0.85);
-    bladeShape.lineTo(-0.06,0.85);
-    bladeShape.quadraticCurveTo(0.02,0.6,-0.08,0.4);
-    bladeShape.quadraticCurveTo(0.1,0.15,-0.06,-0.1);
-    bladeShape.quadraticCurveTo(0.08,-0.35,-0.05,-0.6);
-    bladeShape.closePath();
-
-    const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, {
-      depth: 0.035, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.006, bevelSegments: 2
-    });
-    bladeGeo.center();
-    const steelMat = new THREE.MeshStandardMaterial({ color: 0xc7cdd6, metalness: 0.85, roughness: 0.3 });
-    const blade = new THREE.Mesh(bladeGeo, steelMat);
-    blade.position.y = 0.35;
-    group.add(blade);
-
-    // ganja — flared metal collar where blade meets hilt
-    const ganja = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.15, 0.07, 10),
-      new THREE.MeshStandardMaterial({ color: 0xb08a3c, metalness: 0.6, roughness: 0.4 })
-    );
-    ganja.position.y = -0.28;
-    group.add(ganja);
-
-    // hulu — carved wooden pistol-grip hilt, following a real keris's curved profile
-    const huluCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, -0.3, 0),
-      new THREE.Vector3(0.03, -0.42, 0),
-      new THREE.Vector3(0.05, -0.55, 0.02),
-      new THREE.Vector3(-0.02, -0.63, 0.05),
-    ]);
-    const huluGeo = new THREE.TubeGeometry(huluCurve, 20, 0.05, 10, false);
-    const hulu = new THREE.Mesh(huluGeo, new THREE.MeshStandardMaterial({ color: 0x6a4425, roughness: 0.7 }));
-    group.add(hulu);
-
-    group.userData.blade = blade;
-    return group;
+  // ---------- real keris photo (a museum collection piece), background
+  // removed down to a transparent PNG so it reads as a floating object
+  // rather than a card with a white backdrop -- mounted as a simple
+  // double-sided plane, parented under the same performer group as the
+  // anyaman so both spin together in the existing idle animation ----------
+  function buildKerisPhoto(){
+    const tex = new THREE.TextureLoader().load('assets/images/keris_reference.png');
+    const aspect = 570/754;
+    const h = 1.3, w = h*aspect;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
+    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
   }
 
   // ---------- 3D anyaman model: lathed tray body + woven rim strips ----------
@@ -2224,7 +2190,7 @@
       performer.userData.videoEl = songketGroup.userData.videoEl;
       performer.userData.videoEl2 = batikGroup.userData.videoEl;
     } else if (def.key === 'kraf'){
-      const keris = buildKeris();
+      const keris = buildKerisPhoto();
       keris.position.set(-0.3, 0.05, 0);
       keris.rotation.z = -0.12;
       performer.add(keris);
