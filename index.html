@@ -246,6 +246,7 @@
   let ambienceStarted = false;
   let stationsRef = [];
   let ambienceRef = null;
+  let bgGainNode = null;
   let bgVolCurrent = 0;
   let insideSmooth = 1;
   const BG_BASE_VOL = 0.4;
@@ -305,6 +306,7 @@
     camera.add(listener);
     stations.forEach(s => attachAudio(s, listener));
     ambienceRef = buildOutsideAmbience(listener);
+    bgGainNode = buildBgMusicGain(listener);
     buildTitleSprite();
 
     window.addEventListener('resize', onResize);
@@ -381,10 +383,24 @@
   }
 
   // ---------- ambient background music (anak ayam) — only heard inside the balai ----------
+  // iOS Safari ignores an <audio> element's .volume property entirely (only
+  // the hardware volume buttons work), so fading it in/out by distance would
+  // silently do nothing there -- routing it through a Web Audio GainNode
+  // instead gives real, working volume control on every platform.
+  function buildBgMusicGain(listener){
+    const ctx = listener.context;
+    const audio = document.getElementById('bgMusic');
+    const source = ctx.createMediaElementSource(audio);
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    return gain;
+  }
+
   function startBackgroundMusic(){
     const audio = document.getElementById('bgMusic');
     if (!audio.paused) return; // already playing -- don't restart it from the top
-    audio.volume = 0;
     audio.play().catch(() => {});
   }
 
@@ -2252,11 +2268,12 @@
       const insideAmount = computeInsideAmount(camWorld);
       insideSmooth += (insideAmount - insideSmooth) * Math.min(1, dt*2);
 
-      const bgMusic = document.getElementById('bgMusic');
       const targetBgVol = BG_BASE_VOL * insideSmooth * (1 - maxActive);
       bgVolCurrent += (targetBgVol - bgVolCurrent) * Math.min(1, dt*3);
       const safeVol = Math.max(0, Math.min(1, bgVolCurrent));
-      bgMusic.volume = Number.isFinite(safeVol) ? safeVol : 0;
+      if (bgGainNode && bgGainNode.context.state === 'running'){
+        bgGainNode.gain.value = Number.isFinite(safeVol) ? safeVol : 0;
+      }
 
       // the AudioContext can be suspended/interrupted on mobile (screen lock,
       // notification, incoming call) -- touching its nodes while it isn't
