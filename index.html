@@ -1045,12 +1045,7 @@
     buildAdBillboard(6, 13, {
       logoSrc: 'assets/images/fcoee_logo.png',
       title: 'FCoEE',
-      subtitle: 'Faizuddin Centre of Educational Excellence',
-      lines: [
-        '• Digital Entrepreneurship & AI Robotik',
-        '• Academic Mentoring (Pra Bimbingan) & Sukan',
-        '• Research Grants & Conferences',
-      ],
+      body: 'FCoEE, sebuah inisiatif pendidikan dibawah Majlis Agama Islam dan Adat Istiadat Melayu Perlis (MAIPs) dalam usaha memperkasakan pembelajaran AI & Robotik, inovasi penyelidikan dan teknologi untuk generasi masa hadapan.\nFCoEE menjadi wadah penerokaan yang menghubungkan ilmu, kreativiti, penyelidikan dan teknologi, membuka peluang kepada setiap individu untuk belajar, mencipta dan meneroka potensi tanpa batasan.',
       url: 'faizuddincoe.com',
     });
     buildAdBillboard(-6, 13, {
@@ -1270,6 +1265,25 @@
     return group;
   }
 
+  // ---------- word-wrap a string to fit maxWidth in ctx's current font, measured
+  // for real rather than guessed at a fixed chars-per-line ----------
+  function wrapCanvasText(ctx, text, maxWidth){
+    const words = text.split(/\s+/);
+    const lines = [];
+    let line = '';
+    words.forEach(word => {
+      const test = line ? line + ' ' + word : word;
+      if (line && ctx.measureText(test).width > maxWidth){
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    });
+    if (line) lines.push(line);
+    return lines;
+  }
+
   // ---------- draw an advertisement board onto a canvas, optionally with a logo image ----------
   function drawAdBoard(ctx, w, h, opts, logoImg){
     ctx.clearRect(0, 0, w, h);
@@ -1287,13 +1301,27 @@
     ctx.fillStyle = '#f2d98a';
     ctx.font = '700 58px Georgia';
     ctx.fillText(opts.title, 232, 100);
-    ctx.font = 'italic 27px Georgia';
-    ctx.fillStyle = '#e8d9ad';
-    ctx.fillText(opts.subtitle, 232, 140);
+    if (opts.subtitle){
+      ctx.font = 'italic 27px Georgia';
+      ctx.fillStyle = '#e8d9ad';
+      ctx.fillText(opts.subtitle, 232, 140);
+    }
 
-    ctx.font = '30px Georgia';
-    ctx.fillStyle = '#f2e2b6';
-    opts.lines.forEach((line, i) => ctx.fillText(line, 60, 262 + i*54));
+    if (opts.body){
+      // a longer free-form paragraph (instead of short bullet lines) --
+      // word-wrapped to fit, in a smaller font so more of it fits above the url
+      ctx.font = '22px Georgia';
+      ctx.fillStyle = '#f2e2b6';
+      const maxWidth = w - 60 - 40;
+      const bodyLines = opts.body.split('\n').flatMap(para => wrapCanvasText(ctx, para, maxWidth));
+      const lineHeight = 28;
+      const startY = opts.subtitle ? 200 : 170;
+      bodyLines.forEach((line, i) => ctx.fillText(line, 60, startY + i*lineHeight));
+    } else {
+      ctx.font = '30px Georgia';
+      ctx.fillStyle = '#f2e2b6';
+      opts.lines.forEach((line, i) => ctx.fillText(line, 60, 262 + i*54));
+    }
 
     ctx.textAlign = 'center';
     ctx.font = 'italic 26px Georgia';
@@ -1322,6 +1350,12 @@
       // world-space collider positions are the same set either way
       addCircleCollider(x + px, z, 0.11);
     });
+
+    // the board itself had no collider -- only the two thin posts did --
+    // so visitors could walk straight through the sign between them. A
+    // 180deg rotation keeps the board's local x/z axes aligned with world
+    // x/z, so a simple axis-aligned box collider is enough here.
+    addBoxCollider(x, z, boardHalfWidth + 0.15, 0.2);
 
     const canvas = document.createElement('canvas');
     canvas.width = 1024; canvas.height = 512;
