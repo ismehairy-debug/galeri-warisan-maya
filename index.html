@@ -1543,105 +1543,71 @@
     return new THREE.Sprite(mat);
   }
 
-  // ---------- cartoon poster artwork: a simple illustrated silhouette scene per film,
-  // with a dark vignette band at the bottom so the title/director/year sprites stay
-  // legible over it. 'tone' nods to the film's own era: warm classic (1956),
-  // desaturated/grainy vintage (1961's real black-and-white production), or full
-  // vibrant colour (2004's big-budget colour epic) ----------
-  function makePosterArt(theme, tone){
-    const w = 512, h = 724;
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    const ctx = c.getContext('2d');
+  // ---------- draw the real poster scan (cover-fit, cropping to fill) onto the
+  // card's canvas, with a gold border and a dark caption strip along the bottom
+  // for the title/director/year sprites layered in front of it ----------
+  function drawPosterCanvas(ctx, w, h, img){
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#0d0a06';
+    ctx.fillRect(0, 0, w, h);
 
-    const sky = ctx.createLinearGradient(0, 0, 0, h*0.65);
-    if (tone === 'vintage'){ sky.addColorStop(0, '#3a3226'); sky.addColorStop(1, '#6b5c3f'); }
-    else if (tone === 'color'){ sky.addColorStop(0, '#1e2f5c'); sky.addColorStop(1, '#a8632a'); }
-    else { sky.addColorStop(0, '#2a2350'); sky.addColorStop(1, '#c97a3a'); }
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, h*0.65);
-    ctx.fillStyle = tone === 'vintage' ? '#2a2419' : '#14100a';
-    ctx.fillRect(0, h*0.6, w, h*0.4);
-
-    const cx = w/2;
-    ctx.fillStyle = tone === 'vintage' ? '#1a1710' : '#0d0a06';
-    if (theme === 'hangtuah'){
-      ctx.beginPath(); ctx.arc(cx, h*0.34, 46, 0, Math.PI*2); ctx.fill(); // head
-      ctx.beginPath();
-      ctx.moveTo(cx-70, h*0.62); ctx.lineTo(cx-40, h*0.4); ctx.lineTo(cx+40, h*0.4); ctx.lineTo(cx+70, h*0.62);
-      ctx.closePath(); ctx.fill(); // body/tunic silhouette
-      ctx.save();
-      ctx.translate(cx+55, h*0.42); ctx.rotate(-0.6);
-      ctx.fillRect(-8, -90, 16, 90); // raised arm
-      ctx.restore();
-      ctx.strokeStyle = tone === 'vintage' ? '#c9b98a' : '#e8d9ad';
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(cx+95, h*0.22);
-      ctx.quadraticCurveTo(cx+112, h*0.26, cx+95, h*0.30);
-      ctx.quadraticCurveTo(cx+80, h*0.34, cx+95, h*0.38);
-      ctx.stroke(); // wavy keris blade
-    } else { // 'puterign' -- Puteri Gunung Ledang
-      ctx.beginPath();
-      ctx.moveTo(w*0.1, h*0.62); ctx.lineTo(cx, h*0.28); ctx.lineTo(w*0.9, h*0.62);
-      ctx.closePath(); ctx.fill(); // mountain
-      ctx.beginPath(); ctx.arc(cx, h*0.24, 34, 0, Math.PI*2); ctx.fill(); // head
-      ctx.beginPath();
-      ctx.moveTo(cx-34, h*0.42); ctx.quadraticCurveTo(cx, h*0.30, cx+34, h*0.42);
-      ctx.lineTo(cx+22, h*0.5); ctx.lineTo(cx-22, h*0.5);
-      ctx.closePath(); ctx.fill(); // flowing gown silhouette
-      ctx.strokeStyle = 'rgba(232,217,173,0.3)';
-      ctx.lineWidth = 3;
-      for (let i=0; i<3; i++){
-        ctx.beginPath();
-        ctx.ellipse(cx + (i-1)*60, h*0.58, 70, 10, 0, 0, Math.PI*2);
-        ctx.stroke(); // mist swirls
-      }
+    if (img){
+      const scale = Math.max(w/img.width, h/img.height);
+      const sw = w/scale, sh = h/scale;
+      const sx = (img.width - sw)/2, sy = (img.height - sh)/2;
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
     }
 
-    if (tone === 'vintage'){
-      for (let i=0; i<300; i++){
-        ctx.fillStyle = `rgba(255,255,255,${Math.random()*0.08})`;
-        ctx.fillRect(Math.random()*w, Math.random()*h, 1.5, 1.5); // film grain
-      }
-    }
-
-    const vignette = ctx.createLinearGradient(0, h*0.68, 0, h);
+    const captionH = h*0.22;
+    const vignette = ctx.createLinearGradient(0, h-captionH, 0, h);
     vignette.addColorStop(0, 'rgba(10,7,3,0)');
-    vignette.addColorStop(1, 'rgba(10,7,3,0.9)');
+    vignette.addColorStop(1, 'rgba(10,7,3,0.92)');
     ctx.fillStyle = vignette;
-    ctx.fillRect(0, h*0.68, w, h*0.32);
+    ctx.fillRect(0, h-captionH, w, captionH);
 
     ctx.strokeStyle = '#c9a227';
     ctx.lineWidth = 10;
     ctx.strokeRect(6, 6, w-12, h-12);
-
-    return new THREE.CanvasTexture(c);
   }
 
-  // ---------- one film's poster card: illustrated cartoon poster art plus
-  // independently-animatable title/director/year lines floating in front of it ----------
-  function buildFilemCard(title, director, year, theme, tone){
+  // ---------- one film's poster card: the real poster scan, with independently-
+  // animatable title/director/year lines floating over a caption strip at the
+  // bottom so the artwork itself stays fully visible above it ----------
+  function buildFilemCard(title, director, year, posterSrc){
     const group = new THREE.Group();
 
-    const frameTex = makePosterArt(theme, tone);
+    const w = 512, h = 724;
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    drawPosterCanvas(ctx, w, h, null);
+    const frameTex = new THREE.CanvasTexture(canvas);
     const frameMat = new THREE.MeshStandardMaterial({ map: frameTex, roughness: 0.6, emissive: 0xffffff, emissiveMap: frameTex, emissiveIntensity: 0.35 });
     const frame = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.55, 0.06), frameMat);
     group.add(frame);
 
-    const titleSprite = makeFilmLine(title, '700 42px Georgia', '#f2d98a', 480, 110);
-    titleSprite.position.set(0, 0.5, 0.06);
-    titleSprite.scale.set(1.45, 0.33, 1);
+    const img = new Image();
+    img.onload = () => {
+      drawPosterCanvas(ctx, w, h, img);
+      frameTex.needsUpdate = true;
+    };
+    img.src = posterSrc;
+
+    // compact caption strip at the very bottom -- leaves the poster art
+    // itself unobscured across the rest of the card
+    const titleSprite = makeFilmLine(title, '700 30px Georgia', '#f2d98a', 480, 80);
+    titleSprite.position.set(0, -0.52, 0.06);
+    titleSprite.scale.set(1.3, 0.22, 1);
     group.add(titleSprite);
 
-    const dirSprite = makeFilmLine('Pengarah: ' + director, 'italic 26px Georgia', '#e8d9ad', 480, 70);
-    dirSprite.position.set(0, 0.08, 0.06);
-    dirSprite.scale.set(1.3, 0.19, 1);
+    const dirSprite = makeFilmLine('Pengarah: ' + director, 'italic 22px Georgia', '#e8d9ad', 480, 60);
+    dirSprite.position.set(0, -0.62, 0.06);
+    dirSprite.scale.set(1.15, 0.145, 1);
     group.add(dirSprite);
 
-    const yearSprite = makeFilmLine(String(year), '700 48px Georgia', '#c9a961', 260, 100);
-    yearSprite.position.set(0, -0.4, 0.06);
-    yearSprite.scale.set(0.85, 0.33, 1);
+    const yearSprite = makeFilmLine(String(year), '700 30px Georgia', '#c9a961', 260, 70);
+    yearSprite.position.set(0, -0.72, 0.06);
+    yearSprite.scale.set(0.55, 0.15, 1);
     group.add(yearSprite);
 
     return { group, year, frame, titleSprite, dirSprite, yearSprite };
@@ -1653,12 +1619,12 @@
   function buildFilemMelayu(){
     const group = new THREE.Group();
     const films = [
-      { title:'HANG TUAH', director:'Phani Majumdar', year:1956, theme:'hangtuah', tone:'classic' },
-      { title:'PUTERI GUNUNG LEDANG', director:'S. Roomai Noor', year:1961, theme:'puterign', tone:'vintage' },
-      { title:'PUTERI GUNUNG LEDANG', director:'Saw Teong Hin', year:2004, theme:'puterign', tone:'color' },
+      { title:'HANG TUAH', director:'Phani Majumdar', year:1956, poster:'assets/images/poster_hangtuah_1956.jpg' },
+      { title:'PUTERI GUNUNG LEDANG', director:'S. Roomai Noor', year:1961, poster:'assets/images/poster_puterigl_1961.jpg' },
+      { title:'PUTERI GUNUNG LEDANG', director:'Saw Teong Hin', year:2004, poster:'assets/images/poster_puterigl_2004.jpg' },
     ]; // already sorted ascending by year
     const cards = films.map((f, i) => {
-      const card = buildFilemCard(f.title, f.director, f.year, f.theme, f.tone);
+      const card = buildFilemCard(f.title, f.director, f.year, f.poster);
       card.group.position.set((i-1)*1.3, 0, 0);
       group.add(card.group);
       return card;
