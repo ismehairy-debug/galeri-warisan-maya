@@ -1111,7 +1111,7 @@
   function buildStations(){
     const defs = [
       { key:'tarian',    name:'TARIAN',          sub:'Seni Persembahan',        color:0xd4a017, pos:[-6,0,-7], freq:220, wave:'sine' },
-      { key:'alatmuzik', name:'ALAT MUZIK',      sub:'Gamelan Instrument',      color:0x2a9d8f, pos:[6,0,-7],  audioSrc:'assets/audio/alat_muzik.mp3' },
+      { key:'alatmuzik', name:'ALAT MUZIK',      sub:'Gamelan Instrument',      color:0x2a9d8f, pos:[6,0,-7],  audioSrc:'assets/audio/alat_muzik.mp3', audioTrimStart:5, audioTrimEnd:5 },
       { key:'silat',    name:'SILAT',            sub:'Seni Persembahan',        color:0xa1273d, pos:[0,0,-8],  freq:110, wave:'sawtooth' },
       { key:'pakaian',  name:'SONGKET & BATIK',  sub:'Pakaian & Tekstil',       color:0xb5892f, pos:[-8,0,-2], freq:262, wave:'sine' },
       { key:'kraf',     name:'KERIS & ANYAMAN',  sub:'Kraf Tangan & Persenjataan', color:0x8a8f99, pos:[-8,0,5], freq:196, wave:'triangle' },
@@ -1329,32 +1329,40 @@
     songkok.position.y = 0.6;
     player.add(songkok);
 
-    // left arm resting, right arm on a pivot so it can swing a mallet (tabuh) to strike the keys
+    // left arm resting on the lap -- decorative only, doesn't need to clear the keys
     const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.26, 8), bajuMat);
     leftArm.position.set(-0.19, 0.32, 0.12);
     leftArm.rotation.z = 0.9;
     leftArm.rotation.x = -0.3;
     player.add(leftArm);
 
-    const rightArmPivot = new THREE.Group();
-    rightArmPivot.position.set(0.19, 0.42, 0.08);
-    player.add(rightArmPivot);
-    const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.26, 8), bajuMat);
-    rightArm.position.set(0, -0.13, 0.1);
-    rightArm.rotation.x = -0.6;
-    rightArmPivot.add(rightArm);
+    // mallet-wielding arm (tabuh), built as a plain vertical rig hung from a
+    // pivot rather than a swinging rotated arm -- a rotated chain here put
+    // the mallet head below the keys' surface even at rest, clipping straight
+    // through the instrument. A pure vertical bob keeps its reach easy to
+    // bound so it always stays above the keys.
+    // keys' top surface sits at y=-0.085 (center -0.1 + half-height 0.015)
+    const malletRestY = -0.025; // resting height of the mallet head, ~2.5cm above the keys
+    const armLength = 0.3; // forearm + mallet, stacked, from the pivot down to the mallet head
+    const armPivot = new THREE.Group();
+    armPivot.position.set(0.3, malletRestY + armLength, 0.15); // near a key, roughly at the player's right side
+    group.add(armPivot);
+
+    const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.16, 8), bajuMat);
+    forearm.position.y = -0.08;
+    armPivot.add(forearm);
 
     const malletMat = new THREE.MeshStandardMaterial({ color: 0x2a1a0e });
-    const mallet = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), malletMat);
-    mallet.position.set(0, -0.26, 0.2);
-    mallet.rotation.x = -0.6;
-    const malletHead = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), new THREE.MeshStandardMaterial({ color: 0x1a1206 }));
-    malletHead.position.y = -0.11;
+    const mallet = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.14, 6), malletMat);
+    mallet.position.y = -0.23;
+    armPivot.add(mallet);
+    const malletHead = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 8), new THREE.MeshStandardMaterial({ color: 0x1a1206 }));
+    malletHead.position.y = -0.07;
     mallet.add(malletHead);
-    rightArmPivot.add(mallet);
 
     group.userData.bars = bars;
-    group.userData.malletPivot = rightArmPivot;
+    group.userData.malletPivot = armPivot;
+    group.userData.malletBaseY = armPivot.position.y;
     return group;
   }
 
@@ -1394,6 +1402,7 @@
       performer.add(gamelan);
       performer.userData.bars = gamelan.userData.bars;
       performer.userData.malletPivot = gamelan.userData.malletPivot;
+      performer.userData.malletBaseY = gamelan.userData.malletBaseY;
     } else if (def.key === 'silat'){
       buildVideoScreen(performer, def, 'assets/videos/silat_clip.mp4');
     } else if (def.key === 'pakaian'){
@@ -1465,6 +1474,23 @@
     station.oscStarted = false;
   }
 
+  // ---------- crop dead air/intro-outro off a decoded audio buffer, so
+  // station tracks recorded from a longer source loop tightly on just the
+  // wanted middle section ----------
+  function trimAudioBuffer(buffer, trimStartSec, trimEndSec, ctx){
+    if (!trimStartSec && !trimEndSec) return buffer;
+    const sampleRate = buffer.sampleRate;
+    const startSample = Math.max(0, Math.floor(trimStartSec * sampleRate));
+    const endSample = Math.max(startSample + 1, buffer.length - Math.floor(trimEndSec * sampleRate));
+    if (startSample === 0 && endSample >= buffer.length) return buffer;
+    const frameCount = endSample - startSample;
+    const trimmed = ctx.createBuffer(buffer.numberOfChannels, frameCount, sampleRate);
+    for (let ch=0; ch<buffer.numberOfChannels; ch++){
+      trimmed.getChannelData(ch).set(buffer.getChannelData(ch).subarray(startSample, endSample));
+    }
+    return trimmed;
+  }
+
   function ensureStationAudio(station, ctx){
     if (station.oscStarted) return;
     const videoEl = station.performer && station.performer.userData && station.performer.userData.videoEl;
@@ -1475,7 +1501,8 @@
       if (station.audioLoading) return; // async load in flight -- wait for it
       station.audioLoading = true;
       new THREE.AudioLoader().load(station.def.audioSrc, buffer => {
-        station.sound.setBuffer(buffer);
+        const trimmed = trimAudioBuffer(buffer, station.def.audioTrimStart || 0, station.def.audioTrimEnd || 0, ctx);
+        station.sound.setBuffer(trimmed);
         station.sound.setLoop(true);
         station.sound.play();
         station.oscStarted = true;
@@ -1662,7 +1689,11 @@
             b.scale.y = h/0.4;
           });
           if (st.performer.userData.malletPivot){
-            st.performer.userData.malletPivot.rotation.x = -0.3 + Math.sin(t*4)*0.3*(0.3+st.active);
+            // small vertical bob only -- kept well within the clearance
+            // above the keys computed in buildGamelanPlayer, so the mallet
+            // never dips through the instrument
+            const dip = Math.abs(Math.sin(t*4)) * 0.0154 * (0.3 + st.active);
+            st.performer.userData.malletPivot.position.y = st.performer.userData.malletBaseY - dip;
           }
           st.performer.rotation.y = Math.sin(t*0.5)*0.12;
         } else if (st.def.key === 'pakaian'){
