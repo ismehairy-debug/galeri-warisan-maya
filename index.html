@@ -1441,6 +1441,46 @@
     scene.add(eastTrim);
 
     buildPillars();
+    buildSilatPlaque();
+  }
+
+  // ---------- Jawi calligraphy plaque ("بالاي سني"), mounted on the north
+  // wall directly above the SILAT station. Rendered via canvas (not
+  // THREE.TextGeometry) since the browser's own text shaping is what gets
+  // Arabic/Jawi glyph joining right -- a converted typeface font would not.
+  // Carved as a box (not a flat plane) so it reads as a real 3D signboard. ----------
+  function buildSilatPlaque(){
+    const group = new THREE.Group();
+    group.position.set(0, 2.6, -ROOM.depth/2 + 0.17);
+
+    const border = new THREE.Mesh(
+      new THREE.BoxGeometry(2.3, 1.15, 0.05),
+      new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.2, roughness: 0.5 })
+    );
+    border.position.z = -0.02;
+    group.add(border);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024; canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#c9a24a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#0d0904'; // black ink
+    ctx.font = '700 200px "Traditional Arabic", Arial, sans-serif';
+    ctx.fillText('بالاي سني', canvas.width/2, canvas.height/2 + 10);
+    const tex = new THREE.CanvasTexture(canvas);
+
+    const plaque = new THREE.Mesh(
+      new THREE.BoxGeometry(2.2, 1.1, 0.08),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 })
+    );
+    group.add(plaque);
+
+    scene.add(group);
+    return group;
   }
 
   // ---------- tiang seri (structural timber posts) ----------
