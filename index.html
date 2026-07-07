@@ -1451,7 +1451,11 @@
   // Carved as a box (not a flat plane) so it reads as a real 3D signboard. ----------
   function buildSilatPlaque(){
     const group = new THREE.Group();
-    group.position.set(0, 2.6, -ROOM.depth/2 + 0.17);
+    // north wall's window openings run floor-to-eave at every other segment
+    // (see computeWallSegments), including the one centred on x=0 right
+    // above SILAT -- mounting up in the solid gable area above the eave
+    // line (ROOM.height=4.5) instead avoids sitting in that window gap
+    group.position.set(0, ROOM.height + 0.3, -ROOM.depth/2 + 0.17);
 
     const border = new THREE.Mesh(
       new THREE.BoxGeometry(2.3, 1.15, 0.05),
