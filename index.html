@@ -1301,7 +1301,7 @@
       const maxWidth = w - bodyX - 40;
       const lineHeight = 25;
       const paraGap = 16;
-      let y = 225;
+      let y = 250;
       opts.body.split('\n').forEach(para => {
         wrapCanvasText(ctx, para, maxWidth).forEach(line => {
           ctx.fillText(line, bodyX, y);
