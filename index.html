@@ -1544,6 +1544,72 @@
     performer.userData.screen = screen;
   }
 
+  // ---------- a rectangular picture-frame mesh (outer rect with a rectangular
+  // hole cut for the artwork), used to mount a video like a framed poster
+  // rather than flush in a TV-style bezel ----------
+  function buildPictureFrame(outerW, outerH, innerW, innerH, depth, mat){
+    const shape = new THREE.Shape();
+    shape.moveTo(-outerW/2, -outerH/2);
+    shape.lineTo(outerW/2, -outerH/2);
+    shape.lineTo(outerW/2, outerH/2);
+    shape.lineTo(-outerW/2, outerH/2);
+    shape.closePath();
+    const hole = new THREE.Path();
+    hole.moveTo(-innerW/2, -innerH/2);
+    hole.lineTo(innerW/2, -innerH/2);
+    hole.lineTo(innerW/2, innerH/2);
+    hole.lineTo(-innerW/2, innerH/2);
+    hole.closePath();
+    shape.holes.push(hole);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 2 });
+    return new THREE.Mesh(geo, mat);
+  }
+
+  // ---------- PANTUN & ADAT's video, mounted as a static framed poster (like
+  // the FILEM MELAYU cards) instead of the pulsing TV-bezel the other video
+  // stations use -- the video still plays, but the card itself never scales
+  // or breathes, so it reads as a fixed piece on the wall ----------
+  function buildVideoPosterCard(performer, def, videoSrc, startTime){
+    const video = document.createElement('video');
+    video.src = videoSrc;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute('webkit-playsinline', 'true');
+    video.style.cssText = 'position:fixed; width:1px; height:1px; opacity:0; pointer-events:none;';
+    document.body.appendChild(video);
+
+    if (startTime){
+      video.addEventListener('loadedmetadata', () => { video.currentTime = startTime; });
+      video.addEventListener('ended', () => {
+        video.currentTime = startTime;
+        video.play().catch(() => {});
+      });
+    } else {
+      video.loop = true;
+    }
+    video.play().catch(() => {});
+
+    const videoTex = new THREE.VideoTexture(video);
+
+    const backing = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.86, 1.1),
+      new THREE.MeshStandardMaterial({ color: 0x1a1206, roughness: 0.8 })
+    );
+    backing.position.set(0, 0.3, -0.03);
+    performer.add(backing);
+
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex }));
+    screen.position.set(0, 0.3, 0.001);
+    performer.add(screen);
+
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.4, roughness: 0.4, metalness: 0.5 });
+    const frame = buildPictureFrame(1.86, 1.1, 1.62, 0.92, 0.04, frameMat);
+    frame.position.set(0, 0.3, -0.01);
+    performer.add(frame);
+
+    performer.userData.videoEl = video;
+  }
+
   // ---------- procedural anyaman (woven rattan/pandan) texture ----------
   function makeAnyamanTexture(){
     const c = document.createElement('canvas');
@@ -1921,7 +1987,7 @@
       performer.userData.dishes = [dish1, dish2, dish3];
     } else if (def.key === 'adat'){
       // 0.57s crops a dead intro cut off the front of the clip
-      buildVideoScreen(performer, def, 'assets/videos/pantun_budi.mp4', 0.57);
+      buildVideoPosterCard(performer, def, 'assets/videos/pantun_budi.mp4', 0.57);
     } else if (def.key === 'filem'){
       const cinema = buildFilemMelayu();
       performer.add(cinema);
@@ -2151,7 +2217,7 @@
 
       // idle + active animation per type (stations only — hotspots have no performer)
       if (st.performer){
-        if (st.def.key === 'tarian' || st.def.key === 'silat' || st.def.key === 'adat'){
+        if (st.def.key === 'tarian' || st.def.key === 'silat'){
           const pulse = 1 + Math.sin(t*2)*0.02*(0.3+st.active);
           st.performer.userData.screen.scale.setScalar(pulse);
         } else if (st.def.key === 'alatmuzik'){
