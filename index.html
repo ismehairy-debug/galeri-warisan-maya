@@ -981,66 +981,16 @@
     buildIstanaMelaka(0, 24);
   }
 
-  // ---------- Istana Kesultanan Melaka: the multi-tiered timber palace of the
-  // Melaka Sultanate, reconstructed here from the 15th-century descriptions in
-  // the Sejarah Melayu (Malay Annals). Placed further down the entrance axis,
-  // beyond the gateway, as the grand landmark visitors see on the way out ----------
-  function buildIstanaMelaka(x, z){
+  // ---------- one bertingkat (stepped pyramidal roof) cluster: the real Istana
+  // Kesultanan Melaka's facade is built from several of these side by side,
+  // rather than a single tall tower -- reused for the centre and both wings ----------
+  function buildTieredRoofCluster(baseRadius, tierCount, baseY, darkWoodMat, goldMat){
     const group = new THREE.Group();
-    group.position.set(x, 0, z);
-    scene.add(group);
-
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.8 });
-    const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x2a1a0e, roughness: 0.85 });
-    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf2d98a, emissive: 0xc9a227, emissiveIntensity: 0.5, roughness: 0.4 });
-
-    const platformW = 8, platformD = 6, stiltH = 1.8;
-
-    // stilts raising the whole palace off the ground, like every other
-    // traditional structure here, but taller and more numerous for a grander scale
-    for (let ix=-1; ix<=1; ix++){
-      for (let iz=-1; iz<=1; iz++){
-        const stilt = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, stiltH, 10), woodMat);
-        stilt.position.set(ix*(platformW/2-0.6), stiltH/2, iz*(platformD/2-0.6));
-        group.add(stilt);
-      }
-    }
-
-    const platform = new THREE.Mesh(new THREE.BoxGeometry(platformW, 0.3, platformD), woodMat);
-    platform.position.y = stiltH + 0.15;
-    group.add(platform);
-
-    const wallH = 2.6;
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(platformW*0.92, wallH, platformD*0.92),
-      new THREE.MeshStandardMaterial({ color: 0x3b2415, roughness: 0.85 }));
-    wall.position.y = stiltH + 0.3 + wallH/2;
-    group.add(wall);
-
-    const kerawangTex = makeKerawangTexture('#2a160c', '#c9a227', 6, 1);
-    const trim = new THREE.Mesh(new THREE.BoxGeometry(platformW*0.94, 0.4, platformD*0.94 + 0.02),
-      new THREE.MeshStandardMaterial({ map: kerawangTex, roughness: 0.8 }));
-    trim.position.y = stiltH + 0.3 + wallH - 0.2;
-    group.add(trim);
-
-    // grand entrance staircase facing back toward the gateway
-    const stepCount = 6;
-    for (let i=0; i<stepCount; i++){
-      const stepH = (stiltH+0.3)/stepCount;
-      const step = new THREE.Mesh(new THREE.BoxGeometry(2.2, stepH, 0.4), darkWoodMat);
-      step.position.set(0, stepH*(i+0.5), -(platformD/2 + 0.3 + i*0.36));
-      group.add(step);
-    }
-
-    // bertingkat: the palace's signature multi-tiered pyramidal roof, each
-    // tier smaller than the last -- the real Istana Kesultanan Melaka's most
-    // recognisable feature, distinct from the balai's single gable roof
-    const roofBaseY = stiltH + 0.3 + wallH;
-    const tierCount = 4;
-    let tierY = roofBaseY;
+    let tierY = baseY;
     for (let i=0; i<tierCount; i++){
       const frac = i/tierCount;
-      const radius = (platformW*0.62) * (1 - frac*0.62);
-      const height = 1.1 - frac*0.5;
+      const radius = baseRadius * (1 - frac*0.6);
+      const height = (baseRadius*0.28) * (1 - frac*0.4);
       const roof = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 4), darkWoodMat);
       roof.rotation.y = Math.PI/4;
       roof.position.y = tierY + height/2;
@@ -1054,19 +1004,179 @@
 
       tierY += height * 0.72; // tiers overlap slightly, like a real stepped roof
     }
-
-    const finial = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.9, 8), goldMat);
-    finial.position.y = tierY + 0.45;
+    const finial = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.55, 8), goldMat);
+    finial.position.y = tierY + 0.28;
     group.add(finial);
+    group.userData.topY = tierY + 0.28;
+    return group;
+  }
+
+  // ---------- a simple seated courtier, cartoon-primitive style, lining the
+  // throne hall the way the real audience-hall diorama does ----------
+  function buildCourtierFigure(clothColor){
+    const g = new THREE.Group();
+    const cloth = new THREE.MeshStandardMaterial({ color: clothColor, roughness: 0.75 });
+    const skin = new THREE.MeshStandardMaterial({ color: 0xd9a066, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), cloth);
+    body.scale.set(1, 0.85, 1.1);
+    body.position.y = 0.22;
+    g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 10), skin);
+    head.position.y = 0.5;
+    g.add(head);
+    const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.09, 10),
+      new THREE.MeshStandardMaterial({ color: 0x151008 }));
+    hat.position.y = 0.6;
+    g.add(hat);
+    return g;
+  }
+
+  // ---------- the Sultan's throne dais at the far end of the hall, under its own small canopy ----------
+  function buildThroneDais(goldMat){
+    const g = new THREE.Group();
+    const dais = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.3, 1.6),
+      new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.6, metalness: 0.3 }));
+    dais.position.y = 0.15;
+    g.add(dais);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.8),
+      new THREE.MeshStandardMaterial({ color: 0x6a1520, roughness: 0.6 }));
+    seat.position.y = 0.75;
+    g.add(seat);
+    const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.6, 4),
+      new THREE.MeshStandardMaterial({ color: 0xf2d98a, roughness: 0.5 }));
+    canopy.rotation.y = Math.PI/4;
+    canopy.position.y = 1.9;
+    g.add(canopy);
+    const finial = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 8), goldMat);
+    finial.position.y = 2.35;
+    g.add(finial);
+    return g;
+  }
+
+  // ---------- Istana Kesultanan Melaka: the Melaka Sultanate's palace, modelled
+  // after the real reconstruction near Bukit St. Paul -- a wide timber building
+  // with several bertingkat roof clusters side by side, a grand central
+  // staircase, and (since visitors can walk in) a throne hall inside leading to
+  // the Sultan's dais, styled after the museum's own audience-hall diorama.
+  // Placed further down the entrance axis, beyond the gateway ----------
+  function buildIstanaMelaka(x, z){
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    scene.add(group);
+
+    const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x2a1a0e, roughness: 0.85 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3b2415, roughness: 0.85 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf2d98a, emissive: 0xc9a227, emissiveIntensity: 0.5, roughness: 0.4 });
+
+    // wide facade, deep hall -- the real palace reads as a broad, low building,
+    // not a tall tower, so visitors can walk into a proper throne hall inside
+    const platformW = 16, platformD = 11, wallH = 3.4;
+    const innerW = platformW*0.94, innerD = platformD*0.94;
+
+    // floor -- flat at y=0 like the balai, so it's walkable (no elevated
+    // stilts here: the real building sits low on a plinth, not on tall posts)
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(innerW, innerD),
+      new THREE.MeshStandardMaterial({ map: makeWoodPlankTexture(), roughness: 0.85 }));
+    floor.rotation.x = -Math.PI/2;
+    floor.position.y = 0.01;
+    group.add(floor);
+
+    // side + back walls; the front (facing the gateway, -Z) is left open at
+    // its centre as the grand entrance doorway
+    const sideWall = new THREE.Mesh(new THREE.BoxGeometry(0.25, wallH, innerD), wallMat);
+    sideWall.position.set(-innerW/2, wallH/2, 0);
+    group.add(sideWall);
+    const sideWall2 = sideWall.clone();
+    sideWall2.position.x = innerW/2;
+    group.add(sideWall2);
+
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(innerW, wallH, 0.25), wallMat);
+    backWall.position.set(0, wallH/2, innerD/2);
+    group.add(backWall);
+
+    const doorHalf = 1.9;
+    const frontPieceW = innerW/2 - doorHalf;
+    [-1, 1].forEach(side => {
+      const piece = new THREE.Mesh(new THREE.BoxGeometry(frontPieceW, wallH, 0.25), wallMat);
+      piece.position.set(side*(doorHalf + frontPieceW/2), wallH/2, -innerD/2);
+      group.add(piece);
+    });
+
+    const kerawangTex = makeKerawangTexture('#2a160c', '#c9a227', 10, 1);
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(platformW*0.96, 0.4, platformD*0.96 + 0.02),
+      new THREE.MeshStandardMaterial({ map: kerawangTex, roughness: 0.8 }));
+    trim.position.y = wallH - 0.2;
+    group.add(trim);
+
+    // grand entrance staircase facing back toward the gateway, flanked by flagpoles
+    const stepCount = 5;
+    for (let i=0; i<stepCount; i++){
+      const stepH = 0.5/stepCount;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(4.4, stepH, 0.4), darkWoodMat);
+      step.position.set(0, stepH*(i+0.5), -(innerD/2 + 0.3 + i*0.36));
+      group.add(step);
+    }
+    [-2.6, 2.6].forEach(px => {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 3.2, 8), darkWoodMat);
+      pole.position.set(px, 1.6, -(innerD/2 + 1.4));
+      group.add(pole);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35),
+        new THREE.MeshStandardMaterial({ color: 0xa1273d, side: THREE.DoubleSide }));
+      flag.position.set(px + (px<0?0.27:-0.27), 2.9, -(innerD/2 + 1.4));
+      group.add(flag);
+    });
+
+    // bertingkat roof: three separate stacked-tier clusters along the facade --
+    // the real building's signature silhouette, distinct from a single tower
+    const roofBaseY = wallH;
+    const clusters = [
+      buildTieredRoofCluster(3.0, 3, roofBaseY, darkWoodMat, goldMat),
+      buildTieredRoofCluster(4.2, 4, roofBaseY, darkWoodMat, goldMat),
+      buildTieredRoofCluster(3.0, 3, roofBaseY, darkWoodMat, goldMat),
+    ];
+    let topY = roofBaseY;
+    [-5, 0, 5].forEach((cx, i) => {
+      clusters[i].position.x = cx;
+      group.add(clusters[i]);
+      topY = Math.max(topY, clusters[i].userData.topY);
+    });
 
     // warm glow so the palace reads clearly against the dusk sky at a distance
-    const glow = new THREE.PointLight(0xffd9a0, 1.1, 16, 2);
-    glow.position.set(0, roofBaseY + 1.5, -1);
+    const glow = new THREE.PointLight(0xffd9a0, 1.2, 20, 2);
+    glow.position.set(0, roofBaseY + 1.5, -2);
     group.add(glow);
 
+    // --- interior: a throne hall styled after the museum's own audience-hall
+    // diorama -- a golden central carpet leading to the Sultan's dais, a
+    // scalloped canopy overhead, and rows of seated courtiers along both sides
+    const carpet = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.05, innerD*0.82),
+      new THREE.MeshStandardMaterial({ color: 0xd9b95a, roughness: 0.6, emissive: 0x6a4a10, emissiveIntensity: 0.15 }));
+    carpet.position.y = 0.04;
+    group.add(carpet);
+
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0xf2d98a, roughness: 0.5, side: THREE.DoubleSide });
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.06, innerD*0.85), canopyMat);
+    canopy.position.y = wallH - 0.7;
+    group.add(canopy);
+
+    const courtierColors = [0x2a2350, 0x6a1520, 0x1f4a3a, 0x4a2f1c, 0x6a4fae, 0xb5892f];
+    for (let i=0; i<6; i++){
+      const cz = -innerD*0.35 + i*(innerD*0.7/5);
+      [-1, 1].forEach(side => {
+        const courtier = buildCourtierFigure(courtierColors[i % courtierColors.length]);
+        courtier.position.set(side*2.1, 0, cz);
+        courtier.rotation.y = side>0 ? -Math.PI/2 : Math.PI/2; // facing the central carpet
+        group.add(courtier);
+      });
+    }
+
+    const throne = buildThroneDais(goldMat);
+    throne.position.set(0, 0, innerD*0.4);
+    group.add(throne);
+
     const label = makeLabel('ISTANA KESULTANAN MELAKA', 'Malacca Sultanate Palace, 15th century');
-    label.scale.set(3.2, 1.0, 1);
-    label.position.set(0, tierY + 1.6, 0);
+    label.scale.set(3.6, 1.1, 1);
+    label.position.set(0, topY + 1.6, 0);
     label.material.opacity = 1;
     group.add(label);
 
