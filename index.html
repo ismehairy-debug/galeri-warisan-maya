@@ -1784,7 +1784,11 @@
   }
 
   function buildTitleSprite(){
-    const s = makeLabel('GALERI WARISAN MAYA', 'Walking through time, stepping into culture');
+    // static-facing plane, same as every station/hotspot sign, instead of a
+    // camera-facing sprite -- its default front (+Z) already faces south,
+    // toward the gateway visitors actually walk in from, so no extra
+    // rotation is needed (unlike tanggam/the Istana sign further out)
+    const s = makeLabel('GALERI WARISAN MAYA', 'Walking through time, stepping into culture', true);
     s.position.set(0, 3.1, 2.5);
     s.material.opacity = 1;
     scene.add(s);
@@ -1819,7 +1823,7 @@
     const defs = [
       { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-halfW, 1.3, -6] },
       { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1] },
-      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 4.1, ROOM.depth/2-0.6], labelZOffset:-0.6 },
+      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 2.2, ROOM.depth/2-0.6] },
     ];
     return defs.map(buildHotspot);
   }
@@ -1842,13 +1846,12 @@
     // sprite reads as tilting into the gateway's finial when viewed from a
     // steep angle; a fixed plane at the same 0.5 gap used by the other two
     // hotspots keeps it level and reads the same as every other sign.
-    // tanggam's gateway also has a real gold finial sitting right at the
-    // same (x,z) between its marker and label height, so its sign gets an
-    // extra forward nudge (labelZOffset) to sit in front of the finial
-    // instead of coinciding with it and reading as an obscured, cut-up sign
+    // tanggam itself sits low, between the two gateway posts and well
+    // below the crossbeam/finial cluster up top, so there's nothing there
+    // to obscure it regardless of viewing angle
     const label = makeLabel(def.name, def.sub, true);
     label.scale.set(2.2, 0.7, 1);
-    label.position.set(0, def.pos[1] + 0.5, def.labelZOffset || 0);
+    label.position.set(0, def.pos[1] + 0.5, 0);
     group.add(label);
 
     return { def, group, marker, label, active: 0, worldPos: new THREE.Vector3() };
