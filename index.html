@@ -1023,6 +1023,7 @@
     buildAdBillboard(6, 13, {
       logoSrc: 'assets/images/fcoee_logo.png',
       title: 'FCoEE',
+      fullName: 'Faizuddin Centre of Educational Excellence',
       body: 'FCoEE, sebuah inisiatif pendidikan dibawah Majlis Agama Islam dan Adat Istiadat Melayu Perlis (MAIPs) dalam usaha memperkasakan pembelajaran AI & Robotik, inovasi penyelidikan dan teknologi untuk generasi masa hadapan.\nFCoEE menjadi wadah penerokaan yang menghubungkan ilmu, kreativiti, penyelidikan dan teknologi, membuka peluang kepada setiap individu untuk belajar, mencipta dan meneroka potensi tanpa batasan.',
       url: 'faizuddincoe.com',
     });
@@ -1285,18 +1286,32 @@
       ctx.fillText(opts.subtitle, 232, 140);
     }
 
+    if (opts.fullName){
+      // the company's full name, below the logo (which occupies x 44-204,
+      // y 40-200) rather than crowded in next to the title
+      ctx.font = 'italic 26px Georgia';
+      ctx.fillStyle = '#e8d9ad';
+      ctx.fillText(opts.fullName, 60, 230);
+    }
+
     if (opts.body){
       // a longer free-form paragraph (instead of short bullet lines) --
-      // word-wrapped to fit, in a smaller font so more of it fits above the url.
-      // Starts below the logo (which occupies x 44-204, y 40-200) so the
-      // text never writes over it.
+      // word-wrapped to fit, in a smaller font so more of it fits above the
+      // url. Each '\n'-separated paragraph gets its own wrap pass plus an
+      // extra gap after it, so paragraph breaks actually read as breaks.
       ctx.font = '22px Georgia';
       ctx.fillStyle = '#f2e2b6';
       const maxWidth = w - 60 - 40;
-      const bodyLines = opts.body.split('\n').flatMap(para => wrapCanvasText(ctx, para, maxWidth));
       const lineHeight = 26;
-      const startY = 222;
-      bodyLines.forEach((line, i) => ctx.fillText(line, 60, startY + i*lineHeight));
+      const paraGap = 14;
+      let y = opts.fullName ? 268 : 222;
+      opts.body.split('\n').forEach(para => {
+        wrapCanvasText(ctx, para, maxWidth).forEach(line => {
+          ctx.fillText(line, 60, y);
+          y += lineHeight;
+        });
+        y += paraGap;
+      });
     } else {
       ctx.font = '30px Georgia';
       ctx.fillStyle = '#f2e2b6';
@@ -1710,16 +1725,16 @@
       new THREE.PlaneGeometry(1.86, 1.1),
       new THREE.MeshStandardMaterial({ color: 0x1a1206, roughness: 0.8 })
     );
-    backing.position.set(0, 0.3, -0.03);
+    backing.position.set(0, 0.7, -0.03);
     performer.add(backing);
 
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex }));
-    screen.position.set(0, 0.3, 0.001);
+    screen.position.set(0, 0.7, 0.001);
     performer.add(screen);
 
     const frameMat = new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.4, roughness: 0.4, metalness: 0.5 });
     const frame = buildPictureFrame(1.86, 1.1, 1.62, 0.92, 0.04, frameMat);
-    frame.position.set(0, 0.3, -0.01);
+    frame.position.set(0, 0.7, -0.01);
     performer.add(frame);
 
     performer.userData.videoEl = video;
@@ -2025,7 +2040,7 @@
       // visual-only loops (see ensureStationAudio's 'pakaian' skip), so
       // anak ayam is the only audio heard at this station
       const songketGroup = new THREE.Group();
-      songketGroup.position.set(-1.05, 0.535, 0);
+      songketGroup.position.set(-1.05, 0.315, 0);
       songketGroup.scale.setScalar(0.55);
       performer.add(songketGroup);
       buildVideoPosterCard(songketGroup, def, 'assets/videos/songket_clip.mp4');
@@ -2034,7 +2049,7 @@
       songketGroup.add(songketSwatch);
 
       const batikGroup = new THREE.Group();
-      batikGroup.position.set(1.05, 0.535, 0);
+      batikGroup.position.set(1.05, 0.315, 0);
       batikGroup.scale.setScalar(0.55);
       performer.add(batikGroup);
       buildVideoPosterCard(batikGroup, def, 'assets/videos/batik_clip.mp4');
@@ -2290,14 +2305,6 @@
     renderer.render(scene, camera);
   }
 
-  // ---------- shortest-path angle interpolation (avoids spinning the long
-  // way round when the target crosses the +-PI wrap point) ----------
-  function lerpAngle(current, target, t){
-    let delta = target - current;
-    delta = ((delta + Math.PI) % (Math.PI*2) + Math.PI*2) % (Math.PI*2) - Math.PI;
-    return current + delta * t;
-  }
-
   function updateFrame(points, clouds, birds, dt, t){
     desktopMove(dt);
     vrMove(dt);
@@ -2371,16 +2378,6 @@
           st.performer.rotation.y = t*0.3;
         } else if (st.def.key === 'makanan'){
           st.performer.userData.dishes.forEach((d,i) => { d.position.y = -0.15 - 0.03*i + Math.sin(t*2+i)*0.01; });
-        }
-
-        // video-screen stations turn to face the visitor for as long as
-        // they're close enough to hear/see the interaction (st.active), and
-        // settle back to facing straight ahead the moment nobody's there
-        if (st.def.key === 'tarian' || st.def.key === 'silat' || st.def.key === 'adat' || st.def.key === 'pakaian'){
-          const targetYaw = st.active > 0.05
-            ? Math.atan2(camWorld.x - st.worldPos.x, camWorld.z - st.worldPos.z)
-            : 0;
-          st.performer.rotation.y = lerpAngle(st.performer.rotation.y, targetYaw, Math.min(1, dt*3));
         }
       }
 
