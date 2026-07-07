@@ -208,6 +208,7 @@
 <div id="joystick-base"><div id="joystick-knob"></div></div>
 
 <audio id="bgMusic" src="assets/audio/anak_ayam.mp3" loop></audio>
+<audio id="istanaMusic" src="assets/audio/nobat_kedah.mp3" loop></audio>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -250,6 +251,10 @@
   let bgVolCurrent = 0;
   let insideSmooth = 1;
   const BG_BASE_VOL = 0.4;
+  let istanaGainNode = null;
+  let istanaVolCurrent = 0;
+  let insideIstanaSmooth = 0;
+  const ISTANA_BASE_VOL = 0.4;
   let currentInfoKey = null;
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
@@ -264,6 +269,9 @@
   let lookTouchId = null, lastTouchX = 0, lastTouchY = 0;
 
   const ROOM = { width: 20, depth: 18, height: 4.5 };
+  // must match buildIstanaMelaka's own platformW/platformD and the (0,24)
+  // position it's actually placed at in scatterVegetation
+  const ISTANA = { x: 0, z: 24, halfW: 8, halfD: 5.5 };
 
   // ground-plane (XZ) obstacles the player can't walk through -- populated
   // as the scene is built. Each is either { type:'circle', x,z,r } for
@@ -317,6 +325,7 @@
     stations.forEach(s => attachAudio(s, listener));
     ambienceRef = buildOutsideAmbience(listener);
     bgGainNode = buildBgMusicGain(listener);
+    istanaGainNode = buildIstanaMusicGain(listener);
     buildTitleSprite();
 
     window.addEventListener('resize', onResize);
@@ -375,6 +384,7 @@
       // silently and the enterBtn handler below picks it up as a fallback.
       if (listener.context.state === 'suspended') listener.context.resume().catch(() => {});
       startBackgroundMusic();
+      startIstanaMusic();
       startOutsideAmbience();
       ambienceStarted = true;
     }
@@ -411,6 +421,26 @@
   function startBackgroundMusic(){
     const audio = document.getElementById('bgMusic');
     if (!audio.paused) return; // already playing -- don't restart it from the top
+    audio.play().catch(() => {});
+  }
+
+  // ---------- ambient nobat music (royal court ensemble) — only heard
+  // inside/near the Istana Melaka, same GainNode-routing reasoning as
+  // buildBgMusicGain above ----------
+  function buildIstanaMusicGain(listener){
+    const ctx = listener.context;
+    const audio = document.getElementById('istanaMusic');
+    const source = ctx.createMediaElementSource(audio);
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    return gain;
+  }
+
+  function startIstanaMusic(){
+    const audio = document.getElementById('istanaMusic');
+    if (!audio.paused) return;
     audio.play().catch(() => {});
   }
 
@@ -460,6 +490,15 @@
     const margin = 2.5; // metres of soft crossfade at the open sides/gateway
     const dx = Math.max(0, Math.abs(pos.x) - halfW);
     const dz = Math.max(0, Math.abs(pos.z) - halfD);
+    const dist = Math.hypot(dx, dz);
+    return THREE.MathUtils.clamp(1 - dist/margin, 0, 1);
+  }
+
+  // ---------- how far inside the Istana Melaka's footprint the camera is (1 = inside, 0 = well outside) ----------
+  function computeInsideIstanaAmount(pos){
+    const margin = 3; // metres of soft crossfade approaching through the gateway
+    const dx = Math.max(0, Math.abs(pos.x - ISTANA.x) - ISTANA.halfW);
+    const dz = Math.max(0, Math.abs(pos.z - ISTANA.z) - ISTANA.halfD);
     const dist = Math.hypot(dx, dz);
     return THREE.MathUtils.clamp(1 - dist/margin, 0, 1);
   }
@@ -529,6 +568,7 @@
       ambienceStarted = true;
       unlockStationMedia();
       startBackgroundMusic();
+      startIstanaMusic();
       startOutsideAmbience();
       if (isTouchDevice) requestGyroPermission();
       else renderer.domElement.requestPointerLock();
@@ -1315,9 +1355,14 @@
     throne.position.set(0, 0, innerD*0.4);
     group.add(throne);
 
-    const label = makeLabel('ISTANA KESULTANAN MELAKA', 'Malacca Sultanate Palace, 15th century');
+    // static-facing plane, same as every station/hotspot sign, instead of a
+    // camera-facing sprite -- and explicitly turned to face south (-Z),
+    // straight down the entrance axis toward the balai seni, since the
+    // Istana sits north of it and a visitor always approaches from there
+    const label = makeLabel('ISTANA KESULTANAN MELAKA', 'Malacca Sultanate Palace, 15th century', true);
     label.scale.set(3.6, 1.1, 1);
     label.position.set(0, topY + 1.6, 0);
+    label.rotation.y = Math.PI;
     label.material.opacity = 1;
     group.add(label);
 
@@ -2400,6 +2445,7 @@
               }
               unlockStationMedia();
               startBackgroundMusic();
+              startIstanaMusic();
               startOutsideAmbience();
               ambienceStarted = true;
             });
@@ -2542,10 +2588,14 @@
     updateInfoPanel(bestStation);
 
     // anak ayam only plays inside the balai, and fades out while near any
-    // exhibit interaction; outside the balai, wind + bird chirps take over
+    // exhibit interaction; nobat only plays inside/near the Istana; outside
+    // both, wind + bird chirps take over
     if (ambienceStarted){
       const insideAmount = computeInsideAmount(camWorld);
       insideSmooth += (insideAmount - insideSmooth) * Math.min(1, dt*2);
+
+      const insideIstanaAmount = computeInsideIstanaAmount(camWorld);
+      insideIstanaSmooth += (insideIstanaAmount - insideIstanaSmooth) * Math.min(1, dt*2);
 
       const targetBgVol = BG_BASE_VOL * insideSmooth * (1 - maxActive);
       bgVolCurrent += (targetBgVol - bgVolCurrent) * Math.min(1, dt*3);
@@ -2554,11 +2604,18 @@
         bgGainNode.gain.value = Number.isFinite(safeVol) ? safeVol : 0;
       }
 
+      const targetIstanaVol = ISTANA_BASE_VOL * insideIstanaSmooth;
+      istanaVolCurrent += (targetIstanaVol - istanaVolCurrent) * Math.min(1, dt*3);
+      const safeIstanaVol = Math.max(0, Math.min(1, istanaVolCurrent));
+      if (istanaGainNode && istanaGainNode.context.state === 'running'){
+        istanaGainNode.gain.value = Number.isFinite(safeIstanaVol) ? safeIstanaVol : 0;
+      }
+
       // the AudioContext can be suspended/interrupted on mobile (screen lock,
       // notification, incoming call) -- touching its nodes while it isn't
       // 'running' can throw, so mirror the same guard the station audio uses
       if (ambienceRef && ambienceRef.wind.context.state === 'running'){
-        const outsideAmount = 1 - insideSmooth;
+        const outsideAmount = (1 - insideSmooth) * (1 - insideIstanaSmooth);
         ambienceRef.wind.setVolume(outsideAmount * 0.22);
         ambienceRef.nextChirpIn -= dt;
         if (outsideAmount > 0.05 && ambienceRef.nextChirpIn <= 0){
