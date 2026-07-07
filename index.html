@@ -1157,6 +1157,22 @@
     group.add(eastWall);
     registerWallColliders(innerD, 0.25, 2.2, 1.6, -Math.PI/2, x + innerW/2, z);
 
+    // real-photo reference plaques of the actual Istana Kesultanan Melaka
+    // reconstruction (near Bukit St. Paul) this building is modelled after --
+    // mounted on the outside face of the west/east walls, centred on the
+    // solid wall segment nearest the middle so neither sits over a window
+    // gap, facing outward so visitors approaching from outside see them
+    const refPhotoW = 1.7, refPhotoH = refPhotoW * (400/600); // matches the source photo's 3:2 aspect
+    const westPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', refPhotoW, refPhotoH);
+    westPhoto.position.set(-innerW/2 - 0.145, wallH*0.55, 0.27);
+    westPhoto.rotation.y = -Math.PI/2;
+    group.add(westPhoto);
+
+    const eastPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', refPhotoW, refPhotoH);
+    eastPhoto.position.set(innerW/2 + 0.145, wallH*0.55, -0.27);
+    eastPhoto.rotation.y = Math.PI/2;
+    group.add(eastPhoto);
+
     const backWall = buildSegmentedWall(innerW, wallH, 0.25, wallMat, 2.6, 1.8);
     backWall.position.set(0, 0, innerD/2);
     group.add(backWall);
@@ -1796,6 +1812,33 @@
     performer.add(frame);
 
     performer.userData.videoEl = video;
+  }
+
+  // ---------- a real still photo mounted in the same gold picture-frame
+  // style as buildVideoPosterCard, for reference plaques rather than
+  // looping video (e.g. the real-world photo comparison outside the
+  // Istana Melaka) ----------
+  function buildExteriorPhotoPlaque(imgSrc, w, h){
+    const group = new THREE.Group();
+
+    const backing = new THREE.Mesh(
+      new THREE.PlaneGeometry(w + 0.14, h + 0.14),
+      new THREE.MeshStandardMaterial({ color: 0x1a1206, roughness: 0.8 })
+    );
+    backing.position.z = -0.03;
+    group.add(backing);
+
+    const tex = new THREE.TextureLoader().load(imgSrc);
+    const photo = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75 }));
+    photo.position.z = 0.001;
+    group.add(photo);
+
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.4, roughness: 0.4, metalness: 0.5 });
+    const frame = buildPictureFrame(w + 0.14, h + 0.14, w, h, 0.04, frameMat);
+    frame.position.z = -0.01;
+    group.add(frame);
+
+    return group;
   }
 
   // ---------- procedural anyaman (woven rattan/pandan) texture ----------
