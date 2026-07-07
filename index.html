@@ -1821,7 +1821,7 @@
   function buildArchitectureHotspots(){
     const halfW = ROOM.width/2 - 0.4;
     const defs = [
-      { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-halfW, 1.3, -6] },
+      { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-halfW, 1.3, -6], labelY:1.6 },
       { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1] },
       { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 2.2, ROOM.depth/2-0.6] },
     ];
@@ -1849,9 +1849,12 @@
     // tanggam itself sits low, between the two gateway posts and well
     // below the crossbeam/finial cluster up top, so there's nothing there
     // to obscure it regardless of viewing angle
+    // no extra scale here -- makeLabel's own plane size already matches
+    // every station/plaque sign, so hotspot signs read at the same size
     const label = makeLabel(def.name, def.sub, true);
-    label.scale.set(2.2, 0.7, 1);
-    label.position.set(0, def.pos[1] + 0.5, 0);
+    // tiang seri overrides with labelY so its sign reads at the camera's own
+    // eye height (1.6) rather than floating above the low stilt marker
+    label.position.set(0, def.labelY != null ? def.labelY : def.pos[1] + 0.5, 0);
     group.add(label);
 
     return { def, group, marker, label, active: 0, worldPos: new THREE.Vector3() };
@@ -1926,6 +1929,10 @@
     // have more spare hardware decode capacity so it went unnoticed there)
 
     const videoTex = new THREE.VideoTexture(video);
+    // videos are authored/encoded as sRGB -- without flagging that here, r128's
+    // shader treats the sampled color as linear and re-encodes it for sRGB
+    // output, which is what was flattening the clip's color into a washed-out look
+    videoTex.encoding = THREE.sRGBEncoding;
 
     const backing = new THREE.Mesh(
       new THREE.PlaneGeometry(1.86, 1.1),
@@ -1934,7 +1941,10 @@
     backing.position.set(0, 0.7, -0.03);
     performer.add(backing);
 
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex }));
+    // fog:false so walking up to watch doesn't blend the footage toward the
+    // scene's ambient fog tint -- keeps the clip's own color sharp regardless
+    // of environment brightness/distance while the viewer is actually engaging with it
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex, fog: false }));
     screen.position.set(0, 0.7, 0.001);
     performer.add(screen);
 
