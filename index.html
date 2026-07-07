@@ -839,8 +839,11 @@
   function registerWallColliders(totalWidth, thickness, mullionW, windowW, rotY, centerX, centerZ){
     const segs = computeWallSegments(totalWidth, mullionW, windowW);
     const cos = Math.round(Math.cos(rotY)), sin = Math.round(Math.sin(rotY));
+    // every segment gets a collider, not just the solid mullion posts -- each
+    // window opening still has the low sill wall running its full width, and
+    // since collision here ignores height entirely, skipping "open" segments
+    // left the sill (and everything above it) walkable straight through
     segs.forEach(s => {
-      if (!s.solid) return;
       const mid = s.start + s.width/2;
       const cx = centerX + mid*cos;
       const cz = centerZ - mid*sin;
@@ -2634,11 +2637,25 @@
         bgGainNode.gain.value = Number.isFinite(safeVol) ? safeVol : 0;
       }
 
+      // nobat only plays inside/near the Istana Melaka, same crossfade
+      // treatment as anak ayam does for the balai above
+      const insideIstanaAmount = computeInsideIstanaAmount(camWorld);
+      insideIstanaSmooth += (insideIstanaAmount - insideIstanaSmooth) * Math.min(1, dt*2);
+
+      const targetIstanaVol = ISTANA_BASE_VOL * insideIstanaSmooth;
+      istanaVolCurrent += (targetIstanaVol - istanaVolCurrent) * Math.min(1, dt*3);
+      const safeIstanaVol = Math.max(0, Math.min(1, istanaVolCurrent));
+      if (istanaGainNode && istanaGainNode.context.state === 'running'){
+        istanaGainNode.gain.value = Number.isFinite(safeIstanaVol) ? safeIstanaVol : 0;
+      }
+
       // the AudioContext can be suspended/interrupted on mobile (screen lock,
       // notification, incoming call) -- touching its nodes while it isn't
       // 'running' can throw, so mirror the same guard the station audio uses
       if (ambienceRef && ambienceRef.wind.context.state === 'running'){
-        const outsideAmount = 1 - insideSmooth;
+        // wind + birds are an outdoor soundscape -- they have no business
+        // inside the Istana either, so nobat fully replaces them there too
+        const outsideAmount = (1 - insideSmooth) * (1 - insideIstanaSmooth);
         ambienceRef.wind.setVolume(outsideAmount * 0.22);
         ambienceRef.nextChirpIn -= dt;
         if (outsideAmount > 0.05 && ambienceRef.nextChirpIn <= 0){
