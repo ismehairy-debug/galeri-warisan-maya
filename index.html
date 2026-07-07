@@ -1539,6 +1539,26 @@
     return { def, group, marker, label, active: 0, worldPos: new THREE.Vector3() };
   }
 
+  // ---------- a small real-photo fabric swatch, gold-bordered, meant to sit
+  // just below a process video as a physical-sample reference ----------
+  function buildFabricSwatch(textureSrc){
+    const group = new THREE.Group();
+    const border = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.56, 0.72),
+      new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.25, roughness: 0.5 })
+    );
+    border.position.z = -0.01;
+    group.add(border);
+
+    const tex = new THREE.TextureLoader().load(textureSrc);
+    const swatch = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.5, 0.66),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75 })
+    );
+    group.add(swatch);
+    return group;
+  }
+
   // ---------- shared helper: a looping video panel used by video-backed stations ----------
   function buildVideoScreen(performer, def, videoSrc, startTime){
     const video = document.createElement('video');
@@ -1952,12 +1972,18 @@
       songketGroup.scale.setScalar(0.55);
       performer.add(songketGroup);
       buildVideoScreen(songketGroup, def, 'assets/videos/songket_clip.mp4');
+      const songketSwatch = buildFabricSwatch('assets/images/songket_pattern.jpg');
+      songketSwatch.position.set(0, -0.55, 0.05);
+      songketGroup.add(songketSwatch);
 
       const batikGroup = new THREE.Group();
       batikGroup.position.set(0.85, 0.135, 0);
       batikGroup.scale.setScalar(0.55);
       performer.add(batikGroup);
       buildVideoScreen(batikGroup, def, 'assets/videos/batik_clip.mp4');
+      const batikSwatch = buildFabricSwatch('assets/images/batik_pattern.jpg');
+      batikSwatch.position.set(0, -0.55, 0.05);
+      batikGroup.add(batikSwatch);
 
       performer.userData.videoEl = songketGroup.userData.videoEl;
       performer.userData.videoEl2 = batikGroup.userData.videoEl;
