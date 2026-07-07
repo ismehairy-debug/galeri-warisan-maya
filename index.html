@@ -1185,6 +1185,15 @@
       piece.position.set(side*(doorHalf + frontPieceW/2), wallH/2, -innerD/2);
       group.add(piece);
       addBoxCollider(x + side*(doorHalf + frontPieceW/2), z - innerD/2, frontPieceW/2, 0.25);
+
+      // same real-photo reference plaque, but here on the front-facing
+      // flanking walls either side of the entrance -- the first thing a
+      // visitor actually sees walking up through the gateway, unlike the
+      // west/east plaques above which sit on the far outside faces
+      const frontPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', refPhotoW, refPhotoH);
+      frontPhoto.position.set(side*(doorHalf + frontPieceW/2), wallH*0.55, -innerD/2 - 0.145);
+      frontPhoto.rotation.y = Math.PI;
+      group.add(frontPhoto);
     });
 
     const kerawangTex = makeKerawangTexture('#2a160c', '#c9a227', 10, 1);
