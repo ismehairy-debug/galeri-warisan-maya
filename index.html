@@ -1586,7 +1586,7 @@
   }
 
   // ---------- text sprite ----------
-  function makeLabel(text, sub){
+  function makeLabel(text, sub, staticFacing){
     const c = document.createElement('canvas');
     c.width = 512; c.height = 160;
     const ctx = c.getContext('2d');
@@ -1609,6 +1609,13 @@
     ctx.fillStyle = '#c9a961';
     ctx.fillText(sub || '', 256, 116);
     const tex = new THREE.CanvasTexture(c);
+    // station labels are static (a fixed plane facing the same direction as
+    // their now-static picture frames) so they read as mounted signage
+    // rather than always spinning to face the visitor like a sprite does
+    if (staticFacing){
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0 });
+      return new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.75), mat);
+    }
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0 });
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(2.4, 0.75, 1);
@@ -2077,7 +2084,7 @@
       // visual-only loops (see ensureStationAudio's 'pakaian' skip), so
       // anak ayam is the only audio heard at this station
       const songketGroup = new THREE.Group();
-      songketGroup.position.set(-1.05, 0.315, 0);
+      songketGroup.position.set(-0.6, 0.315, 0);
       songketGroup.scale.setScalar(0.55);
       performer.add(songketGroup);
       buildVideoPosterCard(songketGroup, def, 'assets/videos/songket_clip.mp4');
@@ -2086,7 +2093,7 @@
       songketGroup.add(songketSwatch);
 
       const batikGroup = new THREE.Group();
-      batikGroup.position.set(1.05, 0.315, 0);
+      batikGroup.position.set(0.6, 0.315, 0);
       batikGroup.scale.setScalar(0.55);
       performer.add(batikGroup);
       buildVideoPosterCard(batikGroup, def, 'assets/videos/batik_clip.mp4');
@@ -2132,8 +2139,8 @@
       performer.userData.filemCards = cinema.userData.cards;
     }
 
-    const label = makeLabel(def.name, def.sub);
-    label.position.set(0, def.labelY || 2.1, 0);
+    const label = makeLabel(def.name, def.sub, true);
+    label.position.set(0, def.labelY || 2.6, 0);
     group.add(label);
 
     return {
@@ -2393,7 +2400,7 @@
 
       // label fade
       st.label.material.opacity = st.active;
-      if (st.ring) st.label.position.y = (st.def.labelY || 2.1) + st.active*0.15;
+      if (st.ring) st.label.position.y = (st.def.labelY || 2.6) + st.active*0.15;
 
       // idle + active animation per type (stations only — hotspots have no performer)
       if (st.performer){
