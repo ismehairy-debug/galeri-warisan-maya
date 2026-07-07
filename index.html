@@ -1013,6 +1013,7 @@
       const radius = Math.max(halfW,halfD) + 4 + Math.random()*20;
       const x = Math.cos(angle)*radius, z = Math.sin(angle)*radius;
       if (Math.abs(x) < 4 && z > 0) continue; // keep the entrance approach clear
+      if (Math.abs(x) < 9 && Math.abs(z - 24) < 7) continue; // keep the Istana Melaka's footprint clear
       const r = Math.random();
       if (r < 0.4) buildCoconutPalm(x,z);
       else if (r < 0.7) buildBananaPlant(x,z);
@@ -1291,16 +1292,19 @@
       // word-wrapped to fit, in a smaller font so more of it fits above the
       // url. Each '\n'-separated paragraph gets its own wrap pass plus an
       // extra gap after it, so paragraph breaks actually read as breaks.
-      // Starts below the logo (x 44-204, y 40-200) so it never writes over it.
+      // Starts a good 2-3 line-heights below the logo (x 44-204, y 40-200),
+      // left-aligned to the logo's own left edge (x=44) instead of a
+      // slightly-off x=60, so the whole block reads as one clean column.
       ctx.font = '22px Georgia';
       ctx.fillStyle = '#f2e2b6';
-      const maxWidth = w - 60 - 40;
-      const lineHeight = 26;
-      const paraGap = 14;
-      let y = 222;
+      const bodyX = 44;
+      const maxWidth = w - bodyX - 40;
+      const lineHeight = 25;
+      const paraGap = 16;
+      let y = 300;
       opts.body.split('\n').forEach(para => {
         wrapCanvasText(ctx, para, maxWidth).forEach(line => {
-          ctx.fillText(line, 60, y);
+          ctx.fillText(line, bodyX, y);
           y += lineHeight;
         });
         y += paraGap;
@@ -1403,17 +1407,21 @@
     scene.add(northWall);
     registerWallColliders(ROOM.width, 0.25, 2.9, 2.8, 0, 0, -ROOM.depth/2);
 
-    const westWall = buildSegmentedWall(ROOM.depth, ROOM.height, 0.25, wallMat, 2.6, 2.8);
+    // 2.4/2.8 tiles the 18-deep wall as solid-window-solid-window-solid-window-solid
+    // with no leftover partial segment (2.6 left a sliced-off partial window at
+    // the far edge, same issue the north wall had) -- exactly 3 full windows,
+    // symmetric about the centre
+    const westWall = buildSegmentedWall(ROOM.depth, ROOM.height, 0.25, wallMat, 2.4, 2.8);
     westWall.rotation.y = Math.PI/2;
     westWall.position.set(-ROOM.width/2, 0, 0);
     scene.add(westWall);
-    registerWallColliders(ROOM.depth, 0.25, 2.6, 2.8, Math.PI/2, -ROOM.width/2, 0);
+    registerWallColliders(ROOM.depth, 0.25, 2.4, 2.8, Math.PI/2, -ROOM.width/2, 0);
 
-    const eastWall = buildSegmentedWall(ROOM.depth, ROOM.height, 0.25, wallMat, 2.6, 2.8);
+    const eastWall = buildSegmentedWall(ROOM.depth, ROOM.height, 0.25, wallMat, 2.4, 2.8);
     eastWall.rotation.y = -Math.PI/2;
     eastWall.position.set(ROOM.width/2, 0, 0);
     scene.add(eastWall);
-    registerWallColliders(ROOM.depth, 0.25, 2.6, 2.8, -Math.PI/2, ROOM.width/2, 0);
+    registerWallColliders(ROOM.depth, 0.25, 2.4, 2.8, -Math.PI/2, ROOM.width/2, 0);
 
     // kerawang carved fretwork trim band, like a ventilation panel under the eaves
     const kerawangTex = makeKerawangTexture('#2a160c', '#c9a227', 8, 1);
@@ -1670,7 +1678,7 @@
     const defs = [
       { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-halfW, 1.3, -6] },
       { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1] },
-      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 4.1, ROOM.depth/2-0.6], labelOffset:0.9 },
+      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 4.1, ROOM.depth/2-0.6] },
     ];
     return defs.map(buildHotspot);
   }
@@ -1687,12 +1695,15 @@
     marker.position.y = def.pos[1];
     group.add(marker);
 
-    const label = makeLabel(def.name, def.sub);
+    // static-facing plane, same as every station label, instead of a
+    // camera-facing sprite -- at this close a range (tanggam sits right at
+    // the gateway, where the player stands very close) a billboarding
+    // sprite reads as tilting into the gateway's finial when viewed from a
+    // steep angle; a fixed plane at the same 0.5 gap used by the other two
+    // hotspots keeps it level and reads the same as every other sign
+    const label = makeLabel(def.name, def.sub, true);
     label.scale.set(2.2, 0.7, 1);
-    // tanggam sits right at the gateway, where the player stands very close
-    // and looks sharply upward -- that steep angle makes the usual 0.5 gap
-    // read as the marker overlapping the text, so it needs more clearance
-    label.position.set(0, def.pos[1] + (def.labelOffset || 0.5), 0);
+    label.position.set(0, def.pos[1] + 0.5, 0);
     group.add(label);
 
     return { def, group, marker, label, active: 0, worldPos: new THREE.Vector3() };
