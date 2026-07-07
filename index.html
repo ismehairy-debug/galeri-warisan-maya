@@ -1231,8 +1231,15 @@
     ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 3;
     roundRect(ctx, 4,4, 504,152, 18); ctx.stroke();
     ctx.fillStyle = '#f2e2b6';
-    ctx.font = '700 42px Georgia';
     ctx.textAlign = 'center';
+    // shrink the title font until it fits the box -- a fixed 42px overflowed
+    // and clipped longer titles like "GALERI WARISAN MAYA" at both edges
+    let titleSize = 42;
+    ctx.font = `700 ${titleSize}px Georgia`;
+    while (ctx.measureText(text).width > 470 && titleSize > 20){
+      titleSize -= 2;
+      ctx.font = `700 ${titleSize}px Georgia`;
+    }
     ctx.fillText(text, 256, 76);
     ctx.font = 'italic 22px Georgia';
     ctx.fillStyle = '#c9a961';
