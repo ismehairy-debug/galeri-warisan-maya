@@ -456,9 +456,19 @@
   function unlockStationMedia(){
     stationsRef.forEach(st => {
       const video = st.performer && st.performer.userData && st.performer.userData.videoEl;
-      if (video){
-        video.muted = false;
-        video.play().catch(() => {});
+      if (!video) return;
+      video.muted = false;
+      // playing every video here, synchronously inside the real user
+      // gesture, is what grants each element the right to autoplay
+      // unmuted later -- but leaving them all running afterwards means
+      // every station decodes video at once for the whole session, which
+      // is what caused the iPhone-specific lag. So immediately hand
+      // control back to the proximity logic in animate() (which already
+      // knows how to resume playback once genuinely nearby): pause any
+      // station that isn't currently active once its priming play begins.
+      const playPromise = video.play();
+      if (playPromise && playPromise.then){
+        playPromise.then(() => { if (st.active < 0.05) video.pause(); }).catch(() => {});
       }
     });
   }
@@ -1529,7 +1539,11 @@
     } else {
       video.loop = true;
     }
-    video.play().catch(() => {});
+    // don't autoplay here -- left paused until the proximity logic in
+    // animate() actually plays it, so idle stations aren't all decoding
+    // video simultaneously in the background (multiple concurrent video
+    // decodes is what caused the iPhone-specific lag; Android GPUs tend to
+    // have more spare hardware decode capacity so it went unnoticed there)
 
     const videoTex = new THREE.VideoTexture(video);
     const bezel = new THREE.Mesh(
@@ -1587,7 +1601,7 @@
     } else {
       video.loop = true;
     }
-    video.play().catch(() => {});
+    // don't autoplay here -- see buildVideoScreen's matching comment
 
     const videoTex = new THREE.VideoTexture(video);
 
@@ -2281,12 +2295,18 @@
         st.sound.setVolume(Math.min(1, st.active * 0.35 * volBoost));
       }
 
-      // some mobile browsers silently pause an off-screen <video> used only
-      // as a texture source (power saving / visibility heuristics) -- nudge
-      // it back into play rather than leaving the station frozen
+      // video-backed stations only decode/play their video while the
+      // visitor is actually near them -- having every station's video
+      // decoding simultaneously for the whole session is what caused
+      // iPhone-specific lag (limited concurrent hardware video decoders),
+      // even though it went unnoticed on Android
       const videoEl = st.performer && st.performer.userData && st.performer.userData.videoEl;
-      if (videoEl && audioReady && videoEl.paused && document.visibilityState === 'visible'){
-        videoEl.play().catch(() => {});
+      if (videoEl && audioReady && document.visibilityState === 'visible'){
+        if (st.active > 0.05){
+          if (videoEl.paused) videoEl.play().catch(() => {});
+        } else if (!videoEl.paused){
+          videoEl.pause();
+        }
       }
     });
 
