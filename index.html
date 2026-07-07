@@ -252,8 +252,11 @@
     player.add(camera);
     scene.add(player);
 
-    renderer = new THREE.WebGLRenderer({ antialias:true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // phone GPUs are far more sensitive to antialiasing and high pixel
+    // ratios than desktop -- both are common causes of laggy animation
+    // on mobile, so trade a bit of visual crispness for frame rate there
+    renderer = new THREE.WebGLRenderer({ antialias: !isTouchDevice });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.xr.enabled = true;
@@ -1474,23 +1477,6 @@
     station.oscStarted = false;
   }
 
-  // ---------- crop dead air/intro-outro off a decoded audio buffer, so
-  // station tracks recorded from a longer source loop tightly on just the
-  // wanted middle section ----------
-  function trimAudioBuffer(buffer, trimStartSec, trimEndSec, ctx){
-    if (!trimStartSec && !trimEndSec) return buffer;
-    const sampleRate = buffer.sampleRate;
-    const startSample = Math.max(0, Math.floor(trimStartSec * sampleRate));
-    const endSample = Math.max(startSample + 1, buffer.length - Math.floor(trimEndSec * sampleRate));
-    if (startSample === 0 && endSample >= buffer.length) return buffer;
-    const frameCount = endSample - startSample;
-    const trimmed = ctx.createBuffer(buffer.numberOfChannels, frameCount, sampleRate);
-    for (let ch=0; ch<buffer.numberOfChannels; ch++){
-      trimmed.getChannelData(ch).set(buffer.getChannelData(ch).subarray(startSample, endSample));
-    }
-    return trimmed;
-  }
-
   function ensureStationAudio(station, ctx){
     if (station.oscStarted) return;
     const videoEl = station.performer && station.performer.userData && station.performer.userData.videoEl;
@@ -1501,9 +1487,18 @@
       if (station.audioLoading) return; // async load in flight -- wait for it
       station.audioLoading = true;
       new THREE.AudioLoader().load(station.def.audioSrc, buffer => {
-        const trimmed = trimAudioBuffer(buffer, station.def.audioTrimStart || 0, station.def.audioTrimEnd || 0, ctx);
-        station.sound.setBuffer(trimmed);
+        station.sound.setBuffer(buffer);
         station.sound.setLoop(true);
+        // crop dead intro/outro on tracks recorded from a longer source --
+        // done via the native loop points, not a manual buffer copy, so a
+        // several-minute track doesn't block the main thread while trimming
+        const trimStart = station.def.audioTrimStart || 0;
+        const trimEnd = station.def.audioTrimEnd || 0;
+        if (trimStart || trimEnd){
+          station.sound.offset = trimStart;
+          station.sound.setLoopStart(trimStart);
+          station.sound.setLoopEnd(Math.max(trimStart + 1, buffer.duration - trimEnd));
+        }
         station.sound.play();
         station.oscStarted = true;
       });
