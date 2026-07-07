@@ -1943,12 +1943,24 @@
     } else if (def.key === 'silat'){
       buildVideoScreen(performer, def, 'assets/videos/silat_clip.mp4');
     } else if (def.key === 'pakaian'){
-      const clothTex = makeKerawangTexture('#5c2a1f', '#e8c468', 3, 4);
-      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.3),
-        new THREE.MeshStandardMaterial({ map: clothTex, side: THREE.DoubleSide, roughness: 0.7 }));
-      cloth.rotation.y = 0.2;
-      performer.add(cloth);
-      performer.userData.cloth = cloth;
+      // two real process clips side by side, shrunk from buildVideoScreen's
+      // single-screen size to fit -- songket carries the station's
+      // positional audio; batik plays muted as a silent visual-only loop
+      // since only one PositionalAudio node exists per station
+      const songketGroup = new THREE.Group();
+      songketGroup.position.set(-0.85, 0.135, 0);
+      songketGroup.scale.setScalar(0.55);
+      performer.add(songketGroup);
+      buildVideoScreen(songketGroup, def, 'assets/videos/songket_clip.mp4');
+
+      const batikGroup = new THREE.Group();
+      batikGroup.position.set(0.85, 0.135, 0);
+      batikGroup.scale.setScalar(0.55);
+      performer.add(batikGroup);
+      buildVideoScreen(batikGroup, def, 'assets/videos/batik_clip.mp4');
+
+      performer.userData.videoEl = songketGroup.userData.videoEl;
+      performer.userData.videoEl2 = batikGroup.userData.videoEl;
     } else if (def.key === 'kraf'){
       const keris = buildKeris();
       keris.position.set(-0.3, 0.05, 0);
@@ -2232,8 +2244,6 @@
             st.performer.userData.malletPivot.position.y = st.performer.userData.malletBaseY - dip;
           }
           st.performer.rotation.y = Math.sin(t*0.5)*0.12;
-        } else if (st.def.key === 'pakaian'){
-          st.performer.rotation.y = Math.sin(t*0.6)*0.2;
         } else if (st.def.key === 'kraf'){
           st.performer.rotation.z = Math.sin(t*1.2)*0.08;
           st.performer.rotation.y = t*0.3;
@@ -2244,7 +2254,7 @@
         // video-screen stations turn to face the visitor for as long as
         // they're close enough to hear/see the interaction (st.active), and
         // settle back to facing straight ahead the moment nobody's there
-        if (st.def.key === 'tarian' || st.def.key === 'silat' || st.def.key === 'adat'){
+        if (st.def.key === 'tarian' || st.def.key === 'silat' || st.def.key === 'adat' || st.def.key === 'pakaian'){
           const targetYaw = st.active > 0.05
             ? Math.atan2(camWorld.x - st.worldPos.x, camWorld.z - st.worldPos.z)
             : 0;
@@ -2269,13 +2279,15 @@
       // iPhone-specific lag (limited concurrent hardware video decoders),
       // even though it went unnoticed on Android
       const videoEl = st.performer && st.performer.userData && st.performer.userData.videoEl;
-      if (videoEl && audioReady && document.visibilityState === 'visible'){
+      const videoEl2 = st.performer && st.performer.userData && st.performer.userData.videoEl2;
+      [videoEl, videoEl2].forEach(v => {
+        if (!v || !audioReady || document.visibilityState !== 'visible') return;
         if (st.active > 0.05){
-          if (videoEl.paused) videoEl.play().catch(() => {});
-        } else if (!videoEl.paused){
-          videoEl.pause();
+          if (v.paused) v.play().catch(() => {});
+        } else if (!v.paused){
+          v.pause();
         }
-      }
+      });
     });
 
     updateInfoPanel(bestStation);
