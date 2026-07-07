@@ -1023,7 +1023,7 @@
     buildAdBillboard(6, 13, {
       logoSrc: 'assets/images/fcoee_logo.png',
       title: 'FCoEE',
-      fullName: 'Faizuddin Centre of Educational Excellence',
+      subtitle: 'Faizuddin Centre of Educational Excellence',
       body: 'FCoEE, sebuah inisiatif pendidikan dibawah Majlis Agama Islam dan Adat Istiadat Melayu Perlis (MAIPs) dalam usaha memperkasakan pembelajaran AI & Robotik, inovasi penyelidikan dan teknologi untuk generasi masa hadapan.\nFCoEE menjadi wadah penerokaan yang menghubungkan ilmu, kreativiti, penyelidikan dan teknologi, membuka peluang kepada setiap individu untuk belajar, mencipta dan meneroka potensi tanpa batasan.',
       url: 'faizuddincoe.com',
     });
@@ -1286,25 +1286,18 @@
       ctx.fillText(opts.subtitle, 232, 140);
     }
 
-    if (opts.fullName){
-      // the company's full name, below the logo (which occupies x 44-204,
-      // y 40-200) rather than crowded in next to the title
-      ctx.font = 'italic 26px Georgia';
-      ctx.fillStyle = '#e8d9ad';
-      ctx.fillText(opts.fullName, 60, 230);
-    }
-
     if (opts.body){
       // a longer free-form paragraph (instead of short bullet lines) --
       // word-wrapped to fit, in a smaller font so more of it fits above the
       // url. Each '\n'-separated paragraph gets its own wrap pass plus an
       // extra gap after it, so paragraph breaks actually read as breaks.
+      // Starts below the logo (x 44-204, y 40-200) so it never writes over it.
       ctx.font = '22px Georgia';
       ctx.fillStyle = '#f2e2b6';
       const maxWidth = w - 60 - 40;
       const lineHeight = 26;
       const paraGap = 14;
-      let y = opts.fullName ? 268 : 222;
+      let y = 222;
       opts.body.split('\n').forEach(para => {
         wrapCanvasText(ctx, para, maxWidth).forEach(line => {
           ctx.fillText(line, 60, y);
