@@ -1248,23 +1248,10 @@
 
     // real-photo reference plaques of the actual Istana Kesultanan Melaka
     // reconstruction (near Bukit St. Paul) this building is modelled after --
-    // mounted on the outside face of the west/east walls, centred on the
-    // solid wall segment nearest the middle so neither sits over a window
-    // gap, facing outward so visitors approaching from outside see them.
-    // Sized to fit inside that segment's 1.46 width (the front gateway
-    // plaques below use the larger refPhotoW/H since they have a whole
-    // 5.62-wide wall to themselves).
+    // only at the entrance gateway (see the front-flanking walls below),
+    // not on the west/east side walls, so it reads as a single dedicated
+    // reference plaque at the door rather than repeated around the building
     const refPhotoW = 1.7, refPhotoH = refPhotoW * (400/600); // matches the source photo's 3:2 aspect
-    const sidePhotoW = 1.2, sidePhotoH = sidePhotoW * (400/600);
-    const westPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', sidePhotoW, sidePhotoH);
-    westPhoto.position.set(-innerW/2 - 0.145, wallH*0.55, 1.48);
-    westPhoto.rotation.y = -Math.PI/2;
-    group.add(westPhoto);
-
-    const eastPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', sidePhotoW, sidePhotoH);
-    eastPhoto.position.set(innerW/2 + 0.145, wallH*0.55, -1.48);
-    eastPhoto.rotation.y = Math.PI/2;
-    group.add(eastPhoto);
 
     // 2.41/1.8 tiles the 15.04-wide back wall the same exact way (the old
     // 2.6/1.8 summed to 15.8, past the 15.04 width)
