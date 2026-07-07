@@ -67,15 +67,6 @@
     cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
     display:none;
   }
-  #reset-view-button {
-    pointer-events:auto;
-    margin-top:8px; margin-left:8px; padding:10px 20px; border-radius:999px;
-    background: linear-gradient(135deg,#a1273d,#5f1a2a);
-    color:#ffeaef; border:1px solid #df7a92; font-weight:700;
-    letter-spacing:1px; font-family: Georgia, serif; font-size:13px;
-    cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
-    display:none;
-  }
   #joystick-base {
     position:fixed; left:26px; bottom:26px; width:120px; height:120px;
     border-radius:50%; background:rgba(30,18,8,0.45); border:2px solid rgba(201,162,39,0.6);
@@ -206,7 +197,6 @@
     <button id="vr-button" disabled>MEMERIKSA VR…</button>
     <br>
     <button id="gyro-button">GUNA GYRO / ENABLE GYRO</button>
-    <button id="reset-view-button">RESET PANDANGAN / RESET VIEW</button>
   </div>
 </div>
 
@@ -266,9 +256,6 @@
   let gyroActive = false;
   let deviceAlpha = 0, deviceBeta = 0, deviceGamma = 0;
   let alphaOffset = null;
-  // manual look nudge on top of the gyro's own rotation, so dragging still
-  // works to correct/pan the view while tilt-to-look is active
-  let gyroYawOffset = 0, gyroPitchOffset = 0;
   const joyState = { x: 0, y: 0 };
   let joyTouchId = null;
   let lookTouchId = null, lastTouchX = 0, lastTouchY = 0;
@@ -526,7 +513,6 @@
       document.querySelector('#startScreen small').textContent =
         'Phone: tap Enable Gyro if prompted, tilt your phone to look around, use the joystick (bottom-left) to walk. On a Meta Quest browser, use the ENTER VR button that appears once you\'re inside.';
       document.getElementById('gyro-button').style.display = 'inline-block';
-      document.getElementById('reset-view-button').style.display = 'inline-block';
       document.getElementById('joystick-base').style.display = 'block';
     }
     document.getElementById('enterBtn').addEventListener('click', (e) => {
@@ -585,7 +571,7 @@
   }
   function applyGyroToCamera(){
     const screenAngle = THREE.MathUtils.degToRad(getScreenAngle());
-    gyroEuler.set(deviceBeta + gyroPitchOffset, deviceAlpha + gyroYawOffset, -deviceGamma, 'YXZ');
+    gyroEuler.set(deviceBeta, deviceAlpha, -deviceGamma, 'YXZ');
     camera.quaternion.setFromEuler(gyroEuler);
     camera.quaternion.multiply(gyroQ1);
     camera.quaternion.multiply(gyroQ0.setFromAxisAngle(gyroZ, -screenAngle));
@@ -634,12 +620,9 @@
       for (const t of e.changedTouches){ if (t.identifier === joyTouchId){ joyTouchId = null; resetJoy(); } }
     }));
 
-    // drag-to-look: works whether or not gyro is active. Without gyro it's
-    // the only way to look around; with gyro it nudges a persistent offset
-    // on top of the tilt (see applyGyroToCamera), so a drifted/awkward
-    // gyro calibration can still be corrected by hand instead of only via
-    // the Reset View button.
+    // drag-to-look fallback for when gyro isn't active/granted
     document.addEventListener('touchstart', e => {
+      if (gyroActive) return;
       const rect = joyBase.getBoundingClientRect();
       for (const t of e.changedTouches){
         const inJoy = t.clientX>=rect.left && t.clientX<=rect.right && t.clientY>=rect.top && t.clientY<=rect.bottom;
@@ -648,35 +631,20 @@
       }
     });
     document.addEventListener('touchmove', e => {
+      if (gyroActive) return;
       for (const t of e.changedTouches){
         if (t.identifier !== lookTouchId) continue;
         const dx = t.clientX - lastTouchX, dy = t.clientY - lastTouchY;
         lastTouchX = t.clientX; lastTouchY = t.clientY;
-        if (gyroActive){
-          gyroYawOffset -= dx*0.004; gyroPitchOffset -= dy*0.004;
-          gyroPitchOffset = Math.max(-1.3, Math.min(1.3, gyroPitchOffset));
-        } else {
-          yaw -= dx*0.004; pitch -= dy*0.004;
-          pitch = Math.max(-1.3, Math.min(1.3, pitch));
-          player.rotation.y = yaw; camera.rotation.x = pitch;
-        }
+        yaw -= dx*0.004; pitch -= dy*0.004;
+        pitch = Math.max(-1.3, Math.min(1.3, pitch));
+        player.rotation.y = yaw; camera.rotation.x = pitch;
         e.preventDefault();
       }
     }, { passive:false });
     ['touchend','touchcancel'].forEach(evt => document.addEventListener(evt, e => {
       for (const t of e.changedTouches){ if (t.identifier === lookTouchId) lookTouchId = null; }
     }));
-
-    document.getElementById('reset-view-button').addEventListener('click', resetView);
-  }
-
-  // ---------- recentre the view (gyro drift/awkward tilt, or a manual
-  // drag-look that's ended up looking somewhere odd) ----------
-  function resetView(){
-    yaw = 0; pitch = 0;
-    player.rotation.y = 0; camera.rotation.x = 0;
-    gyroYawOffset = 0; gyroPitchOffset = 0;
-    if (gyroActive) alphaOffset = null; // recalibrate: current phone facing becomes forward again
   }
 
   function joystickMove(dt){
@@ -1309,13 +1277,15 @@
 
     if (opts.body){
       // a longer free-form paragraph (instead of short bullet lines) --
-      // word-wrapped to fit, in a smaller font so more of it fits above the url
+      // word-wrapped to fit, in a smaller font so more of it fits above the url.
+      // Starts below the logo (which occupies x 44-204, y 40-200) so the
+      // text never writes over it.
       ctx.font = '22px Georgia';
       ctx.fillStyle = '#f2e2b6';
       const maxWidth = w - 60 - 40;
       const bodyLines = opts.body.split('\n').flatMap(para => wrapCanvasText(ctx, para, maxWidth));
-      const lineHeight = 28;
-      const startY = opts.subtitle ? 200 : 170;
+      const lineHeight = 26;
+      const startY = 222;
       bodyLines.forEach((line, i) => ctx.fillText(line, 60, startY + i*lineHeight));
     } else {
       ctx.font = '30px Georgia';
