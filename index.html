@@ -1230,38 +1230,48 @@
     // side + back walls, with real window openings (like the balai's own
     // walls) instead of a blank facade; the front (facing the gateway, -Z)
     // is left open at its centre as the grand entrance doorway
-    const westWall = buildSegmentedWall(innerD, wallH, 0.25, wallMat, 2.2, 1.6);
+    // 1.46/1.5 tiles the 10.34-deep wall as solid-window-solid-window-
+    // solid-window-solid with no leftover partial segment (the old 2.2/1.6
+    // summed to 13.6, well past 10.34, so it sliced off early instead of
+    // tiling evenly) -- exactly 3 full windows, symmetric about the centre
+    const westWall = buildSegmentedWall(innerD, wallH, 0.25, wallMat, 1.46, 1.5);
     westWall.rotation.y = Math.PI/2;
     westWall.position.set(-innerW/2, 0, 0);
     group.add(westWall);
-    registerWallColliders(innerD, 0.25, 2.2, 1.6, Math.PI/2, x - innerW/2, z);
+    registerWallColliders(innerD, 0.25, 1.46, 1.5, Math.PI/2, x - innerW/2, z);
 
-    const eastWall = buildSegmentedWall(innerD, wallH, 0.25, wallMat, 2.2, 1.6);
+    const eastWall = buildSegmentedWall(innerD, wallH, 0.25, wallMat, 1.46, 1.5);
     eastWall.rotation.y = -Math.PI/2;
     eastWall.position.set(innerW/2, 0, 0);
     group.add(eastWall);
-    registerWallColliders(innerD, 0.25, 2.2, 1.6, -Math.PI/2, x + innerW/2, z);
+    registerWallColliders(innerD, 0.25, 1.46, 1.5, -Math.PI/2, x + innerW/2, z);
 
     // real-photo reference plaques of the actual Istana Kesultanan Melaka
     // reconstruction (near Bukit St. Paul) this building is modelled after --
     // mounted on the outside face of the west/east walls, centred on the
     // solid wall segment nearest the middle so neither sits over a window
-    // gap, facing outward so visitors approaching from outside see them
+    // gap, facing outward so visitors approaching from outside see them.
+    // Sized to fit inside that segment's 1.46 width (the front gateway
+    // plaques below use the larger refPhotoW/H since they have a whole
+    // 5.62-wide wall to themselves).
     const refPhotoW = 1.7, refPhotoH = refPhotoW * (400/600); // matches the source photo's 3:2 aspect
-    const westPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', refPhotoW, refPhotoH);
-    westPhoto.position.set(-innerW/2 - 0.145, wallH*0.55, 0.27);
+    const sidePhotoW = 1.2, sidePhotoH = sidePhotoW * (400/600);
+    const westPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', sidePhotoW, sidePhotoH);
+    westPhoto.position.set(-innerW/2 - 0.145, wallH*0.55, 1.48);
     westPhoto.rotation.y = -Math.PI/2;
     group.add(westPhoto);
 
-    const eastPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', refPhotoW, refPhotoH);
-    eastPhoto.position.set(innerW/2 + 0.145, wallH*0.55, -0.27);
+    const eastPhoto = buildExteriorPhotoPlaque('assets/images/istana_melaka_exterior.jpg', sidePhotoW, sidePhotoH);
+    eastPhoto.position.set(innerW/2 + 0.145, wallH*0.55, -1.48);
     eastPhoto.rotation.y = Math.PI/2;
     group.add(eastPhoto);
 
-    const backWall = buildSegmentedWall(innerW, wallH, 0.25, wallMat, 2.6, 1.8);
+    // 2.41/1.8 tiles the 15.04-wide back wall the same exact way (the old
+    // 2.6/1.8 summed to 15.8, past the 15.04 width)
+    const backWall = buildSegmentedWall(innerW, wallH, 0.25, wallMat, 2.41, 1.8);
     backWall.position.set(0, 0, innerD/2);
     group.add(backWall);
-    registerWallColliders(innerW, 0.25, 2.6, 1.8, 0, x, z + innerD/2);
+    registerWallColliders(innerW, 0.25, 2.41, 1.8, 0, x, z + innerD/2);
 
     const doorHalf = 1.9;
     const frontPieceW = innerW/2 - doorHalf;
@@ -1653,6 +1663,22 @@
     westRoof.rotation.z = theta;
     westRoof.position.set(-(L/2)*Math.cos(theta), ridgeY - (L/2)*Math.sin(theta), 0);
     scene.add(westRoof);
+
+    // eave fascia boards, one running the full length of each side wall right
+    // at the roof/wall junction -- the roof slab itself is a razor-thin box
+    // (0.15 units) whose edge lands exactly on the wall's top corner, but
+    // viewed near edge-on (looking down the ridge's own length, e.g. from
+    // outside alongside the west/east wall) that thin edge can foreshorten
+    // to almost nothing and read as the roof having stopped; a proper
+    // vertical fascia gives the eave real thickness so it stays a solid,
+    // visible band flush against the wall from any angle
+    const fasciaMat = new THREE.MeshStandardMaterial({ color: 0x1d130a, roughness: 0.85 });
+    const fasciaH = 0.3;
+    [-1, 1].forEach(side => {
+      const fascia = new THREE.Mesh(new THREE.BoxGeometry(0.1, fasciaH, zSpan), fasciaMat);
+      fascia.position.set(side*halfSpan, eaveY - fasciaH/2 + 0.05, 0);
+      scene.add(fascia);
+    });
 
     const ridgeBeam = new THREE.Mesh(
       new THREE.CylinderGeometry(0.12, 0.12, zSpan, 12),
@@ -2588,14 +2614,10 @@
     updateInfoPanel(bestStation);
 
     // anak ayam only plays inside the balai, and fades out while near any
-    // exhibit interaction; nobat only plays inside/near the Istana; outside
-    // both, wind + bird chirps take over
+    // exhibit interaction; outside the balai, wind + bird chirps take over
     if (ambienceStarted){
       const insideAmount = computeInsideAmount(camWorld);
       insideSmooth += (insideAmount - insideSmooth) * Math.min(1, dt*2);
-
-      const insideIstanaAmount = computeInsideIstanaAmount(camWorld);
-      insideIstanaSmooth += (insideIstanaAmount - insideIstanaSmooth) * Math.min(1, dt*2);
 
       const targetBgVol = BG_BASE_VOL * insideSmooth * (1 - maxActive);
       bgVolCurrent += (targetBgVol - bgVolCurrent) * Math.min(1, dt*3);
@@ -2604,18 +2626,11 @@
         bgGainNode.gain.value = Number.isFinite(safeVol) ? safeVol : 0;
       }
 
-      const targetIstanaVol = ISTANA_BASE_VOL * insideIstanaSmooth;
-      istanaVolCurrent += (targetIstanaVol - istanaVolCurrent) * Math.min(1, dt*3);
-      const safeIstanaVol = Math.max(0, Math.min(1, istanaVolCurrent));
-      if (istanaGainNode && istanaGainNode.context.state === 'running'){
-        istanaGainNode.gain.value = Number.isFinite(safeIstanaVol) ? safeIstanaVol : 0;
-      }
-
       // the AudioContext can be suspended/interrupted on mobile (screen lock,
       // notification, incoming call) -- touching its nodes while it isn't
       // 'running' can throw, so mirror the same guard the station audio uses
       if (ambienceRef && ambienceRef.wind.context.state === 'running'){
-        const outsideAmount = (1 - insideSmooth) * (1 - insideIstanaSmooth);
+        const outsideAmount = 1 - insideSmooth;
         ambienceRef.wind.setVolume(outsideAmount * 0.22);
         ambienceRef.nextChirpIn -= dt;
         if (outsideAmount > 0.05 && ambienceRef.nextChirpIn <= 0){
