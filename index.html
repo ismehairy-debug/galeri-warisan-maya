@@ -978,6 +978,99 @@
       ],
       url: 'unimap.edu.my',
     });
+    buildIstanaMelaka(0, 24);
+  }
+
+  // ---------- Istana Kesultanan Melaka: the multi-tiered timber palace of the
+  // Melaka Sultanate, reconstructed here from the 15th-century descriptions in
+  // the Sejarah Melayu (Malay Annals). Placed further down the entrance axis,
+  // beyond the gateway, as the grand landmark visitors see on the way out ----------
+  function buildIstanaMelaka(x, z){
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    scene.add(group);
+
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.8 });
+    const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x2a1a0e, roughness: 0.85 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf2d98a, emissive: 0xc9a227, emissiveIntensity: 0.5, roughness: 0.4 });
+
+    const platformW = 8, platformD = 6, stiltH = 1.8;
+
+    // stilts raising the whole palace off the ground, like every other
+    // traditional structure here, but taller and more numerous for a grander scale
+    for (let ix=-1; ix<=1; ix++){
+      for (let iz=-1; iz<=1; iz++){
+        const stilt = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, stiltH, 10), woodMat);
+        stilt.position.set(ix*(platformW/2-0.6), stiltH/2, iz*(platformD/2-0.6));
+        group.add(stilt);
+      }
+    }
+
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(platformW, 0.3, platformD), woodMat);
+    platform.position.y = stiltH + 0.15;
+    group.add(platform);
+
+    const wallH = 2.6;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(platformW*0.92, wallH, platformD*0.92),
+      new THREE.MeshStandardMaterial({ color: 0x3b2415, roughness: 0.85 }));
+    wall.position.y = stiltH + 0.3 + wallH/2;
+    group.add(wall);
+
+    const kerawangTex = makeKerawangTexture('#2a160c', '#c9a227', 6, 1);
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(platformW*0.94, 0.4, platformD*0.94 + 0.02),
+      new THREE.MeshStandardMaterial({ map: kerawangTex, roughness: 0.8 }));
+    trim.position.y = stiltH + 0.3 + wallH - 0.2;
+    group.add(trim);
+
+    // grand entrance staircase facing back toward the gateway
+    const stepCount = 6;
+    for (let i=0; i<stepCount; i++){
+      const stepH = (stiltH+0.3)/stepCount;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(2.2, stepH, 0.4), darkWoodMat);
+      step.position.set(0, stepH*(i+0.5), -(platformD/2 + 0.3 + i*0.36));
+      group.add(step);
+    }
+
+    // bertingkat: the palace's signature multi-tiered pyramidal roof, each
+    // tier smaller than the last -- the real Istana Kesultanan Melaka's most
+    // recognisable feature, distinct from the balai's single gable roof
+    const roofBaseY = stiltH + 0.3 + wallH;
+    const tierCount = 4;
+    let tierY = roofBaseY;
+    for (let i=0; i<tierCount; i++){
+      const frac = i/tierCount;
+      const radius = (platformW*0.62) * (1 - frac*0.62);
+      const height = 1.1 - frac*0.5;
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 4), darkWoodMat);
+      roof.rotation.y = Math.PI/4;
+      roof.position.y = tierY + height/2;
+      group.add(roof);
+
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(radius*0.98, 0.03, 6, 4), goldMat);
+      ring.rotation.x = Math.PI/2;
+      ring.rotation.z = Math.PI/4;
+      ring.position.y = tierY;
+      group.add(ring);
+
+      tierY += height * 0.72; // tiers overlap slightly, like a real stepped roof
+    }
+
+    const finial = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.9, 8), goldMat);
+    finial.position.y = tierY + 0.45;
+    group.add(finial);
+
+    // warm glow so the palace reads clearly against the dusk sky at a distance
+    const glow = new THREE.PointLight(0xffd9a0, 1.1, 16, 2);
+    glow.position.set(0, roofBaseY + 1.5, -1);
+    group.add(glow);
+
+    const label = makeLabel('ISTANA KESULTANAN MELAKA', 'Malacca Sultanate Palace, 15th century');
+    label.scale.set(3.2, 1.0, 1);
+    label.position.set(0, tierY + 1.6, 0);
+    label.material.opacity = 1;
+    group.add(label);
+
+    return group;
   }
 
   // ---------- draw an advertisement board onto a canvas, optionally with a logo image ----------
