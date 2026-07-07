@@ -1083,6 +1083,106 @@
     performer.userData.screen = screen;
   }
 
+  // ---------- procedural anyaman (woven rattan/pandan) texture ----------
+  function makeAnyamanTexture(){
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const ctx = c.getContext('2d');
+    const cell = 16;
+    for (let y=0; y<128; y+=cell){
+      for (let x=0; x<128; x+=cell){
+        const over = ((x/cell) + (y/cell)) % 2 === 0;
+        ctx.fillStyle = over ? '#c9a24a' : '#a67f34';
+        ctx.fillRect(x, y, cell, cell);
+        ctx.strokeStyle = 'rgba(50,32,8,0.4)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x+0.5, y+0.5, cell-1, cell-1);
+        // subtle strand grain running the length of each woven strip
+        ctx.strokeStyle = 'rgba(50,32,8,0.25)';
+        if (over) ctx.beginPath(), ctx.moveTo(x+2,y), ctx.lineTo(x+2,y+cell), ctx.stroke();
+        else ctx.beginPath(), ctx.moveTo(x,y+2), ctx.lineTo(x+cell,y+2), ctx.stroke();
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(6, 6);
+    return tex;
+  }
+
+  // ---------- 3D keris model: wavy pamor blade + ganja + carved hulu hilt ----------
+  function buildKeris(){
+    const group = new THREE.Group();
+
+    const bladeShape = new THREE.Shape();
+    bladeShape.moveTo(0,-0.6);
+    bladeShape.quadraticCurveTo(0.12,-0.3, 0,-0.05);
+    bladeShape.quadraticCurveTo(-0.12,0.2, 0,0.45);
+    bladeShape.quadraticCurveTo(0.1,0.65, 0,0.85);
+    bladeShape.lineTo(-0.06,0.85);
+    bladeShape.quadraticCurveTo(0.02,0.6,-0.08,0.4);
+    bladeShape.quadraticCurveTo(0.1,0.15,-0.06,-0.1);
+    bladeShape.quadraticCurveTo(0.08,-0.35,-0.05,-0.6);
+    bladeShape.closePath();
+
+    const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, {
+      depth: 0.035, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.006, bevelSegments: 2
+    });
+    bladeGeo.center();
+    const steelMat = new THREE.MeshStandardMaterial({ color: 0xc7cdd6, metalness: 0.85, roughness: 0.3 });
+    const blade = new THREE.Mesh(bladeGeo, steelMat);
+    blade.position.y = 0.35;
+    group.add(blade);
+
+    // ganja — flared metal collar where blade meets hilt
+    const ganja = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.15, 0.07, 10),
+      new THREE.MeshStandardMaterial({ color: 0xb08a3c, metalness: 0.6, roughness: 0.4 })
+    );
+    ganja.position.y = -0.28;
+    group.add(ganja);
+
+    // hulu — carved wooden pistol-grip hilt, following a real keris's curved profile
+    const huluCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, -0.3, 0),
+      new THREE.Vector3(0.03, -0.42, 0),
+      new THREE.Vector3(0.05, -0.55, 0.02),
+      new THREE.Vector3(-0.02, -0.63, 0.05),
+    ]);
+    const huluGeo = new THREE.TubeGeometry(huluCurve, 20, 0.05, 10, false);
+    const hulu = new THREE.Mesh(huluGeo, new THREE.MeshStandardMaterial({ color: 0x6a4425, roughness: 0.7 }));
+    group.add(hulu);
+
+    group.userData.blade = blade;
+    return group;
+  }
+
+  // ---------- 3D anyaman model: lathed tray body + woven rim strips ----------
+  function buildAnyaman(){
+    const group = new THREE.Group();
+    const weaveMat = new THREE.MeshStandardMaterial({ map: makeAnyamanTexture(), roughness: 0.85, side: THREE.DoubleSide });
+
+    const profile = [];
+    for (let i=0; i<=10; i++){
+      const t = i/10;
+      profile.push(new THREE.Vector2(0.05 + t*0.42, Math.pow(t,1.6) * 0.16));
+    }
+    const tray = new THREE.Mesh(new THREE.LatheGeometry(profile, 32), weaveMat);
+    group.add(tray);
+
+    // alternating over/under rim strips for a physical basket-weave edge
+    const stripMat = new THREE.MeshStandardMaterial({ color: 0xc9a24a, roughness: 0.75 });
+    const stripCount = 24;
+    for (let i=0; i<stripCount; i++){
+      const ang = (i/stripCount) * Math.PI*2;
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.09), stripMat);
+      strip.position.set(Math.cos(ang)*0.44, 0.15 + (i%2===0 ? 0.015 : -0.005), Math.sin(ang)*0.44);
+      strip.rotation.y = -ang;
+      group.add(strip);
+    }
+
+    return group;
+  }
+
   function buildStation(def){
     const group = new THREE.Group();
     group.position.set(def.pos[0], 0, def.pos[2]);
@@ -1133,19 +1233,18 @@
       performer.add(cloth);
       performer.userData.cloth = cloth;
     } else if (def.key === 'kraf'){
-      const bladeShape = new THREE.Shape();
-      bladeShape.moveTo(0,-0.6);
-      bladeShape.quadraticCurveTo(0.12,-0.3, 0,-0.05);
-      bladeShape.quadraticCurveTo(-0.12,0.2, 0,0.45);
-      bladeShape.quadraticCurveTo(0.1,0.65, 0,0.85);
-      bladeShape.lineTo(-0.06,0.85);
-      bladeShape.quadraticCurveTo(0.02,0.6,-0.08,0.4);
-      bladeShape.quadraticCurveTo(0.1,0.15,-0.06,-0.1);
-      bladeShape.quadraticCurveTo(0.08,-0.35,-0.05,-0.6);
-      bladeShape.closePath();
-      const keris = new THREE.Mesh(new THREE.ShapeGeometry(bladeShape), partsMat);
+      const keris = buildKeris();
+      keris.position.set(-0.3, 0.05, 0);
+      keris.rotation.z = -0.12;
       performer.add(keris);
       performer.userData.keris = keris;
+
+      const anyaman = buildAnyaman();
+      anyaman.position.set(0.4, -0.35, 0.05);
+      anyaman.rotation.x = -Math.PI/2.3;
+      anyaman.scale.setScalar(0.9);
+      performer.add(anyaman);
+      performer.userData.anyaman = anyaman;
     } else if (def.key === 'makanan'){
       const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.06, 24),
         new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.6 }));
@@ -1388,3 +1487,7 @@
 </script>
 </body>
 </html>
+
+
+
+ 
