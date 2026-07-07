@@ -30,6 +30,25 @@
     max-width:260px; font-size:12px; line-height:1.5; text-align:right;
     color:#e8d9ad; text-shadow:0 2px 6px rgba(0,0,0,.8);
   }
+  #infoPanel {
+    position:fixed; left:50%; bottom:26px; z-index:10;
+    transform:translateX(-50%) translateY(10px);
+    width:min(560px, calc(100vw - 48px)); box-sizing:border-box;
+    padding:16px 22px; border-radius:14px;
+    background:rgba(15,10,4,0.82); border:1px solid rgba(201,162,39,0.55);
+    box-shadow:0 8px 26px rgba(0,0,0,.5);
+    font-family: Georgia, 'Times New Roman', serif; color:#f2e2b6;
+    opacity:0; pointer-events:none;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  #infoPanel.visible { opacity:1; transform:translateX(-50%) translateY(0); }
+  #infoPanel h2 {
+    margin:0 0 6px; font-size:16px; letter-spacing:1.5px; color:#f2d98a;
+    text-shadow:0 2px 6px rgba(0,0,0,.7);
+  }
+  #infoPanel p {
+    margin:0; font-size:13px; line-height:1.55; color:#e8d9ad;
+  }
   #vr-button {
     pointer-events:auto;
     margin-top:10px; padding:10px 20px; border-radius:999px;
@@ -181,6 +200,11 @@
   </div>
 </div>
 
+<div id="infoPanel">
+  <h2 id="infoPanelTitle"></h2>
+  <p id="infoPanelText"></p>
+</div>
+
 <div id="joystick-base"><div id="joystick-knob"></div></div>
 
 <audio id="bgMusic" src="assets/audio/anak_ayam.mp3" loop></audio>
@@ -225,6 +249,7 @@
   let bgVolCurrent = 0;
   let insideSmooth = 1;
   const BG_BASE_VOL = 0.4;
+  let currentInfoKey = null;
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   let gyroActive = false;
@@ -411,6 +436,20 @@
     const dz = Math.max(0, Math.abs(pos.z) - halfD);
     const dist = Math.hypot(dx, dz);
     return THREE.MathUtils.clamp(1 - dist/margin, 0, 1);
+  }
+
+  // ---------- description panel: historical/usage text for the nearest active station ----------
+  function updateInfoPanel(station){
+    const panel = document.getElementById('infoPanel');
+    const key = station ? station.def.key : null;
+    if (key !== currentInfoKey){
+      currentInfoKey = key;
+      if (station){
+        document.getElementById('infoPanelTitle').textContent = station.def.name;
+        document.getElementById('infoPanelText').textContent = station.def.desc;
+      }
+    }
+    panel.classList.toggle('visible', !!station);
   }
 
   // ---------- unmute station video audio (needs a user gesture) ----------
@@ -1113,13 +1152,20 @@
   // ---------- stations: the six branches of Warisan Melayu ----------
   function buildStations(){
     const defs = [
-      { key:'tarian',    name:'TARIAN',          sub:'Seni Persembahan',        color:0xd4a017, pos:[-6,0,-7], freq:220, wave:'sine' },
-      { key:'alatmuzik', name:'ALAT MUZIK',      sub:'Gamelan Instrument',      color:0x2a9d8f, pos:[6,0,-7],  audioSrc:'assets/audio/alat_muzik.mp3', audioTrimStart:5, audioTrimEnd:5 },
-      { key:'silat',    name:'SILAT',            sub:'Seni Persembahan',        color:0xa1273d, pos:[0,0,-8],  freq:110, wave:'sawtooth' },
-      { key:'pakaian',  name:'SONGKET & BATIK',  sub:'Pakaian & Tekstil',       color:0xb5892f, pos:[-8,0,-2], freq:262, wave:'sine' },
-      { key:'kraf',     name:'KERIS & ANYAMAN',  sub:'Kraf Tangan & Persenjataan', color:0x8a8f99, pos:[-8,0,5], freq:196, wave:'triangle' },
-      { key:'makanan',  name:'HIDANGAN WARISAN', sub:'Makanan Warisan',         color:0xc9622a, pos:[8,0,-2],  freq:294, wave:'sine' },
-      { key:'adat',     name:'PANTUN & ADAT',    sub:'Adat Resam & Kesusasteraan', color:0x6a4fae, pos:[8,0,5], freq:174, wave:'triangle' },
+      { key:'tarian', name:'TARIAN', sub:'Seni Persembahan', color:0xd4a017, pos:[-6,0,-7], freq:220, wave:'sine',
+        desc:'Traditional Malay dances such as Zapin, Inang and Joget grew out of village celebrations and royal courts, blending indigenous movement with Arab, Portuguese and Siamese influences carried in by centuries of trade. They were, and still are, performed at weddings, harvest festivals and royal ceremonies to mark important life passages.' },
+      { key:'alatmuzik', name:'ALAT MUZIK', sub:'Gamelan Instrument', color:0x2a9d8f, pos:[6,0,-7], audioSrc:'assets/audio/alat_muzik.mp3', audioTrimStart:5, audioTrimEnd:5,
+        desc:'The gamelan is a bronze-keyed percussion ensemble with deep roots in the royal courts of the Malay Archipelago, where sets were commissioned by sultans and kept as palace treasures. It accompanied royal ceremonies, wedding processions (persandingan) and court dances, its layered, ringing tones setting the pace for the performers around it.' },
+      { key:'silat', name:'SILAT', sub:'Seni Persembahan', color:0xa1273d, pos:[0,0,-8], freq:110, wave:'sawtooth',
+        desc:'Silat Melayu is a traditional martial art combining self-defence with spiritual discipline (adab) passed down from teacher to student (guru-anak murid). Beyond combat training, it is performed ceremonially at weddings and cultural festivals, and historically formed part of a warrior\'s preparation alongside the keris.' },
+      { key:'pakaian', name:'SONGKET & BATIK', sub:'Pakaian & Tekstil', color:0xb5892f, pos:[-8,0,-2], freq:262, wave:'sine',
+        desc:'Songket is a hand-woven brocade with gold or silver thread worked into the fabric on a supplementary weft, historically reserved for royalty and worn at weddings and formal ceremonies for its shimmer and status. Batik, made by wax-resist dyeing, was worn more broadly across daily and festive life throughout the Malay Archipelago.' },
+      { key:'kraf', name:'KERIS & ANYAMAN', sub:'Kraf Tangan & Persenjataan', color:0x8a8f99, pos:[-8,0,5], freq:196, wave:'triangle',
+        desc:'The keris is a wavy-bladed dagger carried as part of formal Malay attire (baju Melayu) and regarded as a symbol of status and spiritual power, often passed down as a family heirloom. Anyaman is the everyday craft of weaving pandan, rattan and bamboo into mats, baskets and trays -- humble household items woven by hand in nearly every kampung.' },
+      { key:'makanan', name:'HIDANGAN WARISAN', sub:'Makanan Warisan', color:0xc9622a, pos:[8,0,-2], freq:294, wave:'sine',
+        desc:'Malay heritage dishes such as rendang, nasi lemak and an array of kuih-muih reflect centuries of spice trade with India, China and the Middle East, absorbed into local ingredients and cooking methods. They are served at kenduri (feasts), weddings and Hari Raya celebrations, where cooking and sharing food is itself a communal, festive act.' },
+      { key:'adat', name:'PANTUN & ADAT', sub:'Adat Resam & Kesusasteraan', color:0x6a4fae, pos:[8,0,5], freq:174, wave:'triangle',
+        desc:'Pantun is a traditional oral poetry form built from rhyming quatrains, historically used in courtship, ceremonies and everyday social exchange to convey wit and wisdom indirectly. Adat resam refers to the customary practices and unwritten laws -- such as adat perpatih and adat temenggong -- that have long governed Malay social conduct, ceremonies and inheritance.' },
     ];
     return defs.map(buildStation);
   }
@@ -1652,6 +1698,7 @@
     });
 
     let maxActive = 0;
+    let bestStation = null, bestActive = 0.5; // threshold -- only show a description once fairly close
 
     points.forEach(st => {
       st.group.getWorldPosition(st.worldPos);
@@ -1659,6 +1706,7 @@
       const targetActive = dist < 3.0 ? 1 : 0;
       st.active += (targetActive - st.active) * Math.min(1, dt*4);
       maxActive = Math.max(maxActive, st.active);
+      if (st.def.desc && st.active > bestActive){ bestActive = st.active; bestStation = st; }
 
       // glow (ring for stations, marker for architecture hotspots)
       if (st.ring){
@@ -1717,6 +1765,8 @@
         videoEl.play().catch(() => {});
       }
     });
+
+    updateInfoPanel(bestStation);
 
     // anak ayam only plays inside the balai, and fades out while near any
     // exhibit interaction; outside the balai, wind + bird chirps take over
