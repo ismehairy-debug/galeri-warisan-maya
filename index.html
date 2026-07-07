@@ -468,7 +468,14 @@
       // station that isn't currently active once its priming play begins.
       const playPromise = video.play();
       if (playPromise && playPromise.then){
-        playPromise.then(() => { if (st.active < 0.05) video.pause(); }).catch(() => {});
+        // wait a moment before pausing again -- pausing the instant play()
+        // resolves can catch a large file (like the multi-minute pantun
+        // video) before it's buffered more than a fraction of a second,
+        // and on a slow connection that stall can persist even after a
+        // later play() call, leaving the station looking blank
+        playPromise.then(() => {
+          setTimeout(() => { if (st.active < 0.05) video.pause(); }, 500);
+        }).catch(() => {});
       }
     });
   }
@@ -1522,6 +1529,7 @@
     video.src = videoSrc;
     video.muted = true;
     video.playsInline = true;
+    video.preload = 'auto';
     video.setAttribute('webkit-playsinline', 'true');
     // many mobile browsers won't reliably decode frames for a video element
     // that's never attached to the DOM, even when only used as a texture source
@@ -1588,6 +1596,7 @@
     video.src = videoSrc;
     video.muted = true;
     video.playsInline = true;
+    video.preload = 'auto';
     video.setAttribute('webkit-playsinline', 'true');
     video.style.cssText = 'position:fixed; width:1px; height:1px; opacity:0; pointer-events:none;';
     document.body.appendChild(video);
@@ -1811,24 +1820,9 @@
     return group;
   }
 
-  // ---------- a single credit line (title / director / year) as a billboard sprite so it always faces the viewer ----------
-  function makeFilmLine(text, font, color, cw, ch){
-    const c = document.createElement('canvas');
-    c.width = cw; c.height = ch;
-    const ctx = c.getContext('2d');
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = color;
-    ctx.font = font;
-    ctx.fillText(text, cw/2, ch/2);
-    const tex = new THREE.CanvasTexture(c);
-    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 1 });
-    return new THREE.Sprite(mat);
-  }
-
-  // ---------- draw the real poster scan (cover-fit, cropping to fill) onto the
-  // card's canvas, with a gold border and a dark caption strip along the bottom
-  // for the title/director/year sprites layered in front of it ----------
+  // ---------- draw the real poster scan (cover-fit, cropping to fill) onto
+  // the card's canvas, with just a gold border -- the artwork itself already
+  // carries the film's title, so no separate caption is layered on top ----------
   function drawPosterCanvas(ctx, w, h, img){
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#0d0a06';
@@ -1841,29 +1835,13 @@
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
     }
 
-    // solid dark backing (not a fade-to-transparent gradient) so the title/
-    // director/year text stays legible regardless of how busy or high-
-    // contrast the poster photo behind it is -- only a thin sliver at the
-    // very top edge softens into the artwork above
-    const captionH = h*0.26;
-    const fadeH = captionH*0.2;
-    const fade = ctx.createLinearGradient(0, h-captionH, 0, h-captionH+fadeH);
-    fade.addColorStop(0, 'rgba(8,5,2,0)');
-    fade.addColorStop(1, 'rgba(8,5,2,0.9)');
-    ctx.fillStyle = fade;
-    ctx.fillRect(0, h-captionH, w, fadeH);
-    ctx.fillStyle = 'rgba(8,5,2,0.9)';
-    ctx.fillRect(0, h-captionH+fadeH, w, captionH-fadeH);
-
     ctx.strokeStyle = '#c9a227';
     ctx.lineWidth = 10;
     ctx.strokeRect(6, 6, w-12, h-12);
   }
 
-  // ---------- one film's poster card: the real poster scan, with independently-
-  // animatable title/director/year lines floating over a caption strip at the
-  // bottom so the artwork itself stays fully visible above it ----------
-  function buildFilemCard(title, director, year, posterSrc){
+  // ---------- one film's poster card: just the real poster scan in a gold frame ----------
+  function buildFilemCard(posterSrc){
     const group = new THREE.Group();
 
     const w = 512, h = 724;
@@ -1883,24 +1861,7 @@
     };
     img.src = posterSrc;
 
-    // compact caption strip at the very bottom -- leaves the poster art
-    // itself unobscured across the rest of the card
-    const titleSprite = makeFilmLine(title, '700 30px Georgia', '#f2d98a', 480, 80);
-    titleSprite.position.set(0, -0.52, 0.06);
-    titleSprite.scale.set(1.3, 0.22, 1);
-    group.add(titleSprite);
-
-    const dirSprite = makeFilmLine('Pengarah: ' + director, 'italic 22px Georgia', '#e8d9ad', 480, 60);
-    dirSprite.position.set(0, -0.62, 0.06);
-    dirSprite.scale.set(1.15, 0.145, 1);
-    group.add(dirSprite);
-
-    const yearSprite = makeFilmLine(String(year), '700 30px Georgia', '#c9a961', 260, 70);
-    yearSprite.position.set(0, -0.72, 0.06);
-    yearSprite.scale.set(0.55, 0.15, 1);
-    group.add(yearSprite);
-
-    return { group, year, frame, titleSprite, dirSprite, yearSprite };
+    return { group, frame };
   }
 
   // ---------- FILEM MELAYU centrepiece: three films set in the Melaka Sultanate era,
@@ -1908,13 +1869,13 @@
   // Malay cinema portrayed that world across the decades ----------
   function buildFilemMelayu(){
     const group = new THREE.Group();
-    const films = [
-      { title:'HANG TUAH', director:'Phani Majumdar', year:1956, poster:'assets/images/poster_hangtuah_1956.jpg' },
-      { title:'PUTERI GUNUNG LEDANG', director:'S. Roomai Noor', year:1961, poster:'assets/images/poster_puterigl_1961.jpg' },
-      { title:'PUTERI GUNUNG LEDANG', director:'Saw Teong Hin', year:2004, poster:'assets/images/poster_puterigl_2004.jpg' },
+    const posters = [
+      'assets/images/poster_hangtuah_1956.jpg',     // Hang Tuah, 1956
+      'assets/images/poster_puterigl_1961.jpg',     // Puteri Gunung Ledang, 1961
+      'assets/images/poster_puterigl_2004.jpg',     // Puteri Gunung Ledang, 2004
     ]; // already sorted ascending by year
-    const cards = films.map((f, i) => {
-      const card = buildFilemCard(f.title, f.director, f.year, f.poster);
+    const cards = posters.map((poster, i) => {
+      const card = buildFilemCard(poster);
       // 0.7 local = world y 1.6 (performer sits at y=0.9), matching the
       // camera's own eye height so the posters read straight-on, not
       // looking up/down at them
@@ -2254,33 +2215,6 @@
           st.performer.rotation.y = t*0.3;
         } else if (st.def.key === 'makanan'){
           st.performer.userData.dishes.forEach((d,i) => { d.position.y = -0.15 - 0.03*i + Math.sin(t*2+i)*0.01; });
-        } else if (st.def.key === 'filem'){
-          // spotlight cycles through the 3 posters in year order (title,
-          // then director, then year fade in like a film credits roll),
-          // so watching the loop also traces the timeline left to right
-          const cards = st.performer.userData.filemCards;
-          const spotlightPeriod = 2.4;
-          const total = spotlightPeriod * cards.length;
-          const cyclePos = ((t % total) + total) % total;
-          const activeIndex = Math.floor(cyclePos / spotlightPeriod);
-          const localT = cyclePos - activeIndex*spotlightPeriod;
-          const dim = 0.32;
-          cards.forEach((card, i) => {
-            let titleOp, dirOp, yearOp, glow;
-            if (i === activeIndex){
-              titleOp = dim + (1-dim)*THREE.MathUtils.clamp(localT/0.4, 0, 1);
-              dirOp   = dim + (1-dim)*THREE.MathUtils.clamp((localT-0.4)/0.4, 0, 1);
-              yearOp  = dim + (1-dim)*THREE.MathUtils.clamp((localT-0.8)/0.4, 0, 1);
-              glow = 0.35 + 0.45*THREE.MathUtils.clamp(localT/0.4, 0, 1);
-            } else {
-              titleOp = dirOp = yearOp = dim;
-              glow = 0.35;
-            }
-            card.titleSprite.material.opacity = titleOp * st.active;
-            card.dirSprite.material.opacity = dirOp * st.active;
-            card.yearSprite.material.opacity = yearOp * st.active;
-            card.frame.material.emissiveIntensity = glow;
-          });
         }
       }
 
