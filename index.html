@@ -14,7 +14,9 @@
     padding:18px 22px; pointer-events:none;
     font-family: Georgia, 'Times New Roman', serif;
     color:#f2e2b6;
+    opacity:0; transition: opacity 0.9s ease;
   }
+  #overlay.visible { opacity:1; }
   #titleblock { pointer-events:none; }
   #titleblock h1 {
     margin:0; font-size:20px; letter-spacing:2px; font-weight:700;
@@ -60,13 +62,32 @@
     position:fixed; inset:0; z-index:20; background:radial-gradient(ellipse at center, #1a1206 0%, #150c07 70%);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     color:#f2e2b6; font-family: Georgia, serif; text-align:center; padding:20px;
+    opacity:1; transition: opacity 0.7s ease;
+    animation: startFadeIn 0.9s ease;
   }
+  #startScreen.fade-out { opacity:0; pointer-events:none; }
+  @keyframes startFadeIn { from { opacity:0; } to { opacity:1; } }
   #startScreen h1 { font-size:32px; letter-spacing:3px; margin-bottom:6px; }
   #startScreen p { color:#c9a961; font-style:italic; margin-top:0; }
   #startScreen button {
     margin-top:28px; padding:14px 36px; border-radius:999px; font-size:15px;
     background: linear-gradient(135deg,#c9a227,#8a6a10); color:#1a1206;
     border:1px solid #f2d98a; font-weight:700; letter-spacing:1px; cursor:pointer;
+    transition: transform 0.15s ease, box-shadow 0.3s ease;
+    animation: enterPulse 2.2s ease-in-out infinite;
+  }
+  #startScreen button:active { transform: scale(0.92); }
+  #startScreen button.clicked {
+    animation: enterClicked 0.6s ease forwards;
+  }
+  @keyframes enterPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(242,217,138,0.0); }
+    50% { box-shadow: 0 0 22px rgba(242,217,138,0.65); }
+  }
+  @keyframes enterClicked {
+    0% { transform: scale(1); opacity:1; }
+    40% { transform: scale(1.14); opacity:1; }
+    100% { transform: scale(1.5); opacity:0; }
   }
   #startScreen small { margin-top:18px; color:#8a7a5a; max-width:420px; font-size:11px; line-height:1.6; }
   #loadingScreen {
@@ -136,7 +157,7 @@
   <small>Desktop: click to enable mouse-look, then WASD to walk. On a Meta Quest browser, use the ENTER VR button that appears top-right once you're inside.</small>
 </div>
 
-<div id="overlay" style="display:none;">
+<div id="overlay">
   <div id="leftPanel">
     <div id="logoRow">
       <img src="assets/images/fcoee_logo.png" alt="FCoEE logo">
@@ -194,7 +215,12 @@
   const keys = {};
   let yaw = 0, pitch = 0;
   let audioReady = false;
+  let ambienceStarted = false;
   let stationsRef = [];
+  let ambienceRef = null;
+  let bgVolCurrent = 0;
+  let insideSmooth = 1;
+  const BG_BASE_VOL = 0.4;
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   let gyroActive = false;
@@ -246,6 +272,7 @@
     const listener = new THREE.AudioListener();
     camera.add(listener);
     stations.forEach(s => attachAudio(s, listener));
+    ambienceRef = buildOutsideAmbience(listener);
     buildTitleSprite();
 
     window.addEventListener('resize', onResize);
@@ -260,7 +287,7 @@
     setupTouchControls();
     setupVRButton();
     setupLoadingScreen();
-    setupIntroScreen();
+    setupIntroScreen(listener);
     setupStartScreen(listener);
 
     renderer.setAnimationLoop(() => animate(allPoints, clouds, birds));
@@ -285,7 +312,7 @@
   }
 
   // ---------- intro video ----------
-  function setupIntroScreen(){
+  function setupIntroScreen(listener){
     const introScreen = document.getElementById('introScreen');
     const introControls = document.getElementById('introControls');
     const soundHint = document.getElementById('tapForSoundHint');
@@ -297,6 +324,15 @@
       introControls.style.display = 'none';
       soundHint.style.display = 'none';
       video.pause();
+      // enter the soundscape the instant the intro ends, in sync with the
+      // world already visible behind it -- don't wait for the MASUK GALERI
+      // click. This only produces sound if a gesture has already unlocked
+      // audio (tapping for sound, or the Skip button); otherwise it fails
+      // silently and the enterBtn handler below picks it up as a fallback.
+      if (listener.context.state === 'suspended') listener.context.resume().catch(() => {});
+      startBackgroundMusic();
+      startOutsideAmbience();
+      ambienceStarted = true;
     }
 
     video.addEventListener('ended', endIntro);
@@ -312,11 +348,62 @@
     }, { once:true });
   }
 
-  // ---------- ambient background music ----------
+  // ---------- ambient background music (anak ayam) — only heard inside the balai ----------
   function startBackgroundMusic(){
     const audio = document.getElementById('bgMusic');
-    audio.volume = 0.4;
+    if (!audio.paused) return; // already playing -- don't restart it from the top
+    audio.volume = 0;
     audio.play().catch(() => {});
+  }
+
+  // ---------- exterior soundscape: wind + birds, only heard outside the balai ----------
+  function buildOutsideAmbience(listener){
+    const ctx = listener.context;
+    const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i=0;i<data.length;i++) data[i] = Math.random()*2 - 1;
+
+    const wind = new THREE.Audio(listener);
+    wind.setBuffer(noiseBuffer);
+    wind.setLoop(true);
+    wind.setVolume(0);
+    const windFilter = ctx.createBiquadFilter();
+    windFilter.type = 'lowpass';
+    windFilter.frequency.value = 420;
+    wind.setFilters([windFilter]);
+
+    return { wind, nextChirpIn: 2 + Math.random()*3 };
+  }
+
+  function startOutsideAmbience(){
+    if (!ambienceRef || ambienceRef.wind.isPlaying) return;
+    ambienceRef.wind.play();
+  }
+
+  function playBirdChirp(ctx, volume){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const startFreq = 1800 + Math.random()*1400;
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(startFreq, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(startFreq*0.6, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(Math.max(volume, 0.001), ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.2);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.22);
+  }
+
+  // ---------- how far inside the balai's footprint the camera is (1 = inside, 0 = well outside) ----------
+  function computeInsideAmount(pos){
+    const halfW = ROOM.width/2, halfD = ROOM.depth/2;
+    const margin = 2.5; // metres of soft crossfade at the open sides/gateway
+    const dx = Math.max(0, Math.abs(pos.x) - halfW);
+    const dz = Math.max(0, Math.abs(pos.z) - halfD);
+    const dist = Math.hypot(dx, dz);
+    return THREE.MathUtils.clamp(1 - dist/margin, 0, 1);
   }
 
   // ---------- unmute station video audio (needs a user gesture) ----------
@@ -339,13 +426,18 @@
       document.getElementById('gyro-button').style.display = 'inline-block';
       document.getElementById('joystick-base').style.display = 'block';
     }
-    document.getElementById('enterBtn').addEventListener('click', () => {
-      document.getElementById('startScreen').style.display = 'none';
-      document.getElementById('overlay').style.display = 'flex';
+    document.getElementById('enterBtn').addEventListener('click', (e) => {
+      const startScreen = document.getElementById('startScreen');
+      e.currentTarget.classList.add('clicked');
+      startScreen.classList.add('fade-out');
+      document.getElementById('overlay').classList.add('visible');
+      setTimeout(() => { startScreen.style.display = 'none'; }, 700);
       if (listener.context.state === 'suspended') listener.context.resume();
       audioReady = true;
+      ambienceStarted = true;
       unlockStationMedia();
       startBackgroundMusic();
+      startOutsideAmbience();
       if (isTouchDevice) requestGyroPermission();
       else renderer.domElement.requestPointerLock();
     });
@@ -1014,8 +1106,8 @@
   // ---------- stations: the six branches of Warisan Melayu ----------
   function buildStations(){
     const defs = [
-      { key:'tarian',   name:'TARIAN',           sub:'Seni Persembahan',        color:0xd4a017, pos:[-6,0,-7], freq:220, wave:'sine' },
-      { key:'nyanyian', name:'NYANYIAN',         sub:'Seni Persembahan',        color:0x2a9d8f, pos:[6,0,-7],  freq:330, wave:'triangle' },
+      { key:'tarian',    name:'TARIAN',          sub:'Seni Persembahan',        color:0xd4a017, pos:[-6,0,-7], freq:220, wave:'sine' },
+      { key:'alatmuzik', name:'ALAT MUZIK',      sub:'Seni Persembahan',        color:0x2a9d8f, pos:[6,0,-7],  audioSrc:'assets/audio/alat_muzik.mp3' },
       { key:'silat',    name:'SILAT',            sub:'Seni Persembahan',        color:0xa1273d, pos:[0,0,-8],  freq:110, wave:'sawtooth' },
       { key:'pakaian',  name:'SONGKET & BATIK',  sub:'Pakaian & Tekstil',       color:0xb5892f, pos:[-8,0,-2], freq:262, wave:'sine' },
       { key:'kraf',     name:'KERIS & ANYAMAN',  sub:'Kraf Tangan & Persenjataan', color:0x8a8f99, pos:[-8,0,5], freq:196, wave:'triangle' },
@@ -1214,7 +1306,7 @@
 
     if (def.key === 'tarian'){
       buildVideoScreen(performer, def, 'assets/videos/tarian_clip.mp4');
-    } else if (def.key === 'nyanyian'){
+    } else if (def.key === 'alatmuzik'){
       const bars = [];
       for (let i=-3;i<=3;i++){
         const bar = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.4, 0.14), partsMat);
@@ -1299,14 +1391,24 @@
     const videoEl = station.performer && station.performer.userData && station.performer.userData.videoEl;
     if (videoEl){
       station.sound.setMediaElementSource(videoEl);
+      station.oscStarted = true;
+    } else if (station.def.audioSrc){
+      if (station.audioLoading) return; // async load in flight -- wait for it
+      station.audioLoading = true;
+      new THREE.AudioLoader().load(station.def.audioSrc, buffer => {
+        station.sound.setBuffer(buffer);
+        station.sound.setLoop(true);
+        station.sound.play();
+        station.oscStarted = true;
+      });
     } else {
       const osc = ctx.createOscillator();
       osc.type = station.def.wave;
       osc.frequency.value = station.def.freq;
       osc.start();
       station.sound.setNodeSource(osc);
+      station.oscStarted = true;
     }
-    station.oscStarted = true;
   }
 
   // ---------- input ----------
@@ -1381,11 +1483,13 @@
               button.textContent = 'EXIT VR';
               if (!audioReady){
                 document.getElementById('startScreen').style.display = 'none';
-                document.getElementById('overlay').style.display = 'flex';
+                document.getElementById('overlay').classList.add('visible');
                 audioReady = true;
               }
               unlockStationMedia();
               startBackgroundMusic();
+              startOutsideAmbience();
+              ambienceStarted = true;
             });
         } else {
           currentSession.end();
@@ -1432,11 +1536,14 @@
       b.userData.wingR.rotation.z = -flap;
     });
 
+    let maxActive = 0;
+
     points.forEach(st => {
       st.group.getWorldPosition(st.worldPos);
       const dist = camWorld.distanceTo(st.worldPos);
       const targetActive = dist < 3.0 ? 1 : 0;
       st.active += (targetActive - st.active) * Math.min(1, dt*4);
+      maxActive = Math.max(maxActive, st.active);
 
       // glow (ring for stations, marker for architecture hotspots)
       if (st.ring){
@@ -1456,7 +1563,7 @@
         if (st.def.key === 'tarian' || st.def.key === 'silat'){
           const pulse = 1 + Math.sin(t*2)*0.02*(0.3+st.active);
           st.performer.userData.screen.scale.setScalar(pulse);
-        } else if (st.def.key === 'nyanyian'){
+        } else if (st.def.key === 'alatmuzik'){
           st.performer.userData.bars.forEach((b,i) => {
             const h = 0.4 + Math.abs(Math.sin(t*4 + i))*0.5*(0.25+st.active);
             b.scale.y = h/0.4;
@@ -1479,6 +1586,28 @@
         st.sound.setVolume(st.active * 0.35);
       }
     });
+
+    // anak ayam only plays inside the balai, and fades out while near any
+    // exhibit interaction; outside the balai, wind + bird chirps take over
+    if (ambienceStarted){
+      const insideAmount = computeInsideAmount(camWorld);
+      insideSmooth += (insideAmount - insideSmooth) * Math.min(1, dt*2);
+
+      const bgMusic = document.getElementById('bgMusic');
+      const targetBgVol = BG_BASE_VOL * insideSmooth * (1 - maxActive);
+      bgVolCurrent += (targetBgVol - bgVolCurrent) * Math.min(1, dt*3);
+      bgMusic.volume = Math.max(0, Math.min(1, bgVolCurrent));
+
+      if (ambienceRef){
+        const outsideAmount = 1 - insideSmooth;
+        ambienceRef.wind.setVolume(outsideAmount * 0.22);
+        ambienceRef.nextChirpIn -= dt;
+        if (outsideAmount > 0.05 && ambienceRef.nextChirpIn <= 0){
+          playBirdChirp(ambienceRef.wind.context, outsideAmount * 0.16);
+          ambienceRef.nextChirpIn = 2 + Math.random()*3.5;
+        }
+      }
+    }
 
     renderer.render(scene, camera);
   }
