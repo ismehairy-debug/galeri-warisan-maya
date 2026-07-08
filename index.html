@@ -280,13 +280,33 @@
   const colliders = [];
   const PLAYER_RADIUS = 0.35;
 
+  // realism registries -- populated while the scene is built, then driven
+  // every frame from updateFrame so the whole world reads as alive: foliage
+  // swaying in one shared wind, fire-lit lamps flickering, cloth rippling
+  const swayItems = [];      // { node, axis, base, amp, speed, phase } wind-swayed foliage
+  const flickerLights = [];  // { light, base, amp, speed, phase } fire-lit lamps
+  const flames = [];         // { sprite, baseX, baseY, phase } pelita flame sprites
+  const flagWaves = [];      // { mesh, poleSide, phase } cloth flags with vertex ripple
+  const idleFigures = [];    // { node, phase } figures breathing/swaying subtly
+  let firefliesRef = null, motesRef = null;
+  let bobPhase = 0;
+  const prevPlayerPos = new THREE.Vector3();
+  // lazy-built shared assets -- declared up here (before the init() call
+  // below) because their builder functions run synchronously during init;
+  // declaring them further down would put them in the temporal dead zone
+  let frondAssets = null;
+  let palmTrunkMat = null;
+  let bananaLeafAssets = null;
+  let flameTexture = null;
+
   init();
 
   function init(){
     scene = new THREE.Scene();
     // fog matches the sky dome's horizon tone so distant objects fade
-    // seamlessly into the sky instead of hitting a hard, mismatched edge
-    scene.fog = new THREE.FogExp2(0xbcdcf0, 0.025);
+    // seamlessly into the sky instead of hitting a hard, mismatched edge --
+    // warmed to a golden-hour haze to match the low sun and lamp-lit balai
+    scene.fog = new THREE.FogExp2(0xead9b8, 0.022);
 
     camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.05, 60);
     camera.position.set(0, 1.6, 0);
@@ -303,6 +323,15 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
+    // filmic tone mapping compresses highlights the way a camera does --
+    // gold trim and warm lamps roll off softly instead of clipping to flat
+    // white, which is most of what makes the lighting read as "real"
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    // real-time sun shadows on desktop only -- phone GPUs already run close
+    // to their frame budget here, and a whole-scene shadow pass would sink it
+    renderer.shadowMap.enabled = !isTouchDevice;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.xr.enabled = true;
     if (renderer.xr.setReferenceSpaceType) renderer.xr.setReferenceSpaceType('local-floor');
     document.body.appendChild(renderer.domElement);
@@ -327,6 +356,12 @@
     bgGainNode = buildBgMusicGain(listener);
     istanaGainNode = buildIstanaMusicGain(listener);
     buildTitleSprite();
+    buildDirtPath();
+    buildPelitaPosts();
+    firefliesRef = buildFireflies();
+    motesRef = buildDustMotes();
+    enableShadows();
+    prevPlayerPos.copy(player.position);
 
     window.addEventListener('resize', onResize);
     document.addEventListener('keydown', e => keys[e.code] = true);
@@ -711,52 +746,166 @@
   // ---------- lights ----------
   function buildLights(){
     // warm dusk sky bounce, like late-afternoon light filtering into an open-sided balai
-    scene.add(new THREE.HemisphereLight(0xffb877, 0x2a1608, 0.6));
-    // low sun so the exterior kampung (palms, huts) isn't lit only by the
-    // hall's interior point lights and doesn't render as flat black silhouettes
-    const sun = new THREE.DirectionalLight(0xffd9a0, 0.7);
-    sun.position.set(30, 40, 20);
+    scene.add(new THREE.HemisphereLight(0xffc98a, 0x2a1a0a, 0.55));
+    // low golden-hour sun -- also the scene's one shadow caster, throwing
+    // long soft shadows off the balai, palms and Istana across the kampung
+    const sun = new THREE.DirectionalLight(0xffce8f, 0.95);
+    sun.position.set(30, 28, 18);
+    if (renderer.shadowMap.enabled){
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      const cam = sun.shadow.camera;
+      cam.left = -42; cam.right = 42; cam.top = 42; cam.bottom = -42;
+      cam.near = 1; cam.far = 130;
+      sun.shadow.bias = -0.0004;
+      sun.shadow.normalBias = 0.02;
+    }
     scene.add(sun);
     const entranceGlow = new THREE.PointLight(0xffcf8a, 1.3, 12, 2);
     entranceGlow.position.set(0, 3.2, 6.5);
     scene.add(entranceGlow);
-    [[-5,0,-3],[5,0,-3],[0,0,-7]].forEach(p => {
+    flickerLights.push({ light: entranceGlow, base: 1.3, amp: 0.12, speed: 9, phase: 0.7 });
+    [[-5,0,-3],[5,0,-3],[0,0,-7]].forEach((p, i) => {
       const spot = new THREE.PointLight(0xffe3b0, 0.9, 8, 2);
       spot.position.set(p[0], 3.2, p[2]+1.5);
       scene.add(spot);
+      flickerLights.push({ light: spot, base: 0.9, amp: 0.06, speed: 7 + i*0.9, phase: i*2.1 });
     });
     // pelita-style warm glow beneath the roof ridge
     const ridgeGlow = new THREE.PointLight(0xffd9a0, 0.5, 16, 2);
     ridgeGlow.position.set(0, ROOM.height + 1.2, -2);
     scene.add(ridgeGlow);
+    flickerLights.push({ light: ridgeGlow, base: 0.5, amp: 0.05, speed: 8.3, phase: 4.2 });
+  }
+
+  // ---------- flag every mesh in the built scene as a shadow caster/receiver.
+  // Runs once, after the whole scene is assembled. Transparent/alpha-tested
+  // surfaces (labels, leaf blades, the dirt path) only receive: the default
+  // shadow depth pass ignores alpha, so letting them cast would throw solid
+  // rectangular shadows for what looks like open fretwork or a frond ----------
+  function enableShadows(){
+    if (!renderer.shadowMap.enabled) return;
+    scene.traverse(o => {
+      if (!o.isMesh || o === skyDome) return;
+      const m = o.material;
+      if (m && (m.transparent || (m.alphaTest && m.alphaTest > 0))){
+        o.receiveShadow = true;
+        return;
+      }
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
   }
 
   // ---------- procedural chengal-wood plank texture (floor) ----------
   function makeWoodPlankTexture(){
     const c = document.createElement('canvas');
-    c.width = c.height = 256;
+    c.width = c.height = 512;
     const ctx = c.getContext('2d');
     const planks = 8, pw = c.width/planks;
     for (let i=0;i<planks;i++){
       const shade = 46 + Math.floor(Math.random()*16);
-      ctx.fillStyle = `rgb(${shade+34},${shade+16},${shade})`;
-      ctx.fillRect(i*pw, 0, pw-2, c.height);
-      ctx.strokeStyle = 'rgba(20,10,4,0.25)';
-      ctx.lineWidth = 1;
-      for (let g=0; g<4; g++){
+      // base plank tone with a subtle lengthwise sheen gradient, like worn
+      // timber polished by decades of bare feet
+      const pg = ctx.createLinearGradient(i*pw, 0, i*pw, c.height);
+      pg.addColorStop(0, `rgb(${shade+34},${shade+16},${shade})`);
+      pg.addColorStop(0.5, `rgb(${shade+46},${shade+24},${shade+6})`);
+      pg.addColorStop(1, `rgb(${shade+30},${shade+14},${shade-2})`);
+      ctx.fillStyle = pg;
+      ctx.fillRect(i*pw, 0, pw-3, c.height);
+      // long wavering grain lines
+      for (let g=0; g<9; g++){
         const gx = i*pw + 6 + Math.random()*(pw-12);
+        ctx.strokeStyle = `rgba(20,10,4,${0.15 + Math.random()*0.2})`;
+        ctx.lineWidth = 0.8 + Math.random()*1.2;
         ctx.beginPath();
         ctx.moveTo(gx, 0);
-        ctx.bezierCurveTo(gx+4,64, gx-4,128, gx+3,256);
+        ctx.bezierCurveTo(gx+8,128, gx-8,256, gx+6,512);
         ctx.stroke();
       }
+      // the occasional dark knot with growth rings around it
+      if (Math.random() < 0.6){
+        const kx = i*pw + pw*0.3 + Math.random()*pw*0.4;
+        const ky = 40 + Math.random()*432;
+        const kg = ctx.createRadialGradient(kx,ky,1,kx,ky,9);
+        kg.addColorStop(0, 'rgba(18,9,3,0.9)');
+        kg.addColorStop(0.5, 'rgba(40,22,9,0.55)');
+        kg.addColorStop(1, 'rgba(40,22,9,0)');
+        ctx.fillStyle = kg;
+        ctx.beginPath(); ctx.ellipse(kx, ky, 9, 14, 0, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(25,13,5,0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(kx, ky, 12, 20, 0, 0, Math.PI*2); ctx.stroke();
+      }
     }
-    ctx.strokeStyle = 'rgba(10,5,2,0.55)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(10,5,2,0.6)';
+    ctx.lineWidth = 3;
     for (let i=0;i<=planks;i++){ ctx.beginPath(); ctx.moveTo(i*pw,0); ctx.lineTo(i*pw,c.height); ctx.stroke(); }
     const tex = new THREE.CanvasTexture(c);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(ROOM.width/3, ROOM.depth/3);
+    return tex;
+  }
+
+  // ---------- procedural vertical wall-plank texture, so the walls read as
+  // real sawn chengal boards instead of one flat brown color ----------
+  function makeWallPlankTexture(base){
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = base || '#3b2415';
+    ctx.fillRect(0,0,256,256);
+    const planks = 7, pw = 256/planks;
+    for (let i=0;i<planks;i++){
+      const tone = Math.floor((Math.random()-0.5)*18);
+      ctx.fillStyle = `rgba(${90+tone},${58+tone},${32+tone},0.35)`;
+      ctx.fillRect(i*pw, 0, pw-2, 256);
+      for (let g=0; g<5; g++){
+        const gx = i*pw + 4 + Math.random()*(pw-8);
+        ctx.strokeStyle = `rgba(18,10,4,${0.12 + Math.random()*0.18})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(gx, 0);
+        ctx.bezierCurveTo(gx+3,80, gx-3,170, gx+2,256);
+        ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = 'rgba(8,4,2,0.55)';
+    ctx.lineWidth = 2;
+    for (let i=0;i<=planks;i++){ ctx.beginPath(); ctx.moveTo(i*pw,0); ctx.lineTo(i*pw,256); ctx.stroke(); }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 2);
+    return tex;
+  }
+
+  // ---------- procedural attap-thatch roof texture: layered horizontal
+  // palm-frond courses, replacing the roof's flat dark color ----------
+  function makeAttapTexture(){
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#1d130a';
+    ctx.fillRect(0,0,256,256);
+    const course = 20;
+    for (let y=0; y<256; y+=course){
+      // each thatch course is a band of short vertical strands with a darker
+      // shadow line where it overlaps the course below
+      for (let x=0; x<256; x+=3){
+        const tone = 22 + Math.floor(Math.random()*26);
+        ctx.strokeStyle = `rgba(${tone+18},${tone+6},${Math.max(0,tone-8)},0.85)`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + (Math.random()-0.5)*2, y);
+        ctx.lineTo(x + (Math.random()-0.5)*4, y + course + 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(0, y + course - 3, 256, 3);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(6, 4);
     return tex;
   }
 
@@ -859,9 +1008,11 @@
     c.width = 2; c.height = 256;
     const ctx = c.getContext('2d');
     const grad = ctx.createLinearGradient(0,0,0,256);
-    grad.addColorStop(0, '#1e5fa8');
-    grad.addColorStop(0.55, '#4f9bdb');
-    grad.addColorStop(1, '#bcdcf0'); // matches the fog color at the horizon
+    // golden-hour dusk: deep blue zenith falling to a warm amber horizon
+    grad.addColorStop(0, '#27538f');
+    grad.addColorStop(0.5, '#7ca6cf');
+    grad.addColorStop(0.8, '#d9c39a');
+    grad.addColorStop(1, '#ead9b8'); // matches the fog color at the horizon
     ctx.fillStyle = grad;
     ctx.fillRect(0,0,2,256);
     const tex = new THREE.CanvasTexture(c);
@@ -870,6 +1021,29 @@
       new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false })
     );
     dome.renderOrder = -1;
+
+    // soft sun glow, parented to the dome (so it re-centers with the camera)
+    // and placed along the same direction the DirectionalLight shines from --
+    // shadows in the scene visibly point away from this glow
+    const sc = document.createElement('canvas');
+    sc.width = sc.height = 128;
+    const sctx = sc.getContext('2d');
+    const sgrad = sctx.createRadialGradient(64,64,0,64,64,64);
+    sgrad.addColorStop(0, 'rgba(255,244,214,1)');
+    sgrad.addColorStop(0.25, 'rgba(255,214,150,0.85)');
+    sgrad.addColorStop(1, 'rgba(255,190,110,0)');
+    sctx.fillStyle = sgrad;
+    sctx.fillRect(0,0,128,128);
+    const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(sc), transparent: true, fog: false,
+      depthWrite: false, blending: THREE.AdditiveBlending
+    }));
+    const sunDir = new THREE.Vector3(30, 28, 18).normalize().multiplyScalar(48);
+    sunSprite.position.copy(sunDir);
+    sunSprite.scale.set(22, 22, 1);
+    sunSprite.renderOrder = -1;
+    dome.add(sunSprite);
+
     scene.add(dome);
     return dome;
   }
@@ -940,13 +1114,28 @@
     const c = document.createElement('canvas');
     c.width = c.height = 256;
     const ctx = c.getContext('2d');
-    ctx.fillStyle = '#3a4a1e';
+    ctx.fillStyle = '#3d4a1e';
     ctx.fillRect(0,0,256,256);
-    for (let i=0;i<700;i++){
+    // patchy earth showing through the grass, so the ground reads as trodden
+    // kampung earth rather than a uniform green carpet
+    for (let i=0;i<7;i++){
+      const px = Math.random()*256, py = Math.random()*256, pr = 18 + Math.random()*30;
+      const pg = ctx.createRadialGradient(px,py,2,px,py,pr);
+      pg.addColorStop(0, 'rgba(90,69,38,0.35)');
+      pg.addColorStop(1, 'rgba(90,69,38,0)');
+      ctx.fillStyle = pg;
+      ctx.beginPath(); ctx.arc(px,py,pr,0,Math.PI*2); ctx.fill();
+    }
+    // individual grass blades in varying greens, drawn as short strokes
+    for (let i=0;i<1200;i++){
       const x = Math.random()*256, y = Math.random()*256;
-      const g = 55 + Math.floor(Math.random()*55);
-      ctx.fillStyle = `rgba(${g-20},${g+25},${g-45},0.5)`;
-      ctx.fillRect(x,y,2,2);
+      const g = 55 + Math.floor(Math.random()*60);
+      ctx.strokeStyle = `rgba(${g-25},${g+25},${g-45},${0.35+Math.random()*0.35})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (Math.random()-0.5)*3, y - 2 - Math.random()*3);
+      ctx.stroke();
     }
     const tex = new THREE.CanvasTexture(c);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -961,31 +1150,304 @@
     scene.add(ground);
   }
 
+  // ---------- worn dirt path from the balai's gateway to the Istana's
+  // entrance, edges feathered into the grass -- the royal approach ----------
+  function buildDirtPath(){
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0,0,128,256);
+    // sandy earth core fading out to transparent at both side edges
+    const grad = ctx.createLinearGradient(0,0,128,0);
+    grad.addColorStop(0, 'rgba(138,111,70,0)');
+    grad.addColorStop(0.22, 'rgba(138,111,70,0.95)');
+    grad.addColorStop(0.78, 'rgba(138,111,70,0.95)');
+    grad.addColorStop(1, 'rgba(138,111,70,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,128,256);
+    // speckled pebbles and footworn scuffs
+    for (let i=0;i<450;i++){
+      const x = 12 + Math.random()*104, y = Math.random()*256;
+      const t = 90 + Math.floor(Math.random()*60);
+      ctx.fillStyle = `rgba(${t},${t-25},${t-52},${0.25+Math.random()*0.3})`;
+      ctx.fillRect(x, y, 1+Math.random()*2, 1+Math.random()*2);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1, 3);
+    const path = new THREE.Mesh(
+      new THREE.PlaneGeometry(3, 9.8),
+      new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 1, depthWrite: false })
+    );
+    path.rotation.x = -Math.PI/2;
+    path.position.set(0, 0.005, 13.9);
+    scene.add(path);
+  }
+
+  // ---------- pelita: oil-lamp posts lining the royal approach, each with a
+  // live flickering flame sprite (and a real flickering light on desktop) ----------
+  function getFlameTexture(){
+    if (flameTexture) return flameTexture;
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createRadialGradient(32, 40, 2, 32, 36, 26);
+    grad.addColorStop(0, 'rgba(255,247,208,1)');
+    grad.addColorStop(0.3, 'rgba(255,190,80,0.9)');
+    grad.addColorStop(0.7, 'rgba(255,110,20,0.45)');
+    grad.addColorStop(1, 'rgba(255,80,10,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,64,64);
+    flameTexture = new THREE.CanvasTexture(c);
+    return flameTexture;
+  }
+
+  function buildPelitaPost(x, z, i){
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    scene.add(group);
+
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.5, 8),
+      new THREE.MeshStandardMaterial({ color: 0x3a2410, roughness: 0.85 }));
+    post.position.y = 0.75;
+    group.add(post);
+
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.06, 0.1, 10),
+      new THREE.MeshStandardMaterial({ color: 0x54331a, roughness: 0.7, metalness: 0.2 }));
+    bowl.position.y = 1.55;
+    group.add(bowl);
+
+    const flame = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: getFlameTexture(), transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, fog: false
+    }));
+    flame.scale.set(0.22, 0.32, 1);
+    flame.position.y = 1.76;
+    group.add(flame);
+    flames.push({ sprite: flame, baseX: 0.22, baseY: 0.32, phase: i*1.7 });
+
+    // an actual light per torch is desktop-only -- four extra point lights
+    // is real per-pixel cost the phones can't spare; the additive flame
+    // sprite still reads as fire there
+    if (!isTouchDevice){
+      const light = new THREE.PointLight(0xffa040, 0.85, 5.5, 2);
+      light.position.y = 1.8;
+      group.add(light);
+      flickerLights.push({ light, base: 0.85, amp: 0.28, speed: 10 + i*1.3, phase: i*2.4 });
+    }
+    addCircleCollider(x, z, 0.09);
+  }
+
+  function buildPelitaPosts(){
+    [[-1.8, 11.3], [1.8, 11.3], [-1.8, 16.6], [1.8, 16.6]].forEach((p, i) => buildPelitaPost(p[0], p[1], i));
+  }
+
+  // ---------- fireflies drifting through the dusk kampung outside ----------
+  function buildFireflies(){
+    const count = 40;
+    const base = new Float32Array(count*3);
+    const phases = new Float32Array(count);
+    for (let i=0;i<count;i++){
+      const ang = Math.random()*Math.PI*2;
+      const radius = 12 + Math.random()*20;
+      base[i*3]   = Math.cos(ang)*radius;
+      base[i*3+1] = 0.5 + Math.random()*1.8;
+      base[i*3+2] = Math.sin(ang)*radius;
+      phases[i] = Math.random()*Math.PI*2;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(base.slice(), 3));
+    const points = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0xffd27a, size: 0.07, transparent: true, opacity: 0.9,
+      blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+    }));
+    scene.add(points);
+    return { points, base, phases };
+  }
+
+  // ---------- dust motes hanging in the balai's lamp light ----------
+  function buildDustMotes(){
+    const count = 30;
+    const base = new Float32Array(count*3);
+    const phases = new Float32Array(count);
+    for (let i=0;i<count;i++){
+      base[i*3]   = (Math.random()-0.5)*ROOM.width*0.9;
+      base[i*3+1] = 0.4 + Math.random()*3.2;
+      base[i*3+2] = (Math.random()-0.5)*ROOM.depth*0.9;
+      phases[i] = Math.random()*Math.PI*2;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(base.slice(), 3));
+    const points = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0xffe9c8, size: 0.03, transparent: true, opacity: 0.3,
+      blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+    }));
+    scene.add(points);
+    return { points, base, phases };
+  }
+
+  // ---------- pinnate palm-frond texture: a central rib with backswept
+  // leaflets, alpha-tested so the gaps between leaflets are real ----------
+  function getFrondAssets(){
+    if (frondAssets) return frondAssets;
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 128;
+    const ctx = c.getContext('2d');
+    ctx.strokeStyle = '#6b7d2e';
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(0,64); ctx.lineTo(256,64); ctx.stroke();
+    for (let x=6; x<250; x+=6){
+      const reach = 50*(1 - x/320) + 6; // leaflets shorten toward the tip
+      [-1,1].forEach(dir => {
+        const g = 96 + Math.floor(Math.random()*70);
+        ctx.strokeStyle = `rgba(${30+Math.floor(Math.random()*30)},${g},${28+Math.floor(Math.random()*25)},0.95)`;
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(x, 64);
+        ctx.quadraticCurveTo(x+13, 64+dir*reach*0.5, x+19, 64+dir*reach);
+        ctx.stroke();
+      });
+    }
+    const tex = new THREE.CanvasTexture(c);
+
+    // frond blade: a plane running along +X from the base, drooping toward
+    // -Z and tapering toward the tip -- once the mesh is laid flat and
+    // tilted upward at the crown, that -Z bend reads as the tip arcing
+    // down under its own weight, the way a real coconut frond hangs
+    const geo = new THREE.PlaneGeometry(2.1, 0.55, 9, 1);
+    geo.translate(1.05, 0, 0);
+    const pos = geo.attributes.position;
+    for (let i=0;i<pos.count;i++){
+      const t = pos.getX(i)/2.1;
+      pos.setZ(i, -t*t*0.85);
+      pos.setY(i, pos.getY(i)*(1 - t*0.5));
+    }
+    geo.computeVertexNormals();
+
+    const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.85 });
+    frondAssets = { geo, mat };
+    return frondAssets;
+  }
+
+  // ---------- ringed palm-trunk texture (leaf-scar rings up the trunk) ----------
+  function getPalmTrunkMat(){
+    if (palmTrunkMat) return palmTrunkMat;
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 128;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#6b4a2a';
+    ctx.fillRect(0,0,64,128);
+    for (let y=4; y<128; y+=9){
+      ctx.strokeStyle = `rgba(35,20,8,${0.35+Math.random()*0.25})`;
+      ctx.lineWidth = 2 + Math.random()*2;
+      ctx.beginPath();
+      ctx.moveTo(0, y + Math.random()*2);
+      ctx.lineTo(64, y + Math.random()*2);
+      ctx.stroke();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1, 3);
+    palmTrunkMat = new THREE.MeshStandardMaterial({ map: tex, bumpMap: tex, bumpScale: 0.01, roughness: 0.9 });
+    return palmTrunkMat;
+  }
+
   function buildCoconutPalm(x,z){
     const group = new THREE.Group();
     group.position.set(x,0,z);
     const trunkH = 3.2 + Math.random()*1.3;
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.18,trunkH,8),
-      new THREE.MeshStandardMaterial({ color:0x6b4a2a, roughness:0.9 }));
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.18,trunkH,8), getPalmTrunkMat());
     trunk.position.y = trunkH/2;
     trunk.rotation.z = (Math.random()-0.5)*0.15;
     group.add(trunk);
-    const frondMat = new THREE.MeshStandardMaterial({ color:0x3f7d3a, roughness:0.8, side:THREE.DoubleSide });
-    for (let i=0;i<6;i++){
-      const frond = new THREE.Mesh(new THREE.ConeGeometry(0.18,1.6,4), frondMat);
-      const ang = (i/6)*Math.PI*2;
-      frond.position.set(Math.cos(ang)*0.4, trunkH, Math.sin(ang)*0.4);
-      frond.rotation.x = Math.PI/2.3;
-      frond.rotation.y = ang;
-      group.add(frond);
+
+    // crown of drooping pinnate fronds, each on its own pivot so the wind
+    // sway rotates it around the crown rather than shearing the mesh
+    const { geo, mat } = getFrondAssets();
+    const frondCount = 9;
+    for (let i=0;i<frondCount;i++){
+      const holder = new THREE.Group();
+      holder.position.y = trunkH;
+      holder.rotation.y = (i/frondCount)*Math.PI*2 + Math.random()*0.4;
+      const tilt = new THREE.Group();
+      // a couple of young fronds stand nearly upright at the crown's heart;
+      // the rest arc outward and down
+      tilt.rotation.z = (i % 4 === 0 ? 1.1 : 0.55) + (Math.random()-0.5)*0.25;
+      holder.add(tilt);
+      const blade = new THREE.Mesh(geo, mat);
+      blade.rotation.x = -Math.PI/2;
+      tilt.add(blade);
+      group.add(holder);
+      swayItems.push({ node: tilt, axis: 'z', base: tilt.rotation.z, amp: 0.055, speed: 0.9 + Math.random()*0.6, phase: Math.random()*Math.PI*2 });
     }
+
     for (let i=0;i<3;i++){
-      const nut = new THREE.Mesh(new THREE.SphereGeometry(0.13,8,8), new THREE.MeshStandardMaterial({ color:0x5c3a1e }));
+      const nut = new THREE.Mesh(new THREE.SphereGeometry(0.13,8,8), new THREE.MeshStandardMaterial({ color:0x5c3a1e, roughness:0.85 }));
       nut.position.set((Math.random()-0.5)*0.3, trunkH-0.15, (Math.random()-0.5)*0.3);
       group.add(nut);
     }
     scene.add(group);
     addCircleCollider(x, z, 0.18);
+  }
+
+  // ---------- broad banana leaf texture: rounded blade, pale central rib,
+  // parallel vein streaks and a few wind-torn notches along the edges ----------
+  function getBananaLeafAssets(){
+    if (bananaLeafAssets) return bananaLeafAssets;
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 256;
+    const ctx = c.getContext('2d');
+    // blade: vertical ellipse with a soft light-to-dark gradient
+    const grad = ctx.createLinearGradient(0,0,128,0);
+    grad.addColorStop(0, '#3a7030');
+    grad.addColorStop(0.5, '#5a9a44');
+    grad.addColorStop(1, '#3a7030');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(64, 128, 56, 122, 0, 0, Math.PI*2);
+    ctx.fill();
+    // central rib
+    ctx.strokeStyle = '#8fbb60';
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(64, 10); ctx.lineTo(64, 246); ctx.stroke();
+    // parallel veins sweeping out from the rib
+    ctx.lineWidth = 1.5;
+    for (let y=16; y<246; y+=9){
+      const shade = Math.random()*0.25;
+      ctx.strokeStyle = `rgba(30,60,22,${0.25+shade})`;
+      [-1,1].forEach(dir => {
+        ctx.beginPath();
+        ctx.moveTo(64, y);
+        ctx.lineTo(64 + dir*54, y + 14);
+        ctx.stroke();
+      });
+    }
+    // wind-torn slits, cut with destination-out so they read as real holes
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = 3;
+    for (let i=0;i<5;i++){
+      const y = 40 + Math.random()*180;
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      ctx.beginPath();
+      ctx.moveTo(64 + dir*20, y);
+      ctx.lineTo(64 + dir*62, y + 12);
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    const tex = new THREE.CanvasTexture(c);
+
+    const geo = new THREE.PlaneGeometry(0.6, 1.8, 1, 8);
+    geo.translate(0, 0.9, 0);
+    const pos = geo.attributes.position;
+    for (let i=0;i<pos.count;i++){
+      const t = pos.getY(i)/1.8;
+      pos.setZ(i, -t*t*0.55); // tip curls back and down
+    }
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.8 });
+    bananaLeafAssets = { geo, mat };
+    return bananaLeafAssets;
   }
 
   function buildBananaPlant(x,z){
@@ -996,14 +1458,16 @@
     trunk.position.y = 0.7;
     group.add(trunk);
     addCircleCollider(x, z, 0.2);
-    const leafMat = new THREE.MeshStandardMaterial({ color:0x4a8a3a, roughness:0.8, side:THREE.DoubleSide });
-    for (let i=0;i<5;i++){
-      const leaf = new THREE.Mesh(new THREE.PlaneGeometry(0.5,1.6), leafMat);
-      leaf.position.y = 1.4;
-      leaf.rotation.y = (i/5)*Math.PI*2;
-      leaf.rotation.x = -0.6;
-      leaf.translateZ(0.5);
-      group.add(leaf);
+    const { geo, mat } = getBananaLeafAssets();
+    for (let i=0;i<6;i++){
+      const holder = new THREE.Group();
+      holder.position.y = 1.3;
+      holder.rotation.y = (i/6)*Math.PI*2 + Math.random()*0.5;
+      const leaf = new THREE.Mesh(geo, mat);
+      leaf.rotation.x = -(0.5 + Math.random()*0.45); // lean outward, tip drooping
+      holder.add(leaf);
+      group.add(holder);
+      swayItems.push({ node: holder, axis: 'z', base: 0, amp: 0.06, speed: 0.7 + Math.random()*0.6, phase: Math.random()*Math.PI*2 });
     }
     scene.add(group);
   }
@@ -1019,11 +1483,20 @@
       const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,h,6), stalkMat);
       stalk.position.set(sx, h/2, sz);
       group.add(stalk);
+      // node rings along the culm, the bamboo's signature silhouette
+      for (let ny=0.4; ny<h-0.2; ny+=0.55){
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.012, 4, 8), stalkMat);
+        ring.rotation.x = Math.PI/2;
+        ring.position.set(sx, ny, sz);
+        group.add(ring);
+      }
       const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.18,0.4,4), tuftMat);
       tuft.position.set(sx, h, sz);
       group.add(tuft);
     }
     scene.add(group);
+    // whole clump flexes together from the base, the way bamboo actually moves
+    swayItems.push({ node: group, axis: 'z', base: 0, amp: 0.03, speed: 0.8 + Math.random()*0.4, phase: Math.random()*Math.PI*2 });
     addCircleCollider(x, z, 0.35);
   }
 
@@ -1214,8 +1687,13 @@
     scene.add(group);
 
     const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x2a1a0e, roughness: 0.85 });
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3b2415, roughness: 0.85 });
+    const istanaWallTex = makeWallPlankTexture('#3a2314');
+    const wallMat = new THREE.MeshStandardMaterial({ map: istanaWallTex, bumpMap: istanaWallTex, bumpScale: 0.01, roughness: 0.85 });
     const goldMat = new THREE.MeshStandardMaterial({ color: 0xf2d98a, emissive: 0xc9a227, emissiveIntensity: 0.5, roughness: 0.4 });
+    // the palace's stepped roofs get the same attap-thatch treatment as the
+    // balai, so both buildings share one believable material language
+    const istanaAttap = makeAttapTexture();
+    const istanaRoofMat = new THREE.MeshStandardMaterial({ map: istanaAttap, bumpMap: istanaAttap, bumpScale: 0.02, roughness: 0.9 });
 
     // wide facade, deep hall -- the real palace reads as a broad, low building,
     // not a tall tower, so visitors can walk into a proper throne hall inside
@@ -1224,8 +1702,9 @@
 
     // floor -- flat at y=0 like the balai, so it's walkable (no elevated
     // stilts here: the real building sits low on a plinth, not on tall posts)
+    const istanaFloorTex = makeWoodPlankTexture();
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(innerW, innerD),
-      new THREE.MeshStandardMaterial({ map: makeWoodPlankTexture(), roughness: 0.85 }));
+      new THREE.MeshStandardMaterial({ map: istanaFloorTex, bumpMap: istanaFloorTex, bumpScale: 0.012, roughness: 0.85 }));
     floor.rotation.x = -Math.PI/2;
     floor.position.y = 0.01;
     group.add(floor);
@@ -1294,15 +1773,42 @@
     trim.position.y = wallH - 0.2;
     group.add(trim);
 
-    // flagpoles flanking the entrance
+    // flagpoles flanking the entrance -- the flags are segmented planes whose
+    // vertices ripple every frame, pinned at the pole edge, so the cloth
+    // genuinely waves in the same wind that sways the palms
     [-2.6, 2.6].forEach(px => {
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 3.2, 8), darkWoodMat);
       pole.position.set(px, 1.6, -(innerD/2 + 1.4));
       group.add(pole);
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35),
-        new THREE.MeshStandardMaterial({ color: 0xa1273d, side: THREE.DoubleSide }));
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35, 8, 4),
+        new THREE.MeshStandardMaterial({ color: 0xa1273d, side: THREE.DoubleSide, roughness: 0.85 }));
       flag.position.set(px + (px<0?0.27:-0.27), 2.9, -(innerD/2 + 1.4));
       group.add(flag);
+      flagWaves.push({ mesh: flag, poleSide: px < 0 ? -1 : 1, phase: Math.random()*Math.PI*2 });
+    });
+
+    // payung kuning: the royal yellow umbrellas of Malay court ceremony,
+    // planted either side of the palace entrance
+    [-4.4, 4.4].forEach(px => {
+      const payung = new THREE.Group();
+      payung.position.set(px, 0, -(innerD/2 + 0.9));
+      const pPole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.6, 8), darkWoodMat);
+      pPole.position.y = 1.3;
+      payung.add(pPole);
+      const canopyMatY = new THREE.MeshStandardMaterial({ color: 0xf2c11c, emissive: 0x8a6a10, emissiveIntensity: 0.2, roughness: 0.6, side: THREE.DoubleSide });
+      const pCanopy = new THREE.Mesh(new THREE.ConeGeometry(0.85, 0.5, 12, 1, true), canopyMatY);
+      pCanopy.position.y = 2.45;
+      payung.add(pCanopy);
+      // hanging valance ring around the canopy's rim
+      const fringe = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.87, 0.1, 12, 1, true),
+        new THREE.MeshStandardMaterial({ color: 0xd9a410, roughness: 0.7, side: THREE.DoubleSide }));
+      fringe.position.y = 2.17;
+      payung.add(fringe);
+      const pFinial = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 8), goldMat);
+      pFinial.position.y = 2.8;
+      payung.add(pFinial);
+      group.add(payung);
+      addCircleCollider(x + px, z - (innerD/2 + 0.9), 0.12);
     });
 
     // roofline matched to the real building's reference photo: one tall
@@ -1310,13 +1816,13 @@
     // flanked by two lower pitched gable wings running the rest of the
     // facade's width -- not three matching pyramid towers side by side
     const roofBaseY = wallH;
-    const centerTower = buildTieredRoofCluster(4.2, 4, roofBaseY, darkWoodMat, goldMat);
+    const centerTower = buildTieredRoofCluster(4.2, 4, roofBaseY, istanaRoofMat, goldMat);
     group.add(centerTower);
     let topY = centerTower.userData.topY;
 
     const wingWidth = 3.6, wingHeight = 1.7, wingDepth = innerD*0.7;
     [-1, 1].forEach(side => {
-      const wing = buildGableRoofWing(wingWidth, wingHeight, wingDepth, darkWoodMat, goldMat);
+      const wing = buildGableRoofWing(wingWidth, wingHeight, wingDepth, istanaRoofMat, goldMat);
       wing.position.set(side*5.7, roofBaseY, 0);
       group.add(wing);
       topY = Math.max(topY, roofBaseY + wing.userData.topY);
@@ -1326,6 +1832,7 @@
     const glow = new THREE.PointLight(0xffd9a0, 1.2, 20, 2);
     glow.position.set(0, roofBaseY + 1.5, -2);
     group.add(glow);
+    flickerLights.push({ light: glow, base: 1.2, amp: 0.1, speed: 8.7, phase: 2.9 });
 
     // --- interior: a throne hall styled after the museum's own audience-hall
     // diorama -- a golden central carpet leading to the Sultan's dais, a
@@ -1348,6 +1855,8 @@
         courtier.position.set(side*2.1, 0, cz);
         courtier.rotation.y = side>0 ? -Math.PI/2 : Math.PI/2; // facing the central carpet
         group.add(courtier);
+        // subtle seated breathing/sway so the audience hall reads as alive
+        idleFigures.push({ node: courtier, phase: Math.random()*Math.PI*2 });
       });
     }
 
@@ -1519,13 +2028,17 @@
   // ---------- villagers: a few decorative kampung folk sharing the hall ----------
   // ---------- room: a balai (open-sided traditional Malay pavilion hall) ----------
   function buildRoom(){
-    const floorMat = new THREE.MeshStandardMaterial({ map: makeWoodPlankTexture(), roughness: 0.85, metalness: 0.05 });
+    // the same canvas doubles as a bump map -- its grain/knot luminance
+    // variation reads as physical relief under the raking golden-hour light
+    const floorTex = makeWoodPlankTexture();
+    const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, bumpMap: floorTex, bumpScale: 0.012, roughness: 0.8, metalness: 0.05 });
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, ROOM.depth), floorMat);
     floor.rotation.x = -Math.PI/2;
     scene.add(floor);
 
-    // plain chengal-wood wall panels — restrained, so the carved trim reads as deliberate
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3b2415, roughness: 0.88 });
+    // sawn chengal wall boards — restrained, so the carved trim reads as deliberate
+    const wallTex = makeWallPlankTexture('#3b2415');
+    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, bumpMap: wallTex, bumpScale: 0.01, roughness: 0.88 });
 
     // 2.9/2.8 tiles the 20-wide wall as solid-window-solid-window-solid-window-solid
     // with no leftover partial segment (2.6 left a sliced-off partial window at
@@ -1647,7 +2160,8 @@
     const L = Math.sqrt(halfSpan*halfSpan + rise*rise);
     const theta = Math.atan2(rise, halfSpan);
 
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x1d130a, roughness: 0.85 });
+    const attapTex = makeAttapTexture();
+    const roofMat = new THREE.MeshStandardMaterial({ map: attapTex, bumpMap: attapTex, bumpScale: 0.02, roughness: 0.9 });
     const eastRoof = new THREE.Mesh(new THREE.BoxGeometry(L, 0.15, zSpan), roofMat);
     eastRoof.rotation.z = -theta;
     eastRoof.position.set((L/2)*Math.cos(theta), ridgeY - (L/2)*Math.sin(theta), 0);
@@ -1738,6 +2252,7 @@
     const gateLight = new THREE.PointLight(0xffd9a0, 1.0, 8, 2);
     gateLight.position.set(0, 3.6, gateZ);
     scene.add(gateLight);
+    flickerLights.push({ light: gateLight, base: 1.0, amp: 0.09, speed: 9.4, phase: 5.1 });
   }
 
   // ---------- text sprite ----------
@@ -1768,10 +2283,10 @@
     // their now-static picture frames) so they read as mounted signage
     // rather than always spinning to face the visitor like a sprite does
     if (staticFacing){
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0 });
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, toneMapped: false });
       return new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.75), mat);
     }
-    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0 });
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0, toneMapped: false });
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(2.4, 0.75, 1);
     return sprite;
@@ -1952,7 +2467,10 @@
     // fog:false so walking up to watch doesn't blend the footage toward the
     // scene's ambient fog tint -- keeps the clip's own color sharp regardless
     // of environment brightness/distance while the viewer is actually engaging with it
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex, fog: false }));
+    // toneMapped:false exempts the footage from the scene's ACES filmic pass
+    // -- the clips are already graded; running them through tone mapping a
+    // second time would wash their color out again
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex, fog: false, toneMapped: false }));
     screen.position.set(0, 0.7, 0.001);
     performer.add(screen);
 
@@ -2529,6 +3047,17 @@
     if (!renderer.xr.isPresenting) joystickMove(dt);
     if (gyroActive && !renderer.xr.isPresenting) applyGyroToCamera();
 
+    // walking head-bob plus a faint idle breathing sway -- scaled by actual
+    // player speed, and never applied in VR where the headset owns the head
+    if (!renderer.xr.isPresenting){
+      const moved = tmp.subVectors(player.position, prevPlayerPos).length();
+      const speedNow = moved / Math.max(dt, 0.0001);
+      bobPhase += Math.min(speedNow, 4) * dt * 3.4;
+      const bobAmp = THREE.MathUtils.clamp(speedNow/3.2, 0, 1) * 0.028;
+      camera.position.y = 1.6 + Math.sin(bobPhase*2)*bobAmp + Math.sin(t*1.6)*0.006;
+    }
+    prevPlayerPos.copy(player.position);
+
     const camWorld = new THREE.Vector3();
     camera.getWorldPosition(camWorld);
 
@@ -2549,6 +3078,71 @@
       b.userData.wingL.rotation.z = flap;
       b.userData.wingR.rotation.z = -flap;
     });
+
+    // one shared wind drives every swaying thing, gusting slowly so the whole
+    // kampung breathes together instead of each plant wobbling independently
+    const gust = 0.7 + 0.3*Math.sin(t*0.23) + 0.15*Math.sin(t*0.61);
+    for (const s of swayItems){
+      s.node.rotation[s.axis] = s.base + Math.sin(t*s.speed + s.phase)*s.amp*gust;
+    }
+
+    // fire-lit lamps: two out-of-phase sines make an organic flicker rather
+    // than a metronomic pulse
+    for (const f of flickerLights){
+      f.light.intensity = f.base + (Math.sin(t*f.speed + f.phase) + Math.sin(t*f.speed*1.7 + f.phase*2.3)) * 0.5 * f.amp;
+    }
+
+    // pelita flames lick and stretch
+    for (const f of flames){
+      const kx = 1 + Math.sin(t*13 + f.phase)*0.1;
+      const ky = 1 + Math.sin(t*11 + f.phase*1.3)*0.18;
+      f.sprite.scale.set(f.baseX*kx, f.baseY*ky, 1);
+    }
+
+    // flag cloth: ripple travels away from the pole, amplitude growing
+    // toward the free edge, and the lighting follows the moving folds
+    for (const fw of flagWaves){
+      const posAttr = fw.mesh.geometry.attributes.position;
+      for (let i=0;i<posAttr.count;i++){
+        const x = posAttr.getX(i);
+        const d = fw.poleSide < 0 ? (x + 0.25) : (0.25 - x);
+        posAttr.setZ(i, Math.sin(d*9 - t*6 + fw.phase) * 0.06 * d * gust);
+      }
+      posAttr.needsUpdate = true;
+      fw.mesh.geometry.computeVertexNormals();
+    }
+
+    // seated courtiers breathe and rock almost imperceptibly
+    for (const fig of idleFigures){
+      fig.node.rotation.z = Math.sin(t*1.1 + fig.phase)*0.03;
+      fig.node.scale.y = 1 + Math.sin(t*2.1 + fig.phase)*0.012;
+    }
+
+    // fireflies wander; dust motes hang and drift in the lamp light
+    if (firefliesRef){
+      const pos = firefliesRef.points.geometry.attributes.position;
+      for (let i=0;i<pos.count;i++){
+        const ph = firefliesRef.phases[i];
+        pos.setXYZ(i,
+          firefliesRef.base[i*3]   + Math.sin(t*0.5 + ph)*0.6,
+          firefliesRef.base[i*3+1] + Math.sin(t*0.9 + ph*2)*0.35,
+          firefliesRef.base[i*3+2] + Math.cos(t*0.4 + ph)*0.6);
+      }
+      pos.needsUpdate = true;
+      // slow communal blink
+      firefliesRef.points.material.opacity = 0.55 + 0.35*Math.sin(t*1.7);
+    }
+    if (motesRef){
+      const pos = motesRef.points.geometry.attributes.position;
+      for (let i=0;i<pos.count;i++){
+        const ph = motesRef.phases[i];
+        pos.setXYZ(i,
+          motesRef.base[i*3]   + Math.sin(t*0.15 + ph)*0.25,
+          motesRef.base[i*3+1] + Math.sin(t*0.23 + ph*2)*0.18,
+          motesRef.base[i*3+2] + Math.cos(t*0.19 + ph)*0.25);
+      }
+      pos.needsUpdate = true;
+    }
 
     let maxActive = 0;
     let bestStation = null, bestActive = 0.5; // threshold -- only show a description once fairly close
