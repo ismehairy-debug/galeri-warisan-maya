@@ -194,8 +194,8 @@
     <p class="subtitle">Laporan Proses Penyelidikan &amp; Pembangunan (R&amp;D) — The Living Heritage Gallery</p>
     <div class="meta">
       <span><b>Pasukan</b> DICE 4.0 UniMAP</span>
-      <span><b>Tempoh pembangunan</b> 6–8 Julai 2026</span>
-      <span><b>Sejarah</b> 100 komit</span>
+      <span><b>Tempoh pembangunan</b> 6–9 Julai 2026</span>
+      <span><b>Sejarah</b> 102 komit</span>
       <span><b>Teknologi</b> Three.js r128 + WebXR, satu fail HTML</span>
     </div>
     <hr class="rule"><hr class="rule-thin">
@@ -218,13 +218,17 @@
     oleh jarak pelawat dengan audio spatial dan video sebenar. Semua ini dibina dalam
     <strong>satu fail <code>index.html</code></strong> tanpa alat bina, dan disiarkan melalui
     GitHub Pages: <a href="https://ismehairy-debug.github.io/Galeri-Warisan-Maya-The-Living-Heritage-Gallery-/">buka galeri</a>.</p>
+    <p>Galeri kini turut menyokong <strong>mod penonton langsung</strong>: tetamu menaip nama
+    dan menerima kod sesi, dan kakitangan boleh melihat pandangan orang-pertama tetamu itu
+    secara langsung pada komputer riba melalui <code>spectator.html</code> — disegerak
+    pelayar-ke-pelayar dengan WebRTC (PeerJS), tanpa sebarang pelayan sendiri.</p>
   </section>
 
   <p class="sep">◆ ◆ ◆</p>
 
   <section class="col">
     <h2>Garis Masa R&amp;D</h2>
-    <p class="kicker">6 – 8 Julai 2026 &middot; 100 komit &middot; 7 fasa</p>
+    <p class="kicker">6 – 9 Julai 2026 &middot; 102 komit &middot; 8 fasa</p>
 
     <div class="phase">
       <h3>Fasa 1 — Asas &amp; Struktur Aset</h3>
@@ -341,15 +345,41 @@
         ralat JavaScript selepas 9 saat animasi langsung (lihat Bukti Semakan di bawah).</li>
       </ul>
     </div>
+
+    <div class="phase">
+      <h3>Fasa 8 — Mod Penonton Langsung (Guest Spectator)</h3>
+      <p class="when">9 Julai</p>
+      <ul>
+        <li><strong>Skrin log masuk tetamu:</strong> tetamu menaip nama sebelum masuk dan
+        menerima kod sesi ringkas (nama + 4 digit rawak, cth. <code>aiman-4827</code>) yang
+        dipaparkan besar pada skrin dan kekal di penjuru atas semasa lawatan — cukup untuk
+        kakitangan membacanya terus dari monitor.</li>
+        <li><strong>Cerminan pandangan masa nyata tanpa pelayan:</strong> memandangkan hos
+        GitHub Pages statik, penyegerakan dibuat pelayar-ke-pelayar melalui saluran data
+        WebRTC (PeerJS); broker awam percuma hanya mengendalikan jabat tangan. Hanya posisi
+        + kuaternion kamera dihantar pada ~15&nbsp;Hz (tatasusunan JSON kecil) — bukan
+        strim video — jadi jalur lebar hampir sifar.</li>
+        <li><strong>Keputusan seni bina:</strong> halaman penonton <code>spectator.html</code>
+        hanyalah skrin sertai; ia menyerahkan kepada <code>index.html?spectate=&lt;kod&gt;</code>
+        yang memaparkan <em>babak yang sama</em> dalam mod cermin pasif — mengelakkan salinan
+        pendua 3,000 baris kod babak yang pasti lapuk.</li>
+        <li>Dalam VR, pos kepala dibaca terus dari rig kamera WebXR supaya penonton melihat
+        betul-betul apa yang dilihat mata tetamu; di sisi penonton, lerp/slerp eksponen
+        melicinkan kemas kini 15&nbsp;Hz menjadi gerakan gelongsor 60&nbsp;fps.</li>
+        <li>Ketahanan: kod sesi dijana semula sendiri jika berlanggar pada broker, penonton
+        mencuba semula setiap 3 saat (boleh sertai sebelum tetamu masuk, tahan muat semula
+        dan gangguan rangkaian), dan berbilang penonton boleh menonton satu tetamu serentak.</li>
+      </ul>
+    </div>
   </section>
 
   <p class="sep">◆ ◆ ◆</p>
 
   <section class="col">
     <h2>Log Komit Penuh</h2>
-    <p class="kicker">Rekod kronologi — 100 komit</p>
+    <p class="kicker">Rekod kronologi — 102 komit</p>
     <details>
-      <summary>Buka log penuh (6 Julai → 8 Julai 2026)</summary>
+      <summary>Buka log penuh (6 Julai → 9 Julai 2026)</summary>
       <div class="logwrap">
         <table class="log">
           <tbody>
@@ -453,6 +483,8 @@
             <tr><td class="hash">242cec1</td><td class="when">08 Jul 00:27</td><td>Fix Istana back wall walk-through and wire up Nobat volume fade</td></tr>
             <tr><td class="hash">bb0bdb6</td><td class="when">08 Jul 00:31</td><td>Fix TIANG SERI hotspot clipping into its own corner pillar</td></tr>
             <tr><td class="hash">c197827</td><td class="when">08 Jul 09:54</td><td>Realism overhaul: shadows, filmic tone mapping, living kampung animation</td></tr>
+            <tr><td class="hash">3836e58</td><td class="when">08 Jul 10:14</td><td>Add self-contained R&amp;D process report (laporan-rnd.html)</td></tr>
+            <tr><td class="hash">650bf8f</td><td class="when">09 Jul 11:50</td><td>Add live guest spectator mode via PeerJS (no backend)</td></tr>
           </tbody>
         </table>
       </div>
