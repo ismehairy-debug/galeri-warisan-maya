@@ -2034,10 +2034,13 @@
     });
 
     // payung kuning: the royal yellow umbrellas of Malay court ceremony,
-    // planted either side of the palace entrance
+    // planted either side of the palace entrance. Stand-off must exceed the
+    // 0.87 canopy/fringe radius plus the wall's 0.125 half-thickness and the
+    // 0.145 photo-plaque protrusion, or the canopy rim sinks into the facade
+    const payungOut = innerD/2 + 1.35;
     [-4.4, 4.4].forEach(px => {
       const payung = new THREE.Group();
-      payung.position.set(px, 0, -(innerD/2 + 0.9));
+      payung.position.set(px, 0, -payungOut);
       const pPole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.6, 8), darkWoodMat);
       pPole.position.y = 1.3;
       payung.add(pPole);
@@ -2054,7 +2057,7 @@
       pFinial.position.y = 2.8;
       payung.add(pFinial);
       group.add(payung);
-      addCircleCollider(x + px, z - (innerD/2 + 0.9), 0.12);
+      addCircleCollider(x + px, z - payungOut, 0.12);
     });
 
     // roofline matched to the real building's reference photo: one tall
