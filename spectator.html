@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galeri Warisan Maya — Spectator</title>
+<link rel="icon" type="image/png" href="assets/images/unimap_logo.png">
+<!--
+  SPECTATOR JOIN PAGE
+  Staff enter the session code shown on the guest's login screen (e.g.
+  "aiman-4827") and this page hands off to index.html?spectate=<code>.
+
+  All of the actual spectating -- the PeerJS WebRTC connection, receiving
+  the guest's camera pose at ~15 Hz, and rendering the gallery scene with
+  the camera mirroring the guest's view -- lives in index.html's spectator
+  mode (search for "guest spectator sync" there). Doing it that way means
+  the spectator renders the *exact same* Three.js scene from the exact
+  same file, instead of this page carrying a duplicate copy of the whole
+  gallery that would drift out of date with every change.
+-->
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#150c07; overflow:hidden; }
+  #joinScreen {
+    position:fixed; inset:0;
+    background:
+      radial-gradient(ellipse at center, rgba(26,18,6,0.93) 0%, rgba(21,12,7,0.97) 70%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='none' stroke='rgba(201,162,39,0.4)' stroke-width='2'%3E%3Ccircle cx='30' cy='30' r='22'/%3E%3Ccircle cx='90' cy='30' r='22'/%3E%3Ccircle cx='30' cy='90' r='22'/%3E%3Ccircle cx='90' cy='90' r='22'/%3E%3Ccircle cx='60' cy='60' r='22'/%3E%3C/g%3E%3Cg fill='rgba(201,162,39,0.22)'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3Ccircle cx='90' cy='30' r='4'/%3E%3Ccircle cx='30' cy='90' r='4'/%3E%3Ccircle cx='90' cy='90' r='4'/%3E%3Ccircle cx='60' cy='60' r='4'/%3E%3C/g%3E%3C/svg%3E");
+    background-repeat: no-repeat, repeat;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#f2e2b6; font-family: Georgia, 'Times New Roman', serif; text-align:center;
+    padding:20px;
+  }
+  h1 { font-size:26px; letter-spacing:3px; margin:0 0 4px; }
+  #joinScreen > p { color:#c9a961; font-style:italic; margin:0 0 26px; }
+  label { font-size:11px; letter-spacing:2px; color:#c9a961; }
+  #codeInput {
+    display:block; margin:10px auto 0; padding:12px 18px;
+    width:min(320px, 80vw); box-sizing:border-box;
+    border-radius:10px; border:1px solid rgba(201,162,39,0.6);
+    background:rgba(15,10,4,0.75); color:#f2d98a;
+    font-family: Georgia, serif; font-size:20px; text-align:center;
+    letter-spacing:3px; outline:none;
+  }
+  #codeInput::placeholder { color:#8a7a5a; font-size:14px; letter-spacing:2px; }
+  #codeInput:focus { border-color:#f2d98a; box-shadow:0 0 12px rgba(242,217,138,0.35); }
+  #joinBtn {
+    margin-top:22px; padding:14px 36px; border-radius:999px; font-size:15px;
+    background: linear-gradient(135deg,#c9a227,#8a6a10); color:#1a1206;
+    border:1px solid #f2d98a; font-weight:700; letter-spacing:1px;
+    font-family: Georgia, serif; cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+  #joinBtn:active { transform: scale(0.95); }
+  #joinError { margin-top:14px; font-size:12px; letter-spacing:1px; color:#e08a6a; min-height:16px; }
+  small { margin-top:22px; color:#8a7a5a; max-width:420px; font-size:11px; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<div id="joinScreen">
+  <h1>GALERI WARISAN MAYA</h1>
+  <p>Mod Penonton / Spectator Mode</p>
+  <label for="codeInput">KOD PENONTON / SPECTATOR CODE</label>
+  <input id="codeInput" type="text" autocomplete="off" autocapitalize="none"
+         spellcheck="false" placeholder="cth: aiman-4827">
+  <button id="joinBtn">SERTAI / JOIN</button>
+  <div id="joinError"></div>
+  <small>Masukkan kod yang tertera pada skrin log masuk tetamu, kemudian tekan
+  SERTAI untuk melihat pandangan tetamu secara langsung.<br>
+  Enter the code shown on the guest's login screen to watch their live
+  first-person view.</small>
+</div>
+
+<script>
+(function(){
+  var input = document.getElementById('codeInput');
+  var errEl = document.getElementById('joinError');
+
+  // allow prefilled links, e.g. spectator.html?code=aiman-4827
+  var prefill = new URLSearchParams(location.search).get('code');
+  if (prefill) input.value = prefill;
+
+  function join(){
+    // normalise however staff typed it (caps, spaces, a pasted "gwm-" prefix)
+    var code = input.value.trim().toLowerCase()
+      .replace(/^gwm-/, '')
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+    if (!code){
+      errEl.textContent = 'SILA MASUKKAN KOD / PLEASE ENTER A CODE';
+      return;
+    }
+    // index.html?spectate=<code> renders the gallery in spectator mode:
+    // same scene, camera driven live by the guest's synced pose
+    location.href = 'index.html?spectate=' + encodeURIComponent(code);
+  }
+
+  document.getElementById('joinBtn').addEventListener('click', join);
+  input.addEventListener('keydown', function(e){ if (e.key === 'Enter') join(); });
+  input.focus();
+})();
+</script>
+</body>
+</html>
