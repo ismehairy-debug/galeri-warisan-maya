@@ -2430,13 +2430,32 @@
       addCircleCollider(10.9, 14.38, 0.42);
       [
         { x: 10.9,  z: 15.62, rotY: -Math.PI/2, r: 0.42 }, // harness partner
-        { x: 16.4,  z: 12.2,  rotY: -1.9, r: 0.55 },       // loose near the cart
       ].forEach(s => {
         const c = holder.clone();
         c.position.set(s.x, 0, s.z);
         c.rotation.y = s.rotY;
         scene.add(c);
         addCircleCollider(s.x, s.z, s.r);
+      });
+    });
+
+    // banana clumps (decimated from 697k to 56k tris offline) planted
+    // around the rumah and the sawah edge, the classic kampung dooryard
+    // plant -- one load, three clones at varied sizes/angles
+    loadImportedModel('assets/models/banana_tree/scene_small.gltf', 1.4,
+      { x: -13.4, z: 18.6, rotY: 0.6 }, holder => {
+      addCircleCollider(-13.4, 18.6, 0.35);
+      [
+        { x: -21.5, z: 12.3, rotY: 2.4,  s: 0.85 },
+        { x: -15.2, z: -4.6, rotY: -1.2, s: 0.95 },
+        { x: 9.6,   z: 21.5, rotY: 1.9,  s: 1.05 },
+      ].forEach(sp => {
+        const c = holder.clone();
+        c.scale.setScalar(sp.s);
+        c.position.set(sp.x, 0, sp.z);
+        c.rotation.y = sp.rotY;
+        scene.add(c);
+        addCircleCollider(sp.x, sp.z, 0.35);
       });
     });
 

@@ -1,0 +1,8 @@
+Model Information:
+* title:	Banana_ Tree
+* source:	https://sketchfab.com/3d-models/banana--tree-f65edc0e32f243ddaab159d5e65523bc
+* author:	Galih.Busro (https://sketchfab.com/Galih.Busro)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works
