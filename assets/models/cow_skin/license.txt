@@ -1,0 +1,11 @@
+Model Information:
+* title:	Cow Skin
+* source:	https://sketchfab.com/3d-models/cow-skin-f79f2bc987f94c9ead02a36844e7c48b
+* author:	GSCreations (https://sketchfab.com/gscreations2508)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Cow Skin" (https://sketchfab.com/3d-models/cow-skin-f79f2bc987f94c9ead02a36844e7c48b) by GSCreations (https://sketchfab.com/gscreations2508) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

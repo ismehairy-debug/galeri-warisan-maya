@@ -409,9 +409,12 @@
     // fog matches the sky dome's horizon tone so distant objects fade
     // seamlessly into the sky instead of hitting a hard, mismatched edge --
     // warmed to a golden-hour haze to match the low sun and lamp-lit balai
-    scene.fog = new THREE.FogExp2(0xead9b8, 0.022);
+    // eased from 0.022 when the imported backdrop landscapes arrived: the
+    // kampung's close-range haze reads the same, but the mountain ranges at
+    // 60-90 m now show as silhouettes instead of vanishing entirely
+    scene.fog = new THREE.FogExp2(0xead9b8, 0.016);
 
-    camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.05, 60);
+    camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.05, 130);
     camera.position.set(0, 1.6, 0);
 
     player = new THREE.Group();
@@ -2526,6 +2529,59 @@
     });
   }
 
+  // ---------- imported scenery: the visitor-supplied Sketchfab models
+  // (each compacted offline -- transforms baked, meshes merged per
+  // material, textures downscaled to 1024 -- so the Quest browser gets a
+  // handful of draw calls instead of thousands). Every load fails soft:
+  // the procedural kampung underneath is complete without them. ----------
+  function loadImportedModel(path, scale, opts, onReady){
+    if (typeof THREE.GLTFLoader !== 'function') return;
+    new THREE.GLTFLoader().load(path, gltf => {
+      const model = gltf.scene;
+      if (scale.length) model.scale.set(scale[0], scale[1], scale[2]);
+      else model.scale.setScalar(scale);
+      model.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+      // normalise: feet on the ground, centred on the holder origin
+      const box = new THREE.Box3().setFromObject(model);
+      const c = box.getCenter(new THREE.Vector3());
+      model.position.set(-c.x, -box.min.y + (opts.sink || 0), -c.z);
+      const holder = new THREE.Group();
+      holder.add(model);
+      holder.position.set(opts.x, 0, opts.z);
+      holder.rotation.y = opts.rotY || 0;
+      scene.add(holder);
+      if (onReady) onReady(holder);
+    }, undefined, () => { /* asset missing -- procedural scenery stands alone */ });
+  }
+
+  function buildImportedScenery(){
+    // two real cows joining the procedural zebu pair: one by the sawah's
+    // edge, one loose near the kereta lembu (~1.4 m at the shoulder)
+    [{ x: -12.4, z: 7.2, rotY: 2.3 }, { x: 16.4, z: 12.2, rotY: -1.9 }].forEach(spot => {
+      loadImportedModel('assets/models/cow_skin/scene.gltf', 1.4 / 178.8, spot,
+        () => addCircleCollider(spot.x, spot.z, 0.55));
+    });
+
+    // knee-high grass drifts: one brushing the sawah's path edge, one on
+    // the east field near the cart (walk-through, no colliders)
+    loadImportedModel('assets/models/patch_of_grass/scene_merged.gltf', 9 / 204, { x: -13.2, z: 10.6, sink: -0.05 });
+    loadImportedModel('assets/models/patch_of_grass/scene_merged.gltf', 11 / 204, { x: 8.5, z: 20.5, rotY: 1.2, sink: -0.05 });
+
+    // forest hillside filling the north-east quadrant behind the cart;
+    // its walkable edge is fenced so nobody wanders into the terrain skirt
+    loadImportedModel('assets/models/low_poly_tree_scene_free/scene_merged.gltf', 0.45,
+      { x: 38, z: 32, sink: -0.25 },
+      () => addBoxCollider(38, 32, 20, 12.5));
+
+    // mountain-forest diorama as the western backdrop beyond the sawah
+    loadImportedModel('assets/models/the_landscape_is_a_forest_in_the_mountains/scene_merged.gltf', 1.6,
+      { x: -62, z: 6, rotY: Math.PI / 2 });
+
+    // the grand mountain range across the whole northern horizon, behind
+    // the Istana (native tile is 1 x 0.17 x 1, so the scale is per-axis)
+    loadImportedModel('assets/models/mountain_range_01/scene.gltf', [150, 90, 55], { x: 0, z: 76 });
+  }
+
   function scatterVegetation(){
     const halfW = ROOM.width/2, halfD = ROOM.depth/2;
     for (let i=0;i<18;i++){
@@ -2566,6 +2622,7 @@
     buildMountains();
     buildSawahPadi();
     buildLowPolyGrove();
+    buildImportedScenery();
     // one more lembu grazing loose near the sawah's edge
     const grazer = buildLembu(0x9a6a3d, true);
     grazer.position.set(-14.6, 0, 4.2);
