@@ -2477,7 +2477,7 @@
     // axis-aligned with the batas grid and squeezed per-axis to the plot's
     // inner rectangle so no blades poke through the bunds. The base load
     // sits in the first plot; the other five are clones.
-    loadImportedModel('assets/models/patch_of_grass/scene_merged.gltf', 9 / 204,
+    loadImportedModel('assets/models/patch_of_grass/scene_small.gltf', 9 / 204,
       { x: -30.3, z: -0.95, sink: -0.05, noShadow: true }, holder => {
       holder.traverse(o => {
         if (o.isMesh && o.material && o.material.color) o.material.color.setRGB(1.3, 1.15, 0.78);
@@ -2500,7 +2500,7 @@
     // clamp, so no colliders are needed. sink measured from the mesh: the
     // terrain skirt's edges sit ~3.5 m above its lowest vertex, so
     // without it the whole tile floats.
-    loadImportedModel('assets/models/low_poly_tree_scene_free/scene_merged.gltf', 0.45,
+    loadImportedModel('assets/models/low_poly_tree_scene_free/scene_small.gltf', 0.45,
       { x: 0, z: 54, sink: -4.2, noShadow: true }, holder => {
       [
         { x: 0,   z: -54, rotY: Math.PI },
@@ -2537,7 +2537,7 @@
     // (native tile is 1 x 0.17 x 1, so the scale is per-axis)
     // taller and sunk harder: the tile's edges bow upward, so at the old
     // -5 the range's flanks still hovered above the plain
-    loadImportedModel('assets/models/mountain_range_01/scene.gltf', [150, 112, 55],
+    loadImportedModel('assets/models/mountain_range_01/scene_small.gltf', [150, 112, 55],
       { x: 0, z: 76, sink: -9, noShadow: true }, holder => {
       [
         { x: 0,   z: -76, rotY: Math.PI },
