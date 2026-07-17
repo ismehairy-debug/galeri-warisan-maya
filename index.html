@@ -1937,6 +1937,233 @@
     addBoxCollider(x, z, 1.2, 1.0);
   }
 
+  // ---------- procedural rubble-masonry texture for the rumah tradisional's
+  // stone ground room ----------
+  function makeStoneTexture(){
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#4c4a46'; // mortar
+    ctx.fillRect(0, 0, 256, 256);
+    for (let row = 0; row < 256; row += 26){
+      for (let sx = 0; sx < 256; ){
+        const sw = 22 + Math.random()*30;
+        const shade = 96 + Math.floor(Math.random()*44);
+        ctx.fillStyle = `rgb(${shade},${shade-2},${shade-6})`;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(sx+2, row+2, sw-4, 21, 5);
+        else ctx.rect(sx+2, row+2, sw-4, 21);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(sx+4, row+3, sw-8, 3);
+        sx += sw;
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 1.6);
+    return tex;
+  }
+
+  // ---------- procedural corrugated-zinc roof texture: thin ribbed bands
+  // with sheet seams and faint rust runs, the classic kampung roof ----------
+  function makeZincRoofTexture(){
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#788089';
+    ctx.fillRect(0, 0, 256, 256);
+    for (let y = 0; y < 256; y += 6){
+      const grd = ctx.createLinearGradient(0, y, 0, y+6);
+      grd.addColorStop(0, 'rgba(255,255,255,0.16)');
+      grd.addColorStop(0.5, 'rgba(0,0,0,0.02)');
+      grd.addColorStop(1, 'rgba(0,0,0,0.22)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, y, 256, 6);
+    }
+    ctx.strokeStyle = 'rgba(30,30,34,0.5)';
+    ctx.lineWidth = 2;
+    for (let x = 0; x <= 256; x += 85){ ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke(); }
+    for (let i = 0; i < 14; i++){
+      const rx = Math.random()*256, ry = Math.random()*256, rl = 20 + Math.random()*60;
+      const rust = ctx.createLinearGradient(rx, ry, rx, ry+rl);
+      rust.addColorStop(0, 'rgba(122,70,32,0.22)');
+      rust.addColorStop(1, 'rgba(122,70,32,0)');
+      ctx.fillStyle = rust;
+      ctx.fillRect(rx, ry, 3 + Math.random()*4, rl);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 3);
+    return tex;
+  }
+
+  // ---------- rumah tradisional Melayu: a stilted kampung house across the
+  // field from the entrance path -- square timber posts on concrete pads,
+  // plank walls with slatted twin-leaf shutters, corrugated zinc bumbung
+  // panjang, a rubble-stone ground room at one end and a covered entrance
+  // stair (anjung) at the front, after the classic rumah tiang form.
+  // The floor sits at 1.9 m so visitors can wander beneath the house
+  // between the posts, the way you can under the real thing. ----------
+  function buildRumahMelayu(x, z, rotY){
+    // rotY must stay a multiple of 90deg: the walk colliders are axis-
+    // aligned, computed in world space through worldOf() below
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    g.rotation.y = rotY;
+    scene.add(g);
+    const cos = Math.round(Math.cos(rotY)), sin = Math.round(Math.sin(rotY));
+    const worldOf = (lx, lz) => [x + lx*cos + lz*sin, z - lx*sin + lz*cos];
+    const swapped = sin !== 0; // 90/270deg: box collider half-extents swap axes
+
+    const FL = 1.9;                     // floor level on the stilts
+    const W = 7.0, D = 4.6, WH = 2.1;   // main body width/depth/wall height
+
+    const wallTex = makeWallPlankTexture('#4d3a24');
+    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, bumpMap: wallTex, bumpScale: 0.012, roughness: 0.85 });
+    const floorTex = makeWallPlankTexture('#5a4026');
+    const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.9 });
+    const postMat = new THREE.MeshStandardMaterial({ color: 0xa8834e, roughness: 0.8 });
+    const padMat = new THREE.MeshStandardMaterial({ color: 0x8f9296, roughness: 0.95 });
+    const stoneTex = makeStoneTexture();
+    const stoneMat = new THREE.MeshStandardMaterial({ map: stoneTex, bumpMap: stoneTex, bumpScale: 0.03, roughness: 0.95 });
+    const zincTex = makeZincRoofTexture();
+    const zincMat = new THREE.MeshStandardMaterial({ map: zincTex, bumpMap: zincTex, bumpScale: 0.015, roughness: 0.55, metalness: 0.35 });
+    const zincTrimMat = new THREE.MeshStandardMaterial({ color: 0x5d6268, roughness: 0.5, metalness: 0.5 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x241608, roughness: 0.9 });
+
+    // stilt grid: concrete footing pads + square timber posts
+    for (let ix = -2; ix <= 2; ix++){
+      for (const lz of [-D/2 + 0.3, 0, D/2 - 0.3]){
+        const lx = ix * 1.55;
+        const pad = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.5, 0.34), padMat);
+        pad.position.set(lx, 0.25, lz);
+        g.add(pad);
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.15, FL - 0.5, 0.15), postMat);
+        post.position.set(lx, 0.5 + (FL - 0.5)/2, lz);
+        g.add(post);
+        const [wx, wz] = worldOf(lx, lz);
+        addCircleCollider(wx, wz, 0.16);
+      }
+    }
+
+    // floor slab + skirt beam
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(W + 0.3, 0.14, D + 0.3), floorMat);
+    floor.position.y = FL;
+    g.add(floor);
+
+    // plank walls sitting on the floor
+    [-1, 1].forEach(s => {
+      const wallFB = new THREE.Mesh(new THREE.BoxGeometry(W, WH, 0.1), wallMat);
+      wallFB.position.set(0, FL + 0.07 + WH/2, s * (D/2 - 0.05));
+      g.add(wallFB);
+      const wallLR = new THREE.Mesh(new THREE.BoxGeometry(0.1, WH, D), wallMat);
+      wallLR.position.set(s * (W/2 - 0.05), FL + 0.07 + WH/2, 0);
+      g.add(wallLR);
+    });
+
+    // main bumbung panjang: ridge along the house's long axis, zinc sheets
+    const roof = buildGableRoofWing(D + 1.6, 1.9, W + 1.8, zincMat, zincTrimMat);
+    roof.rotation.y = Math.PI/2;
+    roof.position.y = FL + 0.07 + WH;
+    g.add(roof);
+
+    // rubble-stone ground room under the west end (as in the reference,
+    // where part of the underfloor is walled in with masonry)
+    const stone = new THREE.Mesh(new THREE.BoxGeometry(2.2, FL, D + 0.2), stoneMat);
+    stone.position.set(-2.4, FL/2, 0);
+    g.add(stone);
+    const stoneDoor = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.06), darkMat);
+    stoneDoor.position.set(-2.4, 0.5, D/2 + 0.08);
+    g.add(stoneDoor);
+    {
+      const [wx, wz] = worldOf(-2.4, 0);
+      addBoxCollider(wx, wz, swapped ? (D + 0.2)/2 : 1.1, swapped ? 1.1 : (D + 0.2)/2);
+    }
+
+    // windows: dark frame + twin slatted shutter leaves, slightly proud of the wall
+    const shutterTex = makeWallPlankTexture('#6f4e2a');
+    shutterTex.repeat.set(1, 1);
+    const shutterMat = new THREE.MeshStandardMaterial({ map: shutterTex, roughness: 0.85 });
+    function addWindow(lx, lz, ry){
+      const w = new THREE.Group();
+      w.position.set(lx, FL + 0.07 + 1.15, lz);
+      w.rotation.y = ry;
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.78, 1.5, 0.07), darkMat);
+      w.add(frame);
+      [-1, 1].forEach(s => {
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.33, 1.36, 0.05), shutterMat);
+        leaf.position.set(s * 0.185, 0, 0.035);
+        w.add(leaf);
+      });
+      g.add(w);
+    }
+    // front (the porch takes the right-hand bay), gable ends, and the back
+    addWindow(-2.5, D/2 + 0.03, 0);
+    addWindow(-1.3, D/2 + 0.03, 0);
+    addWindow(-0.1, D/2 + 0.03, 0);
+    [-1, 1].forEach(s => addWindow(W/2 + 0.03, s * 1.1, Math.PI/2));
+    addWindow(-1.6, -D/2 - 0.03, Math.PI);
+    addWindow(1.6, -D/2 - 0.03, Math.PI);
+
+    // door opening onto the porch
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.75, 0.06), darkMat);
+    door.position.set(1.8, FL + 0.07 + 0.875, D/2 + 0.03);
+    g.add(door);
+
+    // anjung: covered porch landing + its own lower zinc gable over the stair
+    const porch = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 1.5), floorMat);
+    porch.position.set(1.8, FL, D/2 + 0.75);
+    g.add(porch);
+    [-1, 1].forEach(s => {
+      const lx = 1.8 + s * 1.0, lz = D/2 + 1.4;
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 0.3), padMat);
+      pad.position.set(lx, 0.25, lz);
+      g.add(pad);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.13, FL + 1.35 - 0.5, 0.13), postMat);
+      post.position.set(lx, 0.5 + (FL + 1.35 - 0.5)/2, lz);
+      g.add(post);
+      // porch side rail
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 1.4), postMat);
+      rail.position.set(1.8 + s * 1.05, FL + 0.9, D/2 + 0.72);
+      g.add(rail);
+    });
+    const porchRoof = buildGableRoofWing(2.9, 1.1, 3.4, zincMat, zincTrimMat);
+    porchRoof.position.set(1.8, FL + 1.35, D/2 + 0.6);
+    g.add(porchRoof);
+
+    // straight timber stair from the ground up to the porch
+    const steps = 8, rise = FL/steps, run = 0.3;
+    for (let i = 0; i < steps; i++){
+      const tread = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.09, run), floorMat);
+      tread.position.set(1.8, FL - rise * (i + 1) + 0.045, D/2 + 1.5 + run * i + run/2);
+      g.add(tread);
+    }
+    const stairAngle = Math.atan2(FL, steps * run);
+    [-1, 1].forEach(s => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 3.1), postMat);
+      rail.position.set(1.8 + s * 0.58, FL/2 + 0.9, D/2 + 1.5 + (steps * run)/2);
+      rail.rotation.x = stairAngle;
+      g.add(rail);
+      const newel = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.0, 0.1), postMat);
+      newel.position.set(1.8 + s * 0.58, 0.5, D/2 + 1.5 + steps * run);
+      g.add(newel);
+    });
+    {
+      // one collider over the porch + stair footprint (they aren't climbable)
+      const [wx, wz] = worldOf(1.8, D/2 + 1.9);
+      addBoxCollider(wx, wz, swapped ? 1.7 : 1.15, swapped ? 1.15 : 1.7);
+    }
+
+    // sign, always readable like the balai's own gateway sign
+    const sign = makeLabel('RUMAH TRADISIONAL MELAYU', 'Rumah bertiang — timber stilt kampung house', true);
+    const [sx, sz] = worldOf(-1.0, D/2 + 2.6);
+    sign.position.set(sx, 2.1, sz);
+    sign.rotation.y = rotY;
+    sign.material.opacity = 1;
+    scene.add(sign);
+  }
+
   function scatterVegetation(){
     const halfW = ROOM.width/2, halfD = ROOM.depth/2;
     for (let i=0;i<18;i++){
@@ -1945,6 +2172,7 @@
       const x = Math.cos(angle)*radius, z = Math.sin(angle)*radius;
       if (Math.abs(x) < 4 && z > 0) continue; // keep the entrance approach clear
       if (Math.abs(x) < 9 && Math.abs(z - 24) < 7) continue; // keep the Istana Melaka's footprint clear
+      if (x > -23 && x < -11 && z > 9 && z < 21) continue; // keep the rumah tradisional's yard clear
       const r = Math.random();
       if (r < 0.4) buildCoconutPalm(x,z);
       else if (r < 0.7) buildBananaPlant(x,z);
@@ -1971,6 +2199,8 @@
       url: 'unimap.edu.my',
     });
     buildIstanaMelaka(0, 24);
+    // west of the entrance path, front (and its covered stair) facing it
+    buildRumahMelayu(-17, 15, Math.PI/2);
   }
 
   // ---------- one bertingkat (stepped pyramidal roof) cluster: the real Istana
