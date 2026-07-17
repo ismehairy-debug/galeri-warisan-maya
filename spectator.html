@@ -65,10 +65,12 @@
          spellcheck="false" placeholder="cth: aiman-4827">
   <button id="joinBtn">SERTAI / JOIN</button>
   <div id="joinError"></div>
-  <small>Masukkan kod yang tertera pada skrin log masuk tetamu, kemudian tekan
-  SERTAI untuk melihat pandangan tetamu secara langsung.<br>
-  Enter the code shown on the guest's login screen to watch their live
-  first-person view.</small>
+  <small>Cara terpantas: imbas kod QR pada skrin tetamu — ia terus membuka
+  pandangan langsung. Halaman ini hanyalah pilihan gantian: tampal pautan
+  penonton (atau kodnya) dan tekan SERTAI.<br>
+  Fastest way: scan the QR on the guest's screen — it opens the live view
+  directly. This page is just a fallback: paste the spectator link (or its
+  code) and press SERTAI/JOIN.</small>
 </div>
 
 <script>
@@ -81,8 +83,12 @@
   if (prefill) input.value = prefill;
 
   function join(){
+    var code = input.value.trim();
+    // a pasted spectator LINK works too -- pull the code out of it
+    var m = code.match(/[?&]spectate=([^&#\s]+)/i);
+    if (m) code = decodeURIComponent(m[1]);
     // normalise however staff typed it (caps, spaces, a pasted "gwm-" prefix)
-    var code = input.value.trim().toLowerCase()
+    code = code.toLowerCase()
       .replace(/^gwm-/, '')
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '');

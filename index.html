@@ -177,10 +177,27 @@
   #guestName:focus { border-color:#f2d98a; box-shadow:0 0 12px rgba(242,217,138,0.35); }
   #sessionCodeRow { margin-top:12px; font-size:11px; letter-spacing:2px; color:#c9a961; }
   #sessionCodeRow span {
-    display:inline-block; margin-top:6px; font-size:24px; letter-spacing:3px;
+    display:inline-block; margin-top:6px; font-size:13px; letter-spacing:0.5px;
     color:#f2d98a; font-weight:700; text-shadow:0 2px 8px rgba(0,0,0,.6);
+    word-break:break-all; max-width:min(440px, 86vw);
   }
-  #hostCodeLine { display:none; margin-top:8px; font-size:12px; letter-spacing:1px; color:#f2d98a; }
+  /* QR of the spectator link -- staff/visitors scan it straight off the
+     guest's screen instead of typing anything */
+  #qrBox { margin:12px auto 0; min-height:0; }
+  #qrBox img, #qrBox canvas {
+    background:#fff; padding:6px; border-radius:8px;
+    box-shadow:0 2px 10px rgba(0,0,0,.5); display:inline-block;
+  }
+  #copyLinkBtn {
+    display:block; margin:10px auto 0; padding:8px 18px; border-radius:999px;
+    background:rgba(20,14,6,0.65); color:#f2e2b6; font-size:11px;
+    border:1px solid rgba(242,217,138,0.6); font-weight:700; letter-spacing:1px;
+    font-family: Georgia, serif; cursor:pointer;
+  }
+  #hostCodeLine {
+    display:none; margin-top:8px; font-size:11px; letter-spacing:0.5px;
+    color:#f2d98a; word-break:break-all;
+  }
   /* spectator-mode status line (only element shown over the mirrored view) */
   #spectateStatus {
     position:fixed; left:0; right:0; bottom:34px; z-index:25; display:none;
@@ -215,8 +232,10 @@
   <input id="guestName" type="text" maxlength="24" autocomplete="off"
          placeholder="NAMA TETAMU / GUEST NAME">
   <div id="sessionCodeRow">
-    KOD PENONTON / SPECTATOR CODE<br>
-    <span id="sessionCode">—</span>
+    PAUTAN PENONTON / SPECTATOR LINK<br>
+    <span id="sessionLink">—</span>
+    <div id="qrBox"></div>
+    <button id="copyLinkBtn">⧉ SALIN PAUTAN / COPY LINK</button>
   </div>
   <button id="enterBtn">MASUK GALERI / ENTER GALLERY</button>
   <small>Desktop: click to enable mouse-look, then WASD to walk. On a Meta Quest browser, use the ENTER VR button that appears top-right once you're inside.</small>
@@ -241,7 +260,7 @@
     <button id="gyro-button">GUNA GYRO / ENABLE GYRO</button>
     <br>
     <button id="restart-button">⟲ TETAMU BARU / NEW GUEST</button>
-    <div id="hostCodeLine">KOD PENONTON / SPECTATOR CODE: <b id="hostCodeValue"></b></div>
+    <div id="hostCodeLine">PAUTAN PENONTON / SPECTATOR LINK:<br><b id="hostCodeValue"></b></div>
   </div>
 </div>
 
@@ -259,6 +278,9 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<!-- QR encoder for the spectator link (guarded with typeof checks -- if the
+     CDN is unreachable the text link + copy button still work) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 (function(){
 
@@ -714,20 +736,43 @@
       document.getElementById('joystick-base').style.display = 'block';
     }
 
-    // guest login: typing a name generates the session code spectators
-    // join with (slugified name + a random 4-digit code fixed per visit).
-    // Leaving the name blank simply enters solo, with no peer created.
+    // guest login: a session always exists (random suffix keeps the peer ID
+    // unique on the public broker); typing a name just personalises the
+    // spectator link. Nobody types a code anymore -- spectators open the
+    // link directly (or scan its QR off this screen).
     const nameInput = document.getElementById('guestName');
-    const codeEl = document.getElementById('sessionCode');
+    sessionCode = 'tetamu-' + sessionDigits;
+    updateSpectatorLink();
     nameInput.addEventListener('input', () => {
       const slug = slugifyName(nameInput.value);
-      sessionCode = slug ? slug + '-' + sessionDigits : '';
-      codeEl.textContent = sessionCode || '—';
+      sessionCode = (slug || 'tetamu') + '-' + sessionDigits;
+      updateSpectatorLink();
     });
     nameInput.addEventListener('keydown', e => {
       // don't leak typing (W/A/S/D...) into the movement key state
       e.stopPropagation();
       if (e.key === 'Enter') document.getElementById('enterBtn').click();
+    });
+
+    const copyBtn = document.getElementById('copyLinkBtn');
+    copyBtn.addEventListener('click', () => {
+      const link = spectatorLink();
+      const done = () => {
+        copyBtn.textContent = '✓ DISALIN / COPIED';
+        setTimeout(() => { copyBtn.textContent = '⧉ SALIN PAUTAN / COPY LINK'; }, 1600);
+      };
+      const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = link;
+        ta.style.cssText = 'position:fixed; opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { if (document.execCommand('copy')) done(); } catch (e) {}
+        ta.remove();
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(link).then(done).catch(fallback);
+      } else fallback();
     });
 
     document.getElementById('enterBtn').addEventListener('click', (e) => {
@@ -741,7 +786,7 @@
       if (listener.context.state === 'suspended') listener.context.resume();
       unlockStationMedia();
       if (isTouchDevice) requestGyroPermission();
-      startHosting(); // no-op when the name was left blank
+      startHosting(); // session always exists now, so casting is always live
       playIntro();
     });
     document.getElementById('gyro-button').addEventListener('click', requestGyroPermission);
@@ -779,15 +824,15 @@
     alphaOffset = null;
     gyroYawOffset = 0; gyroPitchOffset = 0;
 
-    // fresh spectator session -- the old code dies with the old guest
+    // fresh spectator link -- the old one dies with the old guest
     if (peerHost){ try { peerHost.destroy(); } catch (e) {} }
     peerHost = null;
     hostConns = [];
     hostRetries = 0;
-    sessionCode = '';
     sessionDigits = String(1000 + Math.floor(Math.random() * 9000));
+    sessionCode = 'tetamu-' + sessionDigits;
     document.getElementById('guestName').value = '';
-    document.getElementById('sessionCode').textContent = '—';
+    updateSpectatorLink();
     document.getElementById('hostCodeLine').style.display = 'none';
 
     // back to the details screen; their MASUK will replay the intro
@@ -808,9 +853,25 @@
       .slice(0, 16).replace(/-+$/, '');
   }
 
-  function updateSessionCodeDisplays(){
-    document.getElementById('sessionCode').textContent = sessionCode || '—';
-    document.getElementById('hostCodeValue').textContent = sessionCode;
+  // the "special link" spectators open -- lands straight in spectate mode,
+  // no code/PIN entry anywhere
+  function spectatorLink(){
+    return location.href.split(/[?#]/)[0] + '?spectate=' + encodeURIComponent(sessionCode);
+  }
+
+  function updateSpectatorLink(){
+    const link = sessionCode ? spectatorLink() : '—';
+    document.getElementById('sessionLink').textContent = link;
+    document.getElementById('hostCodeValue').textContent = link;
+    const qrBox = document.getElementById('qrBox');
+    qrBox.innerHTML = '';
+    if (sessionCode && typeof QRCode !== 'undefined'){
+      new QRCode(qrBox, {
+        text: link, width: 108, height: 108,
+        colorDark: '#150c07', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
   }
 
   // Opens this browser as PeerJS peer "gwm-<sessionCode>" and collects
@@ -819,7 +880,7 @@
   function startHosting(){
     if (peerHost || !sessionCode || typeof Peer === 'undefined') return;
     document.getElementById('hostCodeLine').style.display = 'block';
-    updateSessionCodeDisplays();
+    updateSpectatorLink();
 
     peerHost = new Peer(PEER_PREFIX + sessionCode);
     peerHost.on('connection', conn => {
