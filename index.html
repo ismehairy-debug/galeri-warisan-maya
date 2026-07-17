@@ -326,6 +326,9 @@
   let insideIstanaSmooth = 0;
   const ISTANA_BASE_VOL = 0.4;
   let currentInfoKey = null;
+  // assigned inside setupIntroScreen; declared up here because init() runs
+  // before the statements further down this script ever execute
+  let playIntro = () => {}, resetIntro = () => {};
 
   /* ---------------- guest spectator sync (PeerJS) ----------------
      Two roles, both living in this one file so the spectator renders the
@@ -509,8 +512,8 @@
   // Visit order: details screen (name -> spectator code) -> MASUK -> intro
   // video -> the world. setupStartScreen calls playIntro() on MASUK, and
   // endIntro() hands over to enterWorld(). resetIntro() rewinds everything
-  // for the next guest (restart button).
-  let playIntro = () => {}, resetIntro = () => {};
+  // for the next guest (restart button). playIntro/resetIntro themselves
+  // are declared with the other top-level state (before the init() call).
   function setupIntroScreen(listener){
     const introScreen = document.getElementById('introScreen');
     const introControls = document.getElementById('introControls');
@@ -573,10 +576,14 @@
     startIstanaMusic();
     startOutsideAmbience();
     // only works when entry came from a click (Skip); after a natural video
-    // end the browser may refuse, and the existing canvas click handler
-    // picks the lock up on the guest's first click instead
+    // end the browser refuses (needs a gesture, and it's a promise rejection
+    // rather than a throw), and the existing canvas click handler picks the
+    // lock up on the guest's first click instead
     if (!isTouchDevice && !renderer.xr.isPresenting){
-      try { renderer.domElement.requestPointerLock(); } catch (e) {}
+      try {
+        const lock = renderer.domElement.requestPointerLock();
+        if (lock && lock.catch) lock.catch(() => {});
+      } catch (e) {}
     }
   }
 
