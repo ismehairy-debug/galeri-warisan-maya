@@ -3825,6 +3825,22 @@
           keris.visible = false;
           def.desc += ' — Model 3D keris: "Keris" oleh apasipepgapuak di Sketchfab (CC Attribution).';
         }, undefined, () => { /* model file absent -- keep the photo plaque */ });
+
+        // framed wau bulan hanging beside the keris -- the moon kite is
+        // itself a showcase of kampung craft, so it shares this station
+        new THREE.GLTFLoader().load('assets/models/frame_wau_bulan/scene.gltf', gltf => {
+          const model = gltf.scene;
+          const box = new THREE.Box3().setFromObject(model);
+          const size = box.getSize(new THREE.Vector3());
+          model.scale.setScalar(0.9 / size.y);
+          box.setFromObject(model);
+          model.position.sub(box.getCenter(new THREE.Vector3()));
+          model.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+          const holder = new THREE.Group();
+          holder.add(model);
+          holder.position.set(0.42, 0.42, -0.05);
+          performer.add(holder);
+        }, undefined, () => {});
       }
 
       const anyaman = buildAnyaman();

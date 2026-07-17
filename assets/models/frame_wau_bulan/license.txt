@@ -1,0 +1,11 @@
+Model Information:
+* title:	Frame Wau Bulan
+* source:	https://sketchfab.com/3d-models/frame-wau-bulan-7f5d9e1912d34f8eb02e64ac4b8322da
+* author:	eeelabvisual (https://sketchfab.com/eeelabvisual)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Frame Wau Bulan" (https://sketchfab.com/3d-models/frame-wau-bulan-7f5d9e1912d34f8eb02e64ac4b8322da) by eeelabvisual (https://sketchfab.com/eeelabvisual) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
