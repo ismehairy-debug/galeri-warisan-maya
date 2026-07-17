@@ -2247,14 +2247,17 @@
       g.add(wheel);
     });
 
-    // draw pole (bom) + yoke across the oxen's necks
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 2.0, 8), darkWood);
-    pole.rotation.x = Math.PI/2 - 0.12;
-    pole.position.set(0, 0.72, 1.05);
+    // draw pole (bom) running between the pair, up to a yoke that rests
+    // across their shoulders -- lengths/heights sized against the imported
+    // cow model (~1.4 m tall, 0.65 m wide, standing at local z 2.3) so the
+    // timber sits OVER the animals instead of skewering them
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 2.8, 8), darkWood);
+    pole.rotation.x = Math.PI/2 - 0.13;
+    pole.position.set(0, 0.92, 1.5);
     g.add(pole);
-    const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.25, 8), darkWood);
+    const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.8, 8), darkWood);
     yoke.rotation.z = Math.PI/2;
-    yoke.position.set(0, 0.92, 1.85);
+    yoke.position.set(0, 1.16, 2.85);
     g.add(yoke);
 
     // the pair of lembu in harness is the real imported cow model, placed
@@ -2380,12 +2383,11 @@
     // first two stand in the kereta lembu's harness -- world spots derived
     // from the cart at (13.2, 15) rotY -PI/2, ahead of the draw pole.
     loadImportedModel('assets/models/cow_skin/scene.gltf', 1.4 / 178.8,
-      { x: 11.25, z: 14.54, rotY: -Math.PI/2 }, holder => {
-      addCircleCollider(11.25, 14.54, 0.42);
+      { x: 10.9, z: 14.38, rotY: -Math.PI/2 }, holder => {
+      addCircleCollider(10.9, 14.38, 0.42);
       [
-        { x: 11.25, z: 15.46, rotY: -Math.PI/2, r: 0.42 }, // harness partner
-        { x: -14.6, z: 4.2,  rotY: 2.5,  r: 0.55 },        // grazing by the sawah
-        { x: 16.4,  z: 12.2, rotY: -1.9, r: 0.55 },        // loose near the cart
+        { x: 10.9,  z: 15.62, rotY: -Math.PI/2, r: 0.42 }, // harness partner
+        { x: 16.4,  z: 12.2,  rotY: -1.9, r: 0.55 },       // loose near the cart
       ].forEach(s => {
         const c = holder.clone();
         c.position.set(s.x, 0, s.z);
@@ -2395,11 +2397,12 @@
       });
     });
 
-    // kampung chickens pecking around the rumah's yard (~0.4 m tall)
+    // kampung chickens (~0.4 m tall) sheltering under the rumah's stilt
+    // floor between the posts, the way real ayam kampung do
     loadImportedModel('assets/models/chicken/scene.gltf', 0.42 / 1.07,
-      { x: -13.6, z: 17.2, rotY: 0.8 }, holder => {
-      addCircleCollider(-13.6, 17.2, 0.18);
-      [{ x: -12.6, z: 18.4, rotY: -2.1 }, { x: -14.7, z: 19.4, rotY: 2.9 }].forEach(s => {
+      { x: -17.2, z: 12.6, rotY: 0.8 }, holder => {
+      addCircleCollider(-17.2, 12.6, 0.18);
+      [{ x: -16.2, z: 14.1, rotY: -2.1 }, { x: -18.1, z: 13.5, rotY: 2.9 }].forEach(s => {
         const c = holder.clone();
         c.position.set(s.x, 0, s.z);
         c.rotation.y = s.rotY;
@@ -2408,37 +2411,45 @@
       });
     });
 
-    // the grass patch IS the padi now: one drift at the field's path edge,
-    // and a clone filling each of the six flooded plots, all tinted toward
-    // the sawah's softer yellow-green (walk-through, no colliders)
+    // the grass patch IS the padi: one squared-off fill per flooded plot,
+    // axis-aligned with the batas grid and squeezed per-axis to the plot's
+    // inner rectangle so no blades poke through the bunds. The base load
+    // sits in the first plot; the other five are clones.
     loadImportedModel('assets/models/patch_of_grass/scene_merged.gltf', 9 / 204,
-      { x: -13.2, z: 10.6, sink: -0.05 }, holder => {
+      { x: -30.3, z: -0.95, sink: -0.05 }, holder => {
       holder.traverse(o => {
         if (o.isMesh && o.material && o.material.color) o.material.color.setRGB(1.3, 1.15, 0.78);
       });
+      const plotScale = [5.0 / 9, 0.52, 4.4 / 9]; // ~0.33 m tall young padi
+      holder.scale.set(plotScale[0], plotScale[1], plotScale[2]);
       const cols = [-30.3, -24.8, -19.3], rows = [-0.95, 3.95];
       cols.forEach((px, i) => rows.forEach((pz, j) => {
+        if (i === 0 && j === 0) return; // the base load already fills this plot
         const c = holder.clone();
-        c.scale.setScalar(5.2 / 9); // plot-sized, ~0.35 m tall like young padi
         c.position.set(px, 0, pz);
-        c.rotation.y = (i * 2 + j) * 0.9;
+        c.rotation.y = (i + j) % 2 ? Math.PI : 0; // 180deg flips keep the square aligned
         scene.add(c);
       }));
     });
 
-    // forest hillsides: north-east quadrant behind the cart, plus a clone
-    // on the south-west corner; walkable edges fenced so nobody wanders
-    // into the terrain skirt (rotations stay at 0/180 for the AABB colliders)
-    // sink measured from the mesh: the terrain skirt's edges sit ~3.5 m
-    // above its lowest vertex, so without this the whole tile floats
+    // forest hillsides as the MID-GROUND layer: one screen of low-poly
+    // trees in front of each mountain range, hiding the ranges' photoreal
+    // bases behind a softer treeline. All four sit past the 40 m walk
+    // clamp, so no colliders are needed. sink measured from the mesh: the
+    // terrain skirt's edges sit ~3.5 m above its lowest vertex, so
+    // without it the whole tile floats.
     loadImportedModel('assets/models/low_poly_tree_scene_free/scene_merged.gltf', 0.45,
-      { x: 38, z: 32, sink: -4.2 }, holder => {
-      addBoxCollider(38, 32, 20, 12.5);
-      const c = holder.clone();
-      c.position.set(-36, 0, -26);
-      c.rotation.y = Math.PI;
-      scene.add(c);
-      addBoxCollider(-36, -26, 20, 12.5);
+      { x: 0, z: 54, sink: -4.2 }, holder => {
+      [
+        { x: 0,   z: -54, rotY: Math.PI },
+        { x: -54, z: 0,   rotY: Math.PI/2 },
+        { x: 54,  z: 0,   rotY: -Math.PI/2 },
+      ].forEach(s => {
+        const c = holder.clone();
+        c.position.set(s.x, 0, s.z);
+        c.rotation.y = s.rotY;
+        scene.add(c);
+      });
     });
 
     // mountain-forest diorama as the western backdrop beyond the sawah
