@@ -2739,15 +2739,15 @@
         desc:'The gamelan is a bronze-keyed percussion ensemble with deep roots in the royal courts of the Malay Archipelago, where sets were commissioned by sultans and kept as palace treasures. It accompanied royal ceremonies, wedding processions (persandingan) and court dances, its layered, ringing tones setting the pace for the performers around it.' },
       { key:'silat', name:'SILAT', sub:'Seni Persembahan', color:0xa1273d, pos:[0,0,-8], freq:110, wave:'sawtooth',
         desc:'Silat Melayu is a traditional martial art combining self-defence with spiritual discipline (adab) passed down from teacher to student (guru-anak murid). Beyond combat training, it is performed ceremonially at weddings and cultural festivals, and historically formed part of a warrior\'s preparation alongside the keris.' },
-      { key:'pakaian', name:'SONGKET & BATIK', sub:'Pakaian & Tekstil', color:0xb5892f, pos:[-8,0,-2], freq:262, wave:'sine',
+      { key:'pakaian', name:'SONGKET & BATIK', sub:'Pakaian & Tekstil', color:0xb5892f, pos:[-8,0,-2], silent:true,
         desc:'Songket is a hand-woven brocade with gold or silver thread worked into the fabric on a supplementary weft, historically reserved for royalty and worn at weddings and formal ceremonies for its shimmer and status. Batik, made by wax-resist dyeing, was worn more broadly across daily and festive life throughout the Malay Archipelago.' },
-      { key:'kraf', name:'KERIS & ANYAMAN', sub:'Kraf Tangan & Persenjataan', color:0x8a8f99, pos:[-8,0,5], freq:196, wave:'triangle',
+      { key:'kraf', name:'KERIS & ANYAMAN', sub:'Kraf Tangan & Persenjataan', color:0x8a8f99, pos:[-8,0,5], silent:true,
         desc:'The keris is a wavy-bladed dagger carried as part of formal Malay attire (baju Melayu) and regarded as a symbol of status and spiritual power, often passed down as a family heirloom. Anyaman is the everyday craft of weaving pandan, rattan and bamboo into mats, baskets and trays -- humble household items woven by hand in nearly every kampung.' },
-      { key:'makanan', name:'HIDANGAN WARISAN', sub:'Makanan Warisan', color:0xc9622a, pos:[8,0,-2], freq:294, wave:'sine',
+      { key:'makanan', name:'HIDANGAN WARISAN', sub:'Makanan Warisan', color:0xc9622a, pos:[8,0,-2], silent:true,
         desc:'Malay heritage dishes such as rendang, nasi lemak and an array of kuih-muih reflect centuries of spice trade with India, China and the Middle East, absorbed into local ingredients and cooking methods. They are served at kenduri (feasts), weddings and Hari Raya celebrations, where cooking and sharing food is itself a communal, festive act.' },
       { key:'adat', name:'PANTUN & ADAT', sub:'Adat Resam & Kesusasteraan', color:0x6a4fae, pos:[8,0,5], freq:174, wave:'triangle',
         desc:'Pantun is a traditional oral poetry form built from rhyming quatrains, historically used in courtship, ceremonies and everyday social exchange to convey wit and wisdom indirectly. Adat resam refers to the customary practices and unwritten laws -- such as adat perpatih and adat temenggong -- that have long governed Malay social conduct, ceremonies and inheritance.' },
-      { key:'filem', name:'FILEM MELAYU', sub:'Zaman Kesultanan Melayu', color:0xc9a227, pos:[0,0,0], freq:100, wave:'sine', labelY:2.9,
+      { key:'filem', name:'FILEM MELAYU', sub:'Zaman Kesultanan Melayu', color:0xc9a227, pos:[0,0,0], silent:true, labelY:2.9,
         desc:'Three Malay films set in the Melaka Sultanate era, arranged left to right in order of release so the story of that world unfolds across the decades: Hang Tuah (1956, dir. Phani Majumdar), Puteri Gunung Ledang (1961, dir. S. Roomai Noor), and Puteri Gunung Ledang (2004, dir. Saw Teong Hin).' },
     ];
     return defs.map(buildStation);
@@ -3273,10 +3273,12 @@
 
   function ensureStationAudio(station, ctx){
     if (station.oscStarted) return;
-    if (station.def.key === 'pakaian'){
-      // both process clips stay silent -- routing the muted songket video
-      // through createMediaElementSource is what made it unreliable on
-      // iPhone, and this station should only ever carry anak ayam anyway
+    if (station.def.silent){
+      // deliberately soundless exhibits (pakaian, kraf, makanan, filem) --
+      // visual-only, no proximity tone. Pakaian especially: routing its
+      // muted songket video through createMediaElementSource is what made
+      // playback unreliable on iPhone, and the balai's anak ayam ambience
+      // covers these stations anyway
       station.oscStarted = true;
       return;
     }
