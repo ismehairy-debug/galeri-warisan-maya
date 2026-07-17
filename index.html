@@ -183,7 +183,9 @@
   }
   /* QR of the spectator link -- staff/visitors scan it straight off the
      guest's screen instead of typing anything */
-  #qrBox { margin:12px auto 0; min-height:0; }
+  /* qrcodejs sets display:block inline on its <img>, which escapes
+     text-align centering -- flex centers it no matter what the lib emits */
+  #qrBox { margin:12px auto 0; min-height:0; display:flex; justify-content:center; }
   #qrBox img, #qrBox canvas {
     background:#fff; padding:6px; border-radius:8px;
     box-shadow:0 2px 10px rgba(0,0,0,.5); display:inline-block;
