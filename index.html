@@ -3493,11 +3493,10 @@
       performer.userData.keris = keris;
 
       // real 3D keris ("Keris" by apasipepgapuak on Sketchfab, CC
-      // Attribution): once its glTF export is dropped at
-      // assets/models/keris.glb it loads in place of the flat photo;
-      // until the file exists the photo plaque above stays as fallback
+      // Attribution), loaded from its glTF export in place of the flat
+      // photo; if the load fails the photo plaque above stays as fallback
       if (typeof THREE.GLTFLoader === 'function'){
-        new THREE.GLTFLoader().load('assets/models/keris.glb', gltf => {
+        new THREE.GLTFLoader().load('assets/models/keris/scene.gltf', gltf => {
           const model = gltf.scene;
           // normalise: longest side ~1.05 m, centred on its holder, so the
           // exhibit reads the same regardless of the export's own units

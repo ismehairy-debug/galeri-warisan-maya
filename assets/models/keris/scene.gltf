@@ -1,0 +1,478 @@
+{
+  "accessors": [
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 801,
+      "max": [
+        0.23202799260616302,
+        1.9518799781799316,
+        1.4555799961090088
+      ],
+      "min": [
+        0.1519480049610138,
+        1.5374499559402466,
+        0.7123910188674927
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 9612,
+      "componentType": 5126,
+      "count": 801,
+      "max": [
+        1.5431197105167903e-14,
+        0.9999973773956299,
+        0.9999773502349854
+      ],
+      "min": [
+        -9.668311209140926e-14,
+        -0.9930075407028198,
+        -0.9993496537208557
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 801,
+      "max": [
+        4.6143999099731445,
+        87.69760131835938
+      ],
+      "min": [
+        -4.722609996795654,
+        -70.20980072021484
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 1515,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 19224,
+      "componentType": 5126,
+      "count": 1113,
+      "max": [
+        0.26915401220321655,
+        1.8888499736785889,
+        0.4334770143032074
+      ],
+      "min": [
+        0.20768900215625763,
+        1.4668699502944946,
+        0.20938700437545776
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 32580,
+      "componentType": 5126,
+      "count": 1113,
+      "max": [
+        1.0,
+        1.0,
+        0.999937891960144
+      ],
+      "min": [
+        -1.0,
+        -0.9999843835830688,
+        -0.9998283386230469
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 6408,
+      "componentType": 5126,
+      "count": 1113,
+      "max": [
+        0.9153270125389099,
+        0.5035110116004944
+      ],
+      "min": [
+        0.7079780101776123,
+        0.23449699580669403
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 6060,
+      "componentType": 5125,
+      "count": 3213,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 45936,
+      "componentType": 5126,
+      "count": 16,
+      "max": [
+        0.23929600417613983,
+        1.940269947052002,
+        1.316059947013855
+      ],
+      "min": [
+        0.147256001830101,
+        1.528880000114441,
+        0.567637026309967
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 46128,
+      "componentType": 5126,
+      "count": 16,
+      "max": [
+        0.9977715015411377,
+        0.11177396774291992,
+        0.055392827838659286
+      ],
+      "min": [
+        -0.9977774620056152,
+        -0.04874001070857048,
+        -0.3402568995952606
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 15312,
+      "componentType": 5126,
+      "count": 16,
+      "max": [
+        60.647098541259766,
+        43.607398986816406
+      ],
+      "min": [
+        -76.54389953613281,
+        13.677900314331055
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 18912,
+      "componentType": 5125,
+      "count": 24,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 46320,
+      "componentType": 5126,
+      "count": 4840,
+      "max": [
+        0.26915401220321655,
+        1.9518799781799316,
+        1.4555799961090088
+      ],
+      "min": [
+        0.11207400262355804,
+        -0.013483099639415741,
+        0.2633880078792572
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 104400,
+      "componentType": 5126,
+      "count": 4840,
+      "max": [
+        1.0,
+        0.9963327646255493,
+        0.9987215399742126
+      ],
+      "min": [
+        -1.0,
+        -0.9999977350234985,
+        -0.9997422099113464
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 15440,
+      "componentType": 5126,
+      "count": 4840,
+      "max": [
+        0.9475399851799011,
+        0.9304900169372559
+      ],
+      "min": [
+        0.05284909904003143,
+        0.09251020103693008
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 19008,
+      "componentType": 5125,
+      "count": 15453,
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "extras": {
+      "author": "NA3dmodel (https://sketchfab.com/NA3dmodel)",
+      "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "source": "https://sketchfab.com/3d-models/keris-e830625eb66b4aa1945017b756241dc3",
+      "title": "Keris"
+    },
+    "generator": "Sketchfab-15.42.0",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 80820,
+      "name": "floatBufferViews",
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 54160,
+      "byteOffset": 80820,
+      "byteStride": 8,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 162480,
+      "byteOffset": 134980,
+      "byteStride": 12,
+      "name": "floatBufferViews",
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 297460,
+      "uri": "scene.bin"
+    }
+  ],
+  "extensionsUsed": [
+    "KHR_materials_specular"
+  ],
+  "images": [
+    {
+      "uri": "textures/M_20200126904_44_04_PM_baseColor.png"
+    },
+    {
+      "uri": "textures/sulawesi_kris_pamor_weapon_sumatra_weapon_ae66fa6602eece6a74b2dff70e2d4343_baseColor.png"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "Color_D08",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.117647,
+          0.117647,
+          0.176471,
+          1.0
+        ]
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "FrontColor",
+      "pbrMetallicRoughness": {
+        "metallicFactor": 0.0
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.0
+        }
+      },
+      "name": "M_20200126904_44_04_PM",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicFactor": 0.62697231364814
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularColorFactor": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "specularFactor": 0.0
+        }
+      },
+      "name": "sulawesi_kris_pamor_weapon_sumatra_weapon_ae66fa6602eece6a74b2dff70e2d4343",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicFactor": 0.6299080221803078,
+        "roughnessFactor": 0.46697156745349777
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Object_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Object_1",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 5,
+            "POSITION": 4,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 2,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Object_2",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 9,
+            "POSITION": 8,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Object_3",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 13,
+            "POSITION": 12,
+            "TEXCOORD_0": 14
+          },
+          "indices": 15,
+          "material": 3,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        1.1102230246251565e-16,
+        5.551115123125783e-17,
+        -1.0,
+        0.0,
+        3.885780586188048e-16,
+        1.0,
+        1.1102230246251565e-16,
+        0.0,
+        1.0,
+        -4.440892098500626e-16,
+        1.6653345369377338e-16,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Sketchfab_model"
+    },
+    {
+      "children": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "name": "Keris.obj.cleaner.materialmerger.gles"
+    },
+    {
+      "mesh": 0,
+      "name": "Object_2"
+    },
+    {
+      "mesh": 1,
+      "name": "Object_3"
+    },
+    {
+      "mesh": 2,
+      "name": "Object_4"
+    },
+    {
+      "mesh": 3,
+      "name": "Object_5"
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    }
+  ]
+}
