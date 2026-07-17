@@ -3134,9 +3134,11 @@
     // output, which is what was flattening the clip's color into a washed-out look
     videoTex.encoding = THREE.sRGBEncoding;
 
+    // DoubleSide: stations like pantun & adat stand free in the hall, so the
+    // dark mount shows from behind too instead of being backface-culled
     const backing = new THREE.Mesh(
       new THREE.PlaneGeometry(1.86, 1.1),
-      new THREE.MeshStandardMaterial({ color: 0x1a1206, roughness: 0.8 })
+      new THREE.MeshStandardMaterial({ color: 0x1a1206, roughness: 0.8, side: THREE.DoubleSide })
     );
     backing.position.set(0, 0.7, -0.03);
     performer.add(backing);
@@ -3147,9 +3149,22 @@
     // toneMapped:false exempts the footage from the scene's ACES filmic pass
     // -- the clips are already graded; running them through tone mapping a
     // second time would wash their color out again
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: videoTex, fog: false, toneMapped: false }));
+    const screenMat = new THREE.MeshBasicMaterial({ map: videoTex, fog: false, toneMapped: false });
+    const screenGeo = new THREE.PlaneGeometry(1.6, 0.9);
+    const screen = new THREE.Mesh(screenGeo, screenMat);
     screen.position.set(0, 0.7, 0.001);
     performer.add(screen);
+
+    // a second screen facing backward (sharing the same video material), so
+    // walking around behind a free-standing station shows the footage
+    // mirrored -- like the back of a cinema screen -- instead of an empty
+    // see-through frame. It sits just behind the dark backing, which hides
+    // it from the front exactly as the backing hides the front screen from
+    // the rear.
+    const backScreen = new THREE.Mesh(screenGeo, screenMat);
+    backScreen.rotation.y = Math.PI;
+    backScreen.position.set(0, 0.7, -0.061);
+    performer.add(backScreen);
 
     const frameMat = new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.4, roughness: 0.4, metalness: 0.5 });
     const frame = buildPictureFrame(1.86, 1.1, 1.62, 0.92, 0.04, frameMat);
