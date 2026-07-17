@@ -274,6 +274,9 @@
 <audio id="istanaMusic" src="assets/audio/nobat_kedah.mp3" loop></audio>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- glTF loader (same three r128, global-script build) for the real 3D
+     keris exhibit; everything degrades to the photo plaque without it -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <!-- QR encoder for the spectator link (guarded with typeof checks -- if the
      CDN is unreachable the text link + copy button still work) -->
@@ -3488,6 +3491,33 @@
       keris.rotation.z = -0.12;
       performer.add(keris);
       performer.userData.keris = keris;
+
+      // real 3D keris ("Keris" by apasipepgapuak on Sketchfab, CC
+      // Attribution): once its glTF export is dropped at
+      // assets/models/keris.glb it loads in place of the flat photo;
+      // until the file exists the photo plaque above stays as fallback
+      if (typeof THREE.GLTFLoader === 'function'){
+        new THREE.GLTFLoader().load('assets/models/keris.glb', gltf => {
+          const model = gltf.scene;
+          // normalise: longest side ~1.05 m, centred on its holder, so the
+          // exhibit reads the same regardless of the export's own units
+          const box = new THREE.Box3().setFromObject(model);
+          const size = box.getSize(new THREE.Vector3());
+          model.scale.setScalar(1.05 / Math.max(size.x, size.y, size.z));
+          box.setFromObject(model);
+          model.position.sub(box.getCenter(new THREE.Vector3()));
+          // enableShadows() already ran by the time this async load lands
+          model.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+          const holder = new THREE.Group();
+          holder.add(model);
+          holder.position.set(-0.3, 0.1, 0);
+          holder.rotation.z = -0.12;
+          performer.add(holder);
+          performer.userData.kerisModel = holder;
+          keris.visible = false;
+          def.desc += ' — Model 3D keris: "Keris" oleh apasipepgapuak di Sketchfab (CC Attribution).';
+        }, undefined, () => { /* model file absent -- keep the photo plaque */ });
+      }
 
       const anyaman = buildAnyaman();
       anyaman.position.set(0.4, -0.35, 0.05);
