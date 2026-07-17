@@ -2170,6 +2170,45 @@
       addBoxCollider(wx, wz, swapped ? 1.7 : 1.15, swapped ? 1.15 : 1.7);
     }
 
+    // pelita on a timber lamp stand greeting guests at the foot of the
+    // entrance stair, its flame a warm flickering point light after dusk
+    const standPost = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.065, 1.25, 8), darkMat);
+    standPost.position.set(0.9, 0.625, D/2 + 3.7);
+    g.add(standPost);
+    const standPlate = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.04, 0.26), darkMat);
+    standPlate.position.set(0.9, 1.27, D/2 + 3.7);
+    g.add(standPlate);
+    if (typeof THREE.GLTFLoader === 'function'){
+      new THREE.GLTFLoader().load('assets/models/pelita/scene.gltf', gltf => {
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        model.scale.setScalar(0.34 / size.y);
+        box.setFromObject(model);
+        const c = box.getCenter(new THREE.Vector3());
+        model.position.set(0.9 - c.x, 1.29 - box.min.y, D/2 + 3.7 - c.z);
+        model.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+        g.add(model);
+      }, undefined, () => { /* stand simply remains unlit */ });
+    }
+    const flame = new THREE.PointLight(0xffb268, 0.9, 5, 2);
+    flame.position.set(0.9, 1.55, D/2 + 3.7);
+    g.add(flame);
+    flickerLights.push({ light: flame, base: 0.9, amp: 0.22, speed: 9.5, phase: 1.7 });
+    {
+      const [wx, wz] = worldOf(0.9, D/2 + 3.7);
+      addCircleCollider(wx, wz, 0.14);
+    }
+
+    // real-photo reference of an actual kampung stilt house, framed on the
+    // front wall between the window and the door, the same treatment as
+    // the Istana's plaques. Photo: 'Pahang House1' by Orhanghazi
+    // (Wikimedia Commons, CC BY-SA 4.0) -- a timber stilt house on pier
+    // footings with a covered entrance stair, near-twin of this model
+    const refPhoto = buildExteriorPhotoPlaque('assets/images/rumah_reference.jpg', 0.95, 0.66);
+    refPhoto.position.set(0.85, FL + 0.07 + 1.25, D/2 + 0.09);
+    g.add(refPhoto);
+
     // sign, always readable like the balai's own gateway sign
     const sign = makeLabel('RUMAH TRADISIONAL MELAYU', 'Rumah bertiang — timber stilt kampung house', true);
     const [sx, sz] = worldOf(-1.0, D/2 + 2.6);
@@ -3333,7 +3372,7 @@
       // carry their own always-visible signs, so these show just the info
       // panel when a visitor walks up to their entrances
       { key:'rumah',  name:'RUMAH TRADISIONAL MELAYU', sub:'Seni Bina Kampung', pos:[-11.9, 1.3, 14.2], noMarker:true, noLabel:true, silent:true,
-        desc:'The traditional Malay stilt house (rumah tiang) is raised on hardwood posts set on stone or concrete footings, lifting the floor clear of floods, pests and damp ground while cooling air flows beneath. Plank walls with slatted shutters keep the interior shaded and ventilated, the steep bumbung panjang roof sheds tropical rain, and guests enter by a covered stair (anjung). The space under the house is used for storage, daily work and keeping animals -- and the whole structure, joined with tanggam joints, could be dismantled and carried to a new site by the village.' },
+        desc:'The traditional Malay stilt house (rumah tiang) is raised on hardwood posts set on stone or concrete footings, lifting the floor clear of floods, pests and damp ground while cooling air flows beneath. Plank walls with slatted shutters keep the interior shaded and ventilated, the steep bumbung panjang roof sheds tropical rain, and guests enter by a covered stair (anjung). The space under the house is used for storage, daily work and keeping animals -- and the whole structure, joined with tanggam joints, could be dismantled and carried to a new site by the village. — Foto rujukan pada dinding: "Pahang House1" oleh Orhanghazi (Wikimedia Commons, CC BY-SA 4.0).' },
       { key:'kereta', name:'KERETA LEMBU', sub:'Kenderaan Tradisional Melayu', pos:[11.0, 1.3, 15], noMarker:true, noLabel:true, silent:true,
         desc:'The kereta lembu (bullock cart) was the everyday transport of the Malay kampung for centuries: a timber cart on two great spoked wheels, drawn by a pair of oxen, hauling padi from the fields, goods to market and families between villages. Melaka\'s carts became famous for their tall arched attap canopies and gaily painted panels, and decorated bullock carts still parade at cultural festivals today as a heritage icon of the state.' },
       { key:'sawah', name:'SAWAH PADI', sub:'Bendang — Padi Field', pos:[-16.8, 1.3, 1.5], noMarker:true, noLabel:true, silent:true,
@@ -3862,12 +3901,8 @@
         }, undefined, () => {});
       }
 
-      const anyaman = buildAnyaman();
-      anyaman.position.set(0.4, -0.35, 0.05);
-      anyaman.rotation.x = -Math.PI/2.3;
-      anyaman.scale.setScalar(0.9);
-      performer.add(anyaman);
-      performer.userData.anyaman = anyaman;
+      // (the procedural anyaman tray is retired -- this station now shows
+      // imported 3D models only: the keris and the framed wau bulan)
     } else if (def.key === 'makanan'){
       const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.06, 24),
         new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.6 }));

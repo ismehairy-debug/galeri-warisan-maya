@@ -1,0 +1,11 @@
+Model Information:
+* title:	pelita v2
+* source:	https://sketchfab.com/3d-models/pelita-v2-a433948e9a5d41219b75f384f22a5101
+* author:	nazronahmad83 (https://sketchfab.com/nazronahmad83)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "pelita v2" (https://sketchfab.com/3d-models/pelita-v2-a433948e9a5d41219b75f384f22a5101) by nazronahmad83 (https://sketchfab.com/nazronahmad83) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
