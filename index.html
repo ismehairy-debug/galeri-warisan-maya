@@ -67,6 +67,16 @@
     cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
     display:none;
   }
+  /* booth reset: hands the headset/phone to the next guest, back to the
+     details screen so their visit starts from the intro video */
+  #restart-button {
+    pointer-events:auto;
+    margin-top:8px; padding:8px 16px; border-radius:999px;
+    background:rgba(20,14,6,0.65); color:#f2e2b6;
+    border:1px solid rgba(242,217,138,0.6); font-weight:700;
+    letter-spacing:1px; font-family: Georgia, serif; font-size:12px;
+    cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
   #joystick-base {
     position:fixed; left:26px; bottom:26px; width:120px; height:120px;
     border-radius:50%; background:rgba(30,18,8,0.45); border:2px solid rgba(201,162,39,0.6);
@@ -188,11 +198,14 @@
   <p>MEMUATKAN GALERI / LOADING GALLERY…</p>
 </div>
 
-<div id="introScreen">
-  <video id="introVideo" src="assets/videos/intro_opening.mp4" autoplay muted playsinline></video>
+<!-- intro video: hidden until the guest fills the details screen and taps
+     MASUK -- that click doubles as the autoplay-policy gesture, so the
+     intro can start WITH sound -->
+<div id="introScreen" style="display:none">
+  <video id="introVideo" src="assets/videos/intro_opening.mp4" preload="auto" playsinline></video>
 </div>
-<div id="tapForSoundHint">🔊 KETIK SKRIN UNTUK BUNYI / TAP SCREEN FOR SOUND</div>
-<div id="introControls">
+<div id="tapForSoundHint" style="display:none">🔊 KETIK SKRIN UNTUK BUNYI / TAP SCREEN FOR SOUND</div>
+<div id="introControls" style="display:none">
   <button id="skipIntroBtn">SKIP ▶</button>
 </div>
 
@@ -226,6 +239,8 @@
     <button id="vr-button" disabled>MEMERIKSA VR…</button>
     <br>
     <button id="gyro-button">GUNA GYRO / ENABLE GYRO</button>
+    <br>
+    <button id="restart-button">⟲ TETAMU BARU / NEW GUEST</button>
     <div id="hostCodeLine">KOD PENONTON / SPECTATOR CODE: <b id="hostCodeValue"></b></div>
   </div>
 </div>
@@ -469,6 +484,11 @@
   }
 
   // ---------- intro video ----------
+  // Visit order: details screen (name -> spectator code) -> MASUK -> intro
+  // video -> the world. setupStartScreen calls playIntro() on MASUK, and
+  // endIntro() hands over to enterWorld(). resetIntro() rewinds everything
+  // for the next guest (restart button).
+  let playIntro = () => {}, resetIntro = () => {};
   function setupIntroScreen(listener){
     const introScreen = document.getElementById('introScreen');
     const introControls = document.getElementById('introControls');
@@ -477,33 +497,65 @@
     const skipBtn = document.getElementById('skipIntroBtn');
 
     function endIntro(){
+      if (introScreen.style.display === 'none') return; // not showing (or already ended)
       introScreen.style.display = 'none';
       introControls.style.display = 'none';
       soundHint.style.display = 'none';
       video.pause();
-      // enter the soundscape the instant the intro ends, in sync with the
-      // world already visible behind it -- don't wait for the MASUK GALERI
-      // click. This only produces sound if a gesture has already unlocked
-      // audio (tapping for sound, or the Skip button); otherwise it fails
-      // silently and the enterBtn handler below picks it up as a fallback.
-      if (listener.context.state === 'suspended') listener.context.resume().catch(() => {});
-      startBackgroundMusic();
-      startIstanaMusic();
-      startOutsideAmbience();
-      ambienceStarted = true;
+      enterWorld(listener);
     }
+
+    playIntro = function(){
+      introScreen.style.display = 'flex';
+      introControls.style.display = 'flex';
+      // the MASUK tap that got us here is a real user gesture, so the intro
+      // can usually start unmuted; if the browser still refuses, fall back
+      // to muted playback with the tap-for-sound hint
+      video.muted = false;
+      video.currentTime = 0;
+      video.play().catch(() => {
+        video.muted = true;
+        soundHint.style.display = 'block';
+        // video itself unplayable (missing/unsupported) -> straight to the world
+        video.play().catch(endIntro);
+      });
+    };
+
+    resetIntro = function(){
+      video.pause();
+      try { video.currentTime = 0; } catch (e) {}
+      introScreen.style.display = 'none';
+      introControls.style.display = 'none';
+      soundHint.style.display = 'none';
+    };
 
     video.addEventListener('ended', endIntro);
     video.addEventListener('error', endIntro);
     skipBtn.addEventListener('click', endIntro);
 
-    // autoplay policy requires the intro to start muted -- tapping the video
-    // itself (not Skip, a sibling element so this won't fire for that click)
-    // unmutes it without ending the intro
+    // tapping the video itself (not Skip, a sibling element so this won't
+    // fire for that click) unmutes it without ending the intro
     introScreen.addEventListener('click', () => {
       video.muted = false;
       soundHint.style.display = 'none';
-    }, { once:true });
+    });
+  }
+
+  // ---------- world entry (after the intro ends or is skipped) ----------
+  function enterWorld(listener){
+    document.getElementById('overlay').classList.add('visible');
+    if (listener.context.state === 'suspended') listener.context.resume().catch(() => {});
+    audioReady = true;
+    ambienceStarted = true;
+    startBackgroundMusic();
+    startIstanaMusic();
+    startOutsideAmbience();
+    // only works when entry came from a click (Skip); after a natural video
+    // end the browser may refuse, and the existing canvas click handler
+    // picks the lock up on the guest's first click instead
+    if (!isTouchDevice && !renderer.xr.isPresenting){
+      try { renderer.domElement.requestPointerLock(); } catch (e) {}
+    }
   }
 
   // ---------- ambient background music (anak ayam) — only heard inside the balai ----------
@@ -682,20 +734,69 @@
       const startScreen = document.getElementById('startScreen');
       e.currentTarget.classList.add('clicked');
       startScreen.classList.add('fade-out');
-      document.getElementById('overlay').classList.add('visible');
       setTimeout(() => { startScreen.style.display = 'none'; }, 700);
+      // everything below needs THIS user gesture -- audio unlock, station
+      // media, iOS gyro permission -- even though the world itself only
+      // appears after the intro video (enterWorld)
       if (listener.context.state === 'suspended') listener.context.resume();
-      audioReady = true;
-      ambienceStarted = true;
       unlockStationMedia();
-      startBackgroundMusic();
-      startIstanaMusic();
-      startOutsideAmbience();
       if (isTouchDevice) requestGyroPermission();
-      else renderer.domElement.requestPointerLock();
       startHosting(); // no-op when the name was left blank
+      playIntro();
     });
     document.getElementById('gyro-button').addEventListener('click', requestGyroPermission);
+    document.getElementById('restart-button').addEventListener('click', resetWorldForNewGuest);
+  }
+
+  // ---------- booth reset: hand over to the next guest ----------
+  // Puts everything back the way a fresh page load looks (minus asset
+  // reloading): details screen up, intro rewound, player at the spawn
+  // point, world muted, and a brand-new spectator session code.
+  function resetWorldForNewGuest(){
+    // leave VR / release the mouse so the next guest starts on the screen UI
+    const xrSession = renderer.xr.getSession && renderer.xr.getSession();
+    if (xrSession) xrSession.end().catch(() => {});
+    if (document.exitPointerLock) document.exitPointerLock();
+
+    // silence the world until the next guest reaches it
+    audioReady = false;
+    ambienceStarted = false;
+    document.getElementById('bgMusic').pause();
+    document.getElementById('istanaMusic').pause();
+    if (ambienceRef && ambienceRef.wind.isPlaying) ambienceRef.wind.pause();
+    for (const st of stationsRef){
+      const u = st.performer && st.performer.userData;
+      if (!u) continue;
+      [u.videoEl, u.videoEl2].forEach(v => { if (v && !v.paused) v.pause(); });
+    }
+
+    // next guest starts from the spawn point, facing the gallery; on a
+    // phone, re-zero the gyro so "forward" is wherever they hold the phone
+    player.position.set(0, 0, 8.6);
+    yaw = 0; pitch = 0;
+    player.rotation.y = 0;
+    camera.rotation.x = 0;
+    alphaOffset = null;
+    gyroYawOffset = 0; gyroPitchOffset = 0;
+
+    // fresh spectator session -- the old code dies with the old guest
+    if (peerHost){ try { peerHost.destroy(); } catch (e) {} }
+    peerHost = null;
+    hostConns = [];
+    hostRetries = 0;
+    sessionCode = '';
+    sessionDigits = String(1000 + Math.floor(Math.random() * 9000));
+    document.getElementById('guestName').value = '';
+    document.getElementById('sessionCode').textContent = '—';
+    document.getElementById('hostCodeLine').style.display = 'none';
+
+    // back to the details screen; their MASUK will replay the intro
+    resetIntro();
+    document.getElementById('overlay').classList.remove('visible');
+    document.getElementById('enterBtn').classList.remove('clicked');
+    const startScreen = document.getElementById('startScreen');
+    startScreen.style.display = 'flex';
+    startScreen.classList.remove('fade-out');
   }
 
   // ---------- guest spectator sync: host side ----------
