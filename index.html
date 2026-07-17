@@ -320,11 +320,11 @@
   let bgGainNode = null;
   let bgVolCurrent = 0;
   let insideSmooth = 1;
-  const BG_BASE_VOL = 0.4;
+  const BG_BASE_VOL = 0.6;
   let istanaGainNode = null;
   let istanaVolCurrent = 0;
   let insideIstanaSmooth = 0;
-  const ISTANA_BASE_VOL = 0.4;
+  const ISTANA_BASE_VOL = 0.6;
   let currentInfoKey = null;
   // assigned inside setupIntroScreen; declared up here because init() runs
   // before the statements further down this script ever execute
@@ -2757,13 +2757,13 @@
   function buildArchitectureHotspots(){
     const halfW = ROOM.width/2 - 0.4;
     const defs = [
-      // offset 0.55 off the actual pillar's centreline (buildPillars uses
-      // this same -halfW) so the marker/sign sit beside the post facing
-      // into the hall instead of buried inside the solid wood cylinder,
-      // and rotated to face the room like a sign mounted on the wall
-      { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-halfW+0.55, 1.3, -6], labelY:1.6, rotY:Math.PI/2 },
+      // tiang seri sits at the FRONT of the balai beside the gateway (it
+      // used to hide at the back-west pillar between tarian and songket &
+      // batik), facing arriving visitors the same way tanggam does; both
+      // are pure signs (noMarker) since the glowing sphere read as clutter
+      { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-3.4, 1.3, ROOM.depth/2-0.6], labelY:1.6, noMarker:true },
       { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1] },
-      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 2.2, ROOM.depth/2-0.6] },
+      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 2.2, ROOM.depth/2-0.6], noMarker:true },
     ];
     return defs.map(buildHotspot);
   }
@@ -2774,12 +2774,15 @@
     group.rotation.y = def.rotY || 0;
     scene.add(group);
 
-    const marker = new THREE.Mesh(
-      new THREE.SphereGeometry(0.12, 16, 16),
-      new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.5, roughness: 0.4 })
-    );
-    marker.position.y = def.pos[1];
-    group.add(marker);
+    let marker = null;
+    if (!def.noMarker){
+      marker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 16, 16),
+        new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.5, roughness: 0.4 })
+      );
+      marker.position.y = def.pos[1];
+      group.add(marker);
+    }
 
     // static-facing plane, same as every station label, instead of a
     // camera-facing sprite -- at this close a range (tanggam sits right at
