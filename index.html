@@ -2315,6 +2315,135 @@
     scene.add(sign);
   }
 
+  // ---------- Sukhoi Su-30MKM: TUDM's twin-engine fighter, parked on the
+  // grass behind the kereta lembu as the "kenderaan Melayu dulu dan kini"
+  // counterpoint -- same primitive-cartoon fidelity as the rest of the
+  // kampung. Local axes: nose points +z, so the same 90-degree placement
+  // rule as the rumah/cart keeps the colliders axis-aligned. ----------
+  function buildSukhoi(x, z, rotY){
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    g.rotation.y = rotY;
+    scene.add(g);
+    const cos = Math.round(Math.cos(rotY)), sin = Math.round(Math.sin(rotY));
+    const worldOf = (lx, lz) => [x + lx*cos + lz*sin, z - lx*sin + lz*cos];
+    const swapped = sin !== 0;
+
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0x74828e, roughness: 0.45, metalness: 0.55 });
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0x74828e, roughness: 0.45, metalness: 0.55, side: THREE.DoubleSide });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x2b3138, roughness: 0.5, metalness: 0.4 });
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x18242e, roughness: 0.15, metalness: 0.7 });
+    const CY = 1.55; // fuselage centreline height standing on its gear
+
+    // fuselage: main tube, tapered nose section, dark radome
+    const fus = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 5.6, 12), skinMat);
+    fus.rotation.x = Math.PI/2;
+    fus.position.set(0, CY, 0.2);
+    g.add(fus);
+    const noseSec = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.5, 2.0, 12), skinMat);
+    noseSec.rotation.x = Math.PI/2;
+    noseSec.position.set(0, CY + 0.04, 4.0);
+    g.add(noseSec);
+    const radome = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.2, 12), darkMat);
+    radome.rotation.x = Math.PI/2;
+    radome.position.set(0, CY + 0.04, 5.6);
+    g.add(radome);
+    // tandem-seat canopy bubble
+    const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), canopyMat);
+    canopy.scale.set(1, 0.95, 2.6);
+    canopy.position.set(0, CY + 0.42, 2.55);
+    g.add(canopy);
+    // aft taper + tail sting between the nozzles
+    const aft = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.2, 1.8, 12), skinMat);
+    aft.rotation.x = Math.PI/2;
+    aft.position.set(0, CY, -3.5);
+    g.add(aft);
+    const sting = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.0, 10), skinMat);
+    sting.rotation.x = -Math.PI/2;
+    sting.position.set(0, CY, -4.9);
+    g.add(sting);
+
+    // main wings: swept trapezoids, extruded flat
+    const wingShape = new THREE.Shape();
+    wingShape.moveTo(0, 0.9);
+    wingShape.lineTo(3.2, -0.4);
+    wingShape.lineTo(3.2, -1.3);
+    wingShape.lineTo(0, -1.9);
+    wingShape.closePath();
+    const wingGeo = new THREE.ExtrudeGeometry(wingShape, { depth: 0.07, bevelEnabled: false });
+    [-1, 1].forEach(s => {
+      const wing = new THREE.Mesh(wingGeo, wingMat);
+      wing.rotation.x = Math.PI/2;
+      wing.scale.x = s;
+      wing.position.set(s * 0.5, CY - 0.05, -0.3);
+      g.add(wing);
+    });
+    // horizontal stabilators aft
+    const stabShape = new THREE.Shape();
+    stabShape.moveTo(0, 0.5);
+    stabShape.lineTo(1.5, -0.1);
+    stabShape.lineTo(1.5, -0.7);
+    stabShape.lineTo(0, -1.0);
+    stabShape.closePath();
+    const stabGeo = new THREE.ExtrudeGeometry(stabShape, { depth: 0.06, bevelEnabled: false });
+    [-1, 1].forEach(s => {
+      const stab = new THREE.Mesh(stabGeo, wingMat);
+      stab.rotation.x = Math.PI/2;
+      stab.scale.x = s;
+      stab.position.set(s * 0.45, CY, -3.2);
+      g.add(stab);
+    });
+    // twin vertical tails, leaned back
+    [-1, 1].forEach(s => {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.6, 1.1), skinMat);
+      fin.rotation.x = 0.3;
+      fin.position.set(s * 0.5, CY + 1.0, -2.9);
+      g.add(fin);
+    });
+    // twin engine nacelles + dark nozzles
+    [-1, 1].forEach(s => {
+      const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.32, 3.0, 10), skinMat);
+      eng.rotation.x = Math.PI/2;
+      eng.position.set(s * 0.42, CY - 0.28, -2.2);
+      g.add(eng);
+      const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.5, 10), darkMat);
+      noz.rotation.x = Math.PI/2;
+      noz.position.set(s * 0.42, CY - 0.28, -3.9);
+      g.add(noz);
+    });
+
+    // tricycle landing gear: struts + wheels
+    function gearLeg(lx, lz){
+      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, CY - 0.45, 8), darkMat);
+      strut.position.set(lx, (CY - 0.45)/2 + 0.2, lz);
+      g.add(strut);
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.14, 12), darkMat);
+      wheel.rotation.z = Math.PI/2;
+      wheel.position.set(lx, 0.18, lz);
+      g.add(wheel);
+      const [wx, wz] = worldOf(lx, lz);
+      addCircleCollider(wx, wz, 0.2);
+    }
+    gearLeg(0, 3.2);
+    gearLeg(-0.75, -0.9);
+    gearLeg(0.75, -0.9);
+
+    // one big footprint collider -- the wings hang at head height, so the
+    // whole span is fenced off rather than just the fuselage
+    {
+      const [wx, wz] = worldOf(0, 0.4);
+      addBoxCollider(wx, wz, swapped ? 5.4 : 3.8, swapped ? 3.8 : 5.4);
+    }
+
+    // gateway-style static sign facing the path
+    const sign = makeLabel('SUKHOI SU-30MKM', 'Kenderaan Udara Moden — TUDM', true);
+    const [sx, sz] = worldOf(-2.4, 6.4);
+    sign.position.set(sx, 1.9, sz);
+    sign.rotation.y = rotY;
+    sign.material.opacity = 1;
+    scene.add(sign);
+  }
+
   function scatterVegetation(){
     const halfW = ROOM.width/2, halfD = ROOM.depth/2;
     for (let i=0;i<18;i++){
@@ -2325,6 +2454,7 @@
       if (Math.abs(x) < 9 && Math.abs(z - 24) < 7) continue; // keep the Istana Melaka's footprint clear
       if (x > -23 && x < -11 && z > 9 && z < 21) continue; // keep the rumah tradisional's yard clear
       if (x > 9.5 && x < 16.5 && z > 12 && z < 18) continue; // keep the kereta lembu's spot clear
+      if (x > 17 && x < 31 && z > 10 && z < 24) continue; // keep the Sukhoi's apron clear
       const r = Math.random();
       if (r < 0.4) buildCoconutPalm(x,z);
       else if (r < 0.7) buildBananaPlant(x,z);
@@ -2351,6 +2481,9 @@
     buildRumahMelayu(-17, 15, Math.PI/2);
     // east of the path opposite the rumah, oxen facing it
     buildKeretaLembu(13.2, 15, -Math.PI/2);
+    // parked on the grass behind the cart, nose toward the path -- the
+    // old and the new kenderaan side by side
+    buildSukhoi(24, 17, -Math.PI/2);
   }
 
   // ---------- one bertingkat (stepped pyramidal roof) cluster: the real Istana
@@ -3154,6 +3287,8 @@
         desc:'The traditional Malay stilt house (rumah tiang) is raised on hardwood posts set on stone or concrete footings, lifting the floor clear of floods, pests and damp ground while cooling air flows beneath. Plank walls with slatted shutters keep the interior shaded and ventilated, the steep bumbung panjang roof sheds tropical rain, and guests enter by a covered stair (anjung). The space under the house is used for storage, daily work and keeping animals -- and the whole structure, joined with tanggam joints, could be dismantled and carried to a new site by the village.' },
       { key:'kereta', name:'KERETA LEMBU', sub:'Kenderaan Tradisional Melayu', pos:[11.0, 1.3, 15], noMarker:true, noLabel:true, silent:true,
         desc:'The kereta lembu (bullock cart) was the everyday transport of the Malay kampung for centuries: a timber cart on two great spoked wheels, drawn by a pair of oxen, hauling padi from the fields, goods to market and families between villages. Melaka\'s carts became famous for their tall arched attap canopies and gaily painted panels, and decorated bullock carts still parade at cultural festivals today as a heritage icon of the state.' },
+      { key:'sukhoi', name:'SUKHOI SU-30MKM', sub:'Kenderaan Udara Moden', pos:[18.6, 1.3, 16.2], noMarker:true, noLabel:true, silent:true,
+        desc:'From the kereta lembu beside it to this twin-engine multirole fighter: Malay transport across the centuries in one glance. The Sukhoi Su-30MKM has served with the Tentera Udara Diraja Malaysia (TUDM) since 2007, flown by two crew from Gong Kedak air base -- a supersonic aircraft with thrust-vectoring engines, specially configured for Malaysia. In 2007 TUDM cosmonaut Dr Sheikh Muszaphar Shukor also carried Malaysia into space, the same spirit of engineering ambition this gallery\'s student builders share.' },
       { key:'istana', name:'ISTANA KESULTANAN MELAKA', sub:'Seni Bina Diraja', pos:[0, 1.3, 17.6], noMarker:true, noLabel:true, silent:true,
         desc:'A reconstruction of the 15th-century palace of Sultan Mansur Shah, based on its description in the Sejarah Melayu (Malay Annals): a great timber hall raised on carved posts, crowned with tiered bertingkat roofs, and famously built without a single nail. The palace was the heart of the Melaka Sultanate at its golden age -- court ceremonies, royal audiences and the nobat ensemble all took place here. The modern replica at the foot of Bukit St. Paul in Melaka houses the Cultural Museum, whose throne-hall diorama this interior follows.' },
     ];
