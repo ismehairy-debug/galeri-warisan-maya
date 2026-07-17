@@ -2310,30 +2310,8 @@
       g.add(bund);
     }
 
-    // young padi in planting rows: instanced cones with a little jitter
-    const tuftGeo = new THREE.ConeGeometry(0.05, 0.44, 5);
-    const tuftMat = new THREE.MeshStandardMaterial({ color: 0x86b849, roughness: 0.9, flatShading: true });
-    const spots = [];
-    for (let px = X0 + 0.8; px < X1 - 0.4; px += 0.62){
-      for (let pz = Z0 + 0.8; pz < Z1 - 0.4; pz += 0.62){
-        // skip the bund lines so the rows read as separate plots
-        const u = (px - X0) / (X1 - X0) * 3, v = (pz - Z0) / (Z1 - Z0) * 2;
-        if (Math.abs(u - Math.round(u)) < 0.07 || Math.abs(v - Math.round(v)) < 0.07) continue;
-        spots.push([px + (Math.random() - 0.5) * 0.1, pz + (Math.random() - 0.5) * 0.1]);
-      }
-    }
-    const padi = new THREE.InstancedMesh(tuftGeo, tuftMat, spots.length);
-    const dummy = new THREE.Object3D();
-    spots.forEach((p, i) => {
-      dummy.position.set(p[0], 0.2, p[1]);
-      dummy.rotation.y = Math.random() * Math.PI;
-      const s = 0.8 + Math.random() * 0.45;
-      dummy.scale.set(s, s, s);
-      dummy.updateMatrix();
-      padi.setMatrixAt(i, dummy.matrix);
-    });
-    padi.instanceMatrix.needsUpdate = true;
-    g.add(padi);
+    // the padi itself is the imported grass patch, one clone per plot --
+    // see buildImportedScenery's patch_of_grass loader
 
     // orang-orang sawah: the scarecrow at the field's corner
     const straw = new THREE.MeshStandardMaterial({ color: 0xc9a961, roughness: 0.9 });
@@ -2406,8 +2384,7 @@
       addCircleCollider(11.25, 14.54, 0.42);
       [
         { x: 11.25, z: 15.46, rotY: -Math.PI/2, r: 0.42 }, // harness partner
-        { x: -12.4, z: 7.2,  rotY: 2.3,  r: 0.55 },        // grazing by the sawah
-        { x: -14.6, z: 4.2,  rotY: 2.5,  r: 0.55 },        // second sawah grazer
+        { x: -14.6, z: 4.2,  rotY: 2.5,  r: 0.55 },        // grazing by the sawah
         { x: 16.4,  z: 12.2, rotY: -1.9, r: 0.55 },        // loose near the cart
       ].forEach(s => {
         const c = holder.clone();
@@ -2431,26 +2408,31 @@
       });
     });
 
-    // knee-high grass drifts, tinted toward the sawah padi's softer
-    // yellow-green so the imported grass and the padi rows read as one
-    // family of plants (walk-through, no colliders)
+    // the grass patch IS the padi now: one drift at the field's path edge,
+    // and a clone filling each of the six flooded plots, all tinted toward
+    // the sawah's softer yellow-green (walk-through, no colliders)
     loadImportedModel('assets/models/patch_of_grass/scene_merged.gltf', 9 / 204,
       { x: -13.2, z: 10.6, sink: -0.05 }, holder => {
       holder.traverse(o => {
         if (o.isMesh && o.material && o.material.color) o.material.color.setRGB(1.3, 1.15, 0.78);
       });
-      const c = holder.clone();
-      c.scale.setScalar(11 / 9);
-      c.position.set(8.5, 0, 20.5);
-      c.rotation.y = 1.2;
-      scene.add(c);
+      const cols = [-30.3, -24.8, -19.3], rows = [-0.95, 3.95];
+      cols.forEach((px, i) => rows.forEach((pz, j) => {
+        const c = holder.clone();
+        c.scale.setScalar(5.2 / 9); // plot-sized, ~0.35 m tall like young padi
+        c.position.set(px, 0, pz);
+        c.rotation.y = (i * 2 + j) * 0.9;
+        scene.add(c);
+      }));
     });
 
     // forest hillsides: north-east quadrant behind the cart, plus a clone
     // on the south-west corner; walkable edges fenced so nobody wanders
     // into the terrain skirt (rotations stay at 0/180 for the AABB colliders)
+    // sink measured from the mesh: the terrain skirt's edges sit ~3.5 m
+    // above its lowest vertex, so without this the whole tile floats
     loadImportedModel('assets/models/low_poly_tree_scene_free/scene_merged.gltf', 0.45,
-      { x: 38, z: 32, sink: -0.25 }, holder => {
+      { x: 38, z: 32, sink: -4.2 }, holder => {
       addBoxCollider(38, 32, 20, 12.5);
       const c = holder.clone();
       c.position.set(-36, 0, -26);
@@ -2460,14 +2442,15 @@
     });
 
     // mountain-forest diorama as the western backdrop beyond the sawah
+    // (edge-measured sink, as above)
     loadImportedModel('assets/models/the_landscape_is_a_forest_in_the_mountains/scene_merged.gltf', 1.6,
-      { x: -62, z: 6, rotY: Math.PI / 2 });
+      { x: -62, z: 6, rotY: Math.PI / 2, sink: -3.5 });
 
     // the grand mountain range rings the whole horizon: loaded once for
     // the north behind the Istana, then cloned to the other three sides
     // (native tile is 1 x 0.17 x 1, so the scale is per-axis)
     loadImportedModel('assets/models/mountain_range_01/scene.gltf', [150, 90, 55],
-      { x: 0, z: 76 }, holder => {
+      { x: 0, z: 76, sink: -5 }, holder => {
       [
         { x: 0,   z: -76, rotY: Math.PI },
         { x: -76, z: 0,   rotY: Math.PI/2 },
