@@ -3167,6 +3167,20 @@
     clampToRoom();
   }
 
+  // rotating the rig pivots around its origin, which in room-scale VR is the
+  // floor center, not the player -- re-anchor so the head stays put
+  const headPos = new THREE.Vector3();
+  function vrTurn(angle){
+    renderer.xr.getCamera(camera).getWorldPosition(headPos);
+    yaw += angle;
+    player.rotation.y = yaw;
+    const dx = player.position.x - headPos.x;
+    const dz = player.position.z - headPos.z;
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    player.position.x = headPos.x + dx * cos + dz * sin;
+    player.position.z = headPos.z - dx * sin + dz * cos;
+  }
+
   function vrMove(dt){
     if (!renderer.xr.isPresenting) return;
     const session = renderer.xr.getSession();
@@ -3176,6 +3190,12 @@
       const axes = src.gamepad.axes;
       const ax = axes.length >= 4 ? axes[2] : axes[0];
       const ay = axes.length >= 4 ? axes[3] : axes[1];
+      if (src.handedness === 'right'){
+        // right stick steers the view like the phone gyro/drag look:
+        // horizontal = smooth yaw turn (pitch stays on the headset)
+        if (Math.abs(ax) > 0.15) vrTurn(-ax * 2.0 * dt);
+        continue;
+      }
       if (Math.abs(ax) < 0.12 && Math.abs(ay) < 0.12) continue;
       camera.getWorldDirection(tmp);
       tmp.y = 0; tmp.normalize();
