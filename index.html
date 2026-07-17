@@ -2200,13 +2200,13 @@
       addCircleCollider(wx, wz, 0.14);
     }
 
-    // real-photo reference of an actual kampung stilt house, framed on the
-    // front wall between the window and the door, the same treatment as
-    // the Istana's plaques. Photo: 'Pahang House1' by Orhanghazi
+    // real-photo reference of an actual kampung stilt house, framed at
+    // eye level on the stone room's front face (the upper wall spot hid
+    // behind the anjung roof). Photo: 'Pahang House1' by Orhanghazi
     // (Wikimedia Commons, CC BY-SA 4.0) -- a timber stilt house on pier
     // footings with a covered entrance stair, near-twin of this model
-    const refPhoto = buildExteriorPhotoPlaque('assets/images/rumah_reference.jpg', 0.95, 0.66);
-    refPhoto.position.set(0.85, FL + 0.07 + 1.25, D/2 + 0.09);
+    const refPhoto = buildExteriorPhotoPlaque('assets/images/rumah_reference.jpg', 1.05, 0.79);
+    refPhoto.position.set(-2.4, 1.45, D/2 + 0.14);
     g.add(refPhoto);
 
     // sign, always readable like the balai's own gateway sign
