@@ -275,6 +275,9 @@
 
 <audio id="bgMusic" src="assets/audio/anak_ayam.mp3" loop></audio>
 <audio id="istanaMusic" src="assets/audio/nobat_kedah.mp3" loop></audio>
+<!-- narrator voice-over (audio track extracted from the recorded video),
+     played once right after the intro video ends -->
+<audio id="naratorVoice" src="assets/audio/narator.m4a" preload="auto"></audio>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
@@ -329,6 +332,7 @@
   // assigned inside setupIntroScreen; declared up here because init() runs
   // before the statements further down this script ever execute
   let playIntro = () => {}, resetIntro = () => {};
+  let naratorEl = null; // set in enterWorld; checked per-frame to duck anak ayam
 
   /* ---------------- guest spectator sync (PeerJS) ----------------
      Two roles, both living in this one file so the spectator renders the
@@ -575,6 +579,11 @@
     startBackgroundMusic();
     startIstanaMusic();
     startOutsideAmbience();
+    // narrator voice-over greets the guest as the world opens; the MASUK
+    // click earlier gives the page the sticky activation audible play needs
+    naratorEl = document.getElementById('naratorVoice');
+    naratorEl.currentTime = 0;
+    naratorEl.play().catch(() => {});
     // only works when entry came from a click (Skip); after a natural video
     // end the browser refuses (needs a gesture, and it's a promise rejection
     // rather than a throw), and the existing canvas click handler picks the
@@ -815,6 +824,9 @@
     ambienceStarted = false;
     document.getElementById('bgMusic').pause();
     document.getElementById('istanaMusic').pause();
+    const narator = document.getElementById('naratorVoice');
+    narator.pause();
+    narator.currentTime = 0; // next guest hears the greeting from the top
     if (ambienceRef && ambienceRef.wind.isPlaying) ambienceRef.wind.pause();
     for (const st of stationsRef){
       const u = st.performer && st.performer.userData;
@@ -3684,7 +3696,9 @@
       const insideAmount = computeInsideAmount(camWorld);
       insideSmooth += (insideAmount - insideSmooth) * Math.min(1, dt*2);
 
-      const targetBgVol = BG_BASE_VOL * insideSmooth * (1 - maxActive);
+      // anak ayam ducks while the narrator voice-over is speaking
+      const naratorDuck = (naratorEl && !naratorEl.paused && !naratorEl.ended) ? 0.25 : 1;
+      const targetBgVol = BG_BASE_VOL * insideSmooth * (1 - maxActive) * naratorDuck;
       bgVolCurrent += (targetBgVol - bgVolCurrent) * Math.min(1, dt*3);
       const safeVol = Math.max(0, Math.min(1, bgVolCurrent));
       if (bgGainNode && bgGainNode.context.state === 'running'){
