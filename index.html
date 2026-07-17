@@ -2180,43 +2180,88 @@
   // the kampung east of the entrance path -- big spoked timber wheels, an
   // arched attap canopy in the Melaka style, a draw pole with yoke, and a
   // pair of pale oxen standing in harness ----------
-  function buildOx(){
+  // ---------- lembu: a proper 3D-modelled kampung zebu (humped Malaysian
+  // cattle) -- barrel body, shoulder hump, dewlap, lowered head with curved
+  // horns, hooves and a tufted tail. Faces +x; pass grazing:true for a
+  // head-down pose. ----------
+  function buildLembu(hideColor, grazing){
     const g = new THREE.Group();
-    const hideMat = new THREE.MeshStandardMaterial({ color: 0xd8c9a8, roughness: 0.85 });
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x5a4a38, roughness: 0.8 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), hideMat);
-    body.scale.set(1.55, 1, 0.95);
-    body.position.y = 0.62;
-    g.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 10), hideMat);
-    head.position.set(0.62, 0.72, 0);
-    g.add(head);
-    const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.14, 8), darkMat);
-    muzzle.rotation.z = -Math.PI/2;
-    muzzle.position.set(0.76, 0.68, 0);
-    g.add(muzzle);
-    // horns: shallow curved cones swept outward
+    const hide = new THREE.MeshStandardMaterial({ color: hideColor, roughness: 0.85 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.8 });
+    const hornMat = new THREE.MeshStandardMaterial({ color: 0xe8e0cc, roughness: 0.5 });
+
+    // barrel body: capsule from a cylinder plus rump/chest spheres
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.34, 0.85, 12), hide);
+    barrel.rotation.z = Math.PI/2;
+    barrel.position.set(-0.02, 0.78, 0);
+    g.add(barrel);
+    const rump = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), hide);
+    rump.scale.set(1.1, 1, 0.95);
+    rump.position.set(-0.46, 0.78, 0);
+    g.add(rump);
+    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.30, 12, 10), hide);
+    chest.position.set(0.42, 0.75, 0);
+    g.add(chest);
+    // the zebu's shoulder hump (bonggol)
+    const hump = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), hide);
+    hump.scale.set(1, 0.9, 0.8);
+    hump.position.set(0.30, 1.03, 0);
+    g.add(hump);
+
+    // neck + head, lowered to the grass when grazing
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0.58, 0.82, 0);
+    headGroup.rotation.z = grazing ? -0.95 : -0.2;
+    g.add(headGroup);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 0.42, 10), hide);
+    neck.rotation.z = -Math.PI/2;
+    neck.position.set(0.16, 0, 0);
+    headGroup.add(neck);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.19), hide);
+    head.position.set(0.42, 0.01, 0);
+    headGroup.add(head);
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.15, 0.15), darkMat);
+    muzzle.position.set(0.62, -0.03, 0);
+    headGroup.add(muzzle);
+    // dewlap hanging under the neck
+    const dewlap = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), hide);
+    dewlap.scale.set(1.5, 1, 0.45);
+    dewlap.position.set(0.14, -0.17, 0);
+    headGroup.add(dewlap);
     [-1, 1].forEach(s => {
-      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.26, 6),
-        new THREE.MeshStandardMaterial({ color: 0xe8e0cc, roughness: 0.5 }));
-      horn.position.set(0.60, 0.86, s * 0.14);
-      horn.rotation.set(s * -0.9, 0, -0.5);
-      g.add(horn);
-      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), hideMat);
-      ear.scale.set(1.4, 0.6, 1);
-      ear.position.set(0.55, 0.76, s * 0.17);
-      g.add(ear);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.024, 6, 6), darkMat);
+      eye.position.set(0.46, 0.1, s * 0.1);
+      headGroup.add(eye);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), hide);
+      ear.scale.set(1.5, 0.5, 1);
+      ear.position.set(0.34, 0.1, s * 0.16);
+      ear.rotation.z = 0.3;
+      headGroup.add(ear);
+      // curved horn: a torus arc sweeping up and outward
+      const horn = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.022, 6, 10, Math.PI * 0.8), hornMat);
+      horn.position.set(0.36, 0.16, s * 0.09);
+      horn.rotation.set(s * 0.9, s * Math.PI/2, 0.2);
+      headGroup.add(horn);
     });
-    // legs
-    [[0.32, 0.14], [0.32, -0.14], [-0.32, 0.14], [-0.32, -0.14]].forEach(p => {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.5, 8), hideMat);
-      leg.position.set(p[0], 0.25, p[1]);
+
+    // legs with dark hooves
+    [[0.36, 0.16], [0.36, -0.16], [-0.42, 0.16], [-0.42, -0.16]].forEach(p => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.56, 8), hide);
+      leg.position.set(p[0], 0.3, p[1]);
       g.add(leg);
+      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.1, 8), darkMat);
+      hoof.position.set(p[0], 0.05, p[1]);
+      g.add(hoof);
     });
-    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.012, 0.42, 6), hideMat);
-    tail.position.set(-0.52, 0.5, 0);
-    tail.rotation.z = 0.35;
+    // tail with a dark tuft
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.014, 0.5, 6), hide);
+    tail.position.set(-0.66, 0.62, 0);
+    tail.rotation.z = 0.3;
     g.add(tail);
+    const tuftEnd = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), darkMat);
+    tuftEnd.scale.set(1, 1.8, 1);
+    tuftEnd.position.set(-0.73, 0.38, 0);
+    g.add(tuftEnd);
     return g;
   }
 
@@ -2291,14 +2336,14 @@
     yoke.position.set(0, 0.92, 1.85);
     g.add(yoke);
 
-    // the pair of oxen, faces forward (+z local)
+    // the pair of lembu in harness, one brown and one fawn, facing forward
     [-1, 1].forEach(s => {
-      const ox = buildOx();
-      ox.rotation.y = -Math.PI/2; // buildOx faces +x; turn to face +z (away from the cart)
-      ox.position.set(s * 0.44, 0, 1.95);
-      g.add(ox);
-      const [wx, wz] = worldOf(s * 0.44, 1.95);
-      addCircleCollider(wx, wz, 0.4);
+      const lembu = buildLembu(s < 0 ? 0x8a5a33 : 0xc9a678, false);
+      lembu.rotation.y = -Math.PI/2; // buildLembu faces +x; turn to face +z (away from the cart)
+      lembu.position.set(s * 0.46, 0, 1.95);
+      g.add(lembu);
+      const [wx, wz] = worldOf(s * 0.46, 1.95);
+      addCircleCollider(wx, wz, 0.42);
     });
 
     {
@@ -2315,133 +2360,170 @@
     scene.add(sign);
   }
 
-  // ---------- Sukhoi Su-30MKM: TUDM's twin-engine fighter, parked on the
-  // grass behind the kereta lembu as the "kenderaan Melayu dulu dan kini"
-  // counterpoint -- same primitive-cartoon fidelity as the rest of the
-  // kampung. Local axes: nose points +z, so the same 90-degree placement
-  // rule as the rumah/cart keeps the colliders axis-aligned. ----------
-  function buildSukhoi(x, z, rotY){
+  // ---------- distant mountain ring: hazy low-poly peaks around the
+  // horizon. They sit at radius ~42-45 -- inside the 50 m sky dome and the
+  // 60 m far plane, but past the 40 m walk clamp -- and the exp2 fog fades
+  // them into blue-green silhouettes like hills seen across padi flats.
+  // Each gets a collider so the walkable corners can't clip into them. ----------
+  function buildMountains(){
+    const mats = [0x4f6a5e, 0x5a7a68, 0x475f66].map(c =>
+      new THREE.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true }));
+    const N = 14;
+    for (let i = 0; i < N; i++){
+      const a = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
+      const r = 42 + Math.random() * 3;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const h = 7 + Math.random() * 8;
+      const base = 7 + Math.random() * 4;
+      const peak = new THREE.Mesh(new THREE.ConeGeometry(base, h, 5 + Math.floor(Math.random() * 3)), mats[i % 3]);
+      peak.position.set(x, h/2 - 0.4, z);
+      peak.rotation.y = Math.random() * Math.PI;
+      scene.add(peak);
+      addCircleCollider(x, z, base * 0.75);
+      // a lower foothill drifted in front of every other peak, for depth
+      if (i % 2 === 0){
+        const fh = 2.5 + Math.random() * 2.5;
+        const fb = 4 + Math.random() * 3;
+        const fr = r - base * 0.9;
+        const fx = Math.cos(a + (Math.random() - 0.5) * 0.14) * fr;
+        const fz = Math.sin(a + (Math.random() - 0.5) * 0.14) * fr;
+        if (fx > -38 && fx < -14 && fz > -9 && fz < 13) continue; // never on the sawah flats
+        const hill = new THREE.Mesh(new THREE.ConeGeometry(fb, fh, 6), mats[(i + 1) % 3]);
+        hill.position.set(fx, fh/2 - 0.3, fz);
+        scene.add(hill);
+        addCircleCollider(fx, fz, fb * 0.7);
+      }
+    }
+  }
+
+  // ---------- sawah padi: flooded rice plots south-west of the kampung,
+  // between the balai and the rumah tradisional -- shallow water sheets,
+  // earthen batas (bunds) dividing six plots, rows of young padi seedlings
+  // (one InstancedMesh, so hundreds of tufts cost a single draw call) and
+  // an orang-orang (scarecrow) keeping watch ----------
+  function buildSawahPadi(){
+    const X0 = -33, X1 = -16.6, Z0 = -3.4, Z1 = 6.4; // field extents
     const g = new THREE.Group();
-    g.position.set(x, 0, z);
-    g.rotation.y = rotY;
     scene.add(g);
-    const cos = Math.round(Math.cos(rotY)), sin = Math.round(Math.sin(rotY));
-    const worldOf = (lx, lz) => [x + lx*cos + lz*sin, z - lx*sin + lz*cos];
-    const swapped = sin !== 0;
 
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0x74828e, roughness: 0.45, metalness: 0.55 });
-    const wingMat = new THREE.MeshStandardMaterial({ color: 0x74828e, roughness: 0.45, metalness: 0.55, side: THREE.DoubleSide });
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x2b3138, roughness: 0.5, metalness: 0.4 });
-    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x18242e, roughness: 0.15, metalness: 0.7 });
-    const CY = 1.55; // fuselage centreline height standing on its gear
+    // one continuous water sheet under all the plots
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(X1 - X0, Z1 - Z0),
+      new THREE.MeshStandardMaterial({ color: 0x51704f, roughness: 0.25, metalness: 0.35 })
+    );
+    water.rotation.x = -Math.PI/2;
+    water.position.set((X0 + X1)/2, 0.03, (Z0 + Z1)/2);
+    g.add(water);
 
-    // fuselage: main tube, tapered nose section, dark radome
-    const fus = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 5.6, 12), skinMat);
-    fus.rotation.x = Math.PI/2;
-    fus.position.set(0, CY, 0.2);
-    g.add(fus);
-    const noseSec = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.5, 2.0, 12), skinMat);
-    noseSec.rotation.x = Math.PI/2;
-    noseSec.position.set(0, CY + 0.04, 4.0);
-    g.add(noseSec);
-    const radome = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.2, 12), darkMat);
-    radome.rotation.x = Math.PI/2;
-    radome.position.set(0, CY + 0.04, 5.6);
-    g.add(radome);
-    // tandem-seat canopy bubble
-    const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), canopyMat);
-    canopy.scale.set(1, 0.95, 2.6);
-    canopy.position.set(0, CY + 0.42, 2.55);
-    g.add(canopy);
-    // aft taper + tail sting between the nozzles
-    const aft = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.2, 1.8, 12), skinMat);
-    aft.rotation.x = Math.PI/2;
-    aft.position.set(0, CY, -3.5);
-    g.add(aft);
-    const sting = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.0, 10), skinMat);
-    sting.rotation.x = -Math.PI/2;
-    sting.position.set(0, CY, -4.9);
-    g.add(sting);
-
-    // main wings: swept trapezoids, extruded flat
-    const wingShape = new THREE.Shape();
-    wingShape.moveTo(0, 0.9);
-    wingShape.lineTo(3.2, -0.4);
-    wingShape.lineTo(3.2, -1.3);
-    wingShape.lineTo(0, -1.9);
-    wingShape.closePath();
-    const wingGeo = new THREE.ExtrudeGeometry(wingShape, { depth: 0.07, bevelEnabled: false });
-    [-1, 1].forEach(s => {
-      const wing = new THREE.Mesh(wingGeo, wingMat);
-      wing.rotation.x = Math.PI/2;
-      wing.scale.x = s;
-      wing.position.set(s * 0.5, CY - 0.05, -0.3);
-      g.add(wing);
-    });
-    // horizontal stabilators aft
-    const stabShape = new THREE.Shape();
-    stabShape.moveTo(0, 0.5);
-    stabShape.lineTo(1.5, -0.1);
-    stabShape.lineTo(1.5, -0.7);
-    stabShape.lineTo(0, -1.0);
-    stabShape.closePath();
-    const stabGeo = new THREE.ExtrudeGeometry(stabShape, { depth: 0.06, bevelEnabled: false });
-    [-1, 1].forEach(s => {
-      const stab = new THREE.Mesh(stabGeo, wingMat);
-      stab.rotation.x = Math.PI/2;
-      stab.scale.x = s;
-      stab.position.set(s * 0.45, CY, -3.2);
-      g.add(stab);
-    });
-    // twin vertical tails, leaned back
-    [-1, 1].forEach(s => {
-      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.6, 1.1), skinMat);
-      fin.rotation.x = 0.3;
-      fin.position.set(s * 0.5, CY + 1.0, -2.9);
-      g.add(fin);
-    });
-    // twin engine nacelles + dark nozzles
-    [-1, 1].forEach(s => {
-      const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.32, 3.0, 10), skinMat);
-      eng.rotation.x = Math.PI/2;
-      eng.position.set(s * 0.42, CY - 0.28, -2.2);
-      g.add(eng);
-      const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.5, 10), darkMat);
-      noz.rotation.x = Math.PI/2;
-      noz.position.set(s * 0.42, CY - 0.28, -3.9);
-      g.add(noz);
-    });
-
-    // tricycle landing gear: struts + wheels
-    function gearLeg(lx, lz){
-      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, CY - 0.45, 8), darkMat);
-      strut.position.set(lx, (CY - 0.45)/2 + 0.2, lz);
-      g.add(strut);
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.14, 12), darkMat);
-      wheel.rotation.z = Math.PI/2;
-      wheel.position.set(lx, 0.18, lz);
-      g.add(wheel);
-      const [wx, wz] = worldOf(lx, lz);
-      addCircleCollider(wx, wz, 0.2);
+    // batas: earthen bund grid around/between the 3x2 plots
+    const bundMat = new THREE.MeshStandardMaterial({ color: 0x6a4a2c, roughness: 0.95 });
+    const bundH = 0.18, bundW = 0.4;
+    for (let i = 0; i <= 3; i++){
+      const bx = X0 + (i / 3) * (X1 - X0);
+      const bund = new THREE.Mesh(new THREE.BoxGeometry(bundW, bundH, Z1 - Z0 + bundW), bundMat);
+      bund.position.set(bx, bundH/2, (Z0 + Z1)/2);
+      g.add(bund);
     }
-    gearLeg(0, 3.2);
-    gearLeg(-0.75, -0.9);
-    gearLeg(0.75, -0.9);
-
-    // one big footprint collider -- the wings hang at head height, so the
-    // whole span is fenced off rather than just the fuselage
-    {
-      const [wx, wz] = worldOf(0, 0.4);
-      addBoxCollider(wx, wz, swapped ? 5.4 : 3.8, swapped ? 3.8 : 5.4);
+    for (let j = 0; j <= 2; j++){
+      const bz = Z0 + (j / 2) * (Z1 - Z0);
+      const bund = new THREE.Mesh(new THREE.BoxGeometry(X1 - X0 + bundW, bundH, bundW), bundMat);
+      bund.position.set((X0 + X1)/2, bundH/2, bz);
+      g.add(bund);
     }
+
+    // young padi in planting rows: instanced cones with a little jitter
+    const tuftGeo = new THREE.ConeGeometry(0.05, 0.44, 5);
+    const tuftMat = new THREE.MeshStandardMaterial({ color: 0x86b849, roughness: 0.9, flatShading: true });
+    const spots = [];
+    for (let px = X0 + 0.8; px < X1 - 0.4; px += 0.62){
+      for (let pz = Z0 + 0.8; pz < Z1 - 0.4; pz += 0.62){
+        // skip the bund lines so the rows read as separate plots
+        const u = (px - X0) / (X1 - X0) * 3, v = (pz - Z0) / (Z1 - Z0) * 2;
+        if (Math.abs(u - Math.round(u)) < 0.07 || Math.abs(v - Math.round(v)) < 0.07) continue;
+        spots.push([px + (Math.random() - 0.5) * 0.1, pz + (Math.random() - 0.5) * 0.1]);
+      }
+    }
+    const padi = new THREE.InstancedMesh(tuftGeo, tuftMat, spots.length);
+    const dummy = new THREE.Object3D();
+    spots.forEach((p, i) => {
+      dummy.position.set(p[0], 0.2, p[1]);
+      dummy.rotation.y = Math.random() * Math.PI;
+      const s = 0.8 + Math.random() * 0.45;
+      dummy.scale.set(s, s, s);
+      dummy.updateMatrix();
+      padi.setMatrixAt(i, dummy.matrix);
+    });
+    padi.instanceMatrix.needsUpdate = true;
+    g.add(padi);
+
+    // orang-orang sawah: the scarecrow at the field's corner
+    const straw = new THREE.MeshStandardMaterial({ color: 0xc9a961, roughness: 0.9 });
+    const cloth = new THREE.MeshStandardMaterial({ color: 0x8a3030, roughness: 0.85 });
+    const sc = new THREE.Group();
+    sc.position.set(-18.2, 0, 5.2);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.7, 6), new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.9 }));
+    pole.position.y = 0.85;
+    sc.add(pole);
+    const arms = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.1, 6), new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.9 }));
+    arms.rotation.z = Math.PI/2;
+    arms.position.y = 1.28;
+    sc.add(arms);
+    const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.16), cloth);
+    shirt.position.y = 1.15;
+    sc.add(shirt);
+    const scHead = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), straw);
+    scHead.position.y = 1.52;
+    sc.add(scHead);
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.16, 10), straw);
+    hat.position.y = 1.66;
+    sc.add(hat);
+    g.add(sc);
+    addCircleCollider(-18.2, 5.2, 0.15);
+
+    // low water kept off the walkable approach: fence the whole field with
+    // its outer bunds' footprint so visitors view it from the batas edge
+    addBoxCollider((X0 + X1)/2, (Z0 + Z1)/2, (X1 - X0)/2, (Z1 - Z0)/2);
 
     // gateway-style static sign facing the path
-    const sign = makeLabel('SUKHOI SU-30MKM', 'Kenderaan Udara Moden — TUDM', true);
-    const [sx, sz] = worldOf(-2.4, 6.4);
-    sign.position.set(sx, 1.9, sz);
-    sign.rotation.y = rotY;
+    const sign = makeLabel('SAWAH PADI', 'Bendang — Padi Field', true);
+    sign.position.set(-15.6, 1.8, 1.5);
+    sign.rotation.y = Math.PI/2;
     sign.material.opacity = 1;
     scene.add(sign);
+  }
+
+  // ---------- low-poly grove behind the rumah tradisional: faceted fruit
+  // trees and a few boulders, the kampung backyard ----------
+  function buildLowPolyGrove(){
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 0.9 });
+    const leafMats = [0x4e7d3a, 0x5f9147, 0x3f6f31].map(c =>
+      new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true }));
+    const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8a84, roughness: 1, flatShading: true });
+
+    [[-23.5, 11.5], [-25.6, 13.6], [-26.8, 16.2], [-25.2, 18.6], [-22.9, 20.0], [-27.6, 19.2]].forEach((p, i) => {
+      const h = 1.3 + Math.random() * 0.7;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, h, 7), trunkMat);
+      trunk.position.set(p[0], h/2, p[1]);
+      scene.add(trunk);
+      const layers = 2 + (i % 2);
+      for (let l = 0; l < layers; l++){
+        const rad = 0.95 - l * 0.28;
+        const canopy = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 0), leafMats[(i + l) % 3]);
+        canopy.position.set(p[0] + (Math.random() - 0.5) * 0.2, h + 0.4 + l * 0.55, p[1] + (Math.random() - 0.5) * 0.2);
+        canopy.rotation.set(Math.random(), Math.random(), Math.random());
+        scene.add(canopy);
+      }
+      addCircleCollider(p[0], p[1], 0.28);
+    });
+
+    [[-21.9, 13.0], [-26.9, 12.1], [-24.0, 19.8]].forEach(p => {
+      const r = 0.3 + Math.random() * 0.22;
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), rockMat);
+      rock.position.set(p[0], r * 0.5, p[1]);
+      rock.rotation.set(Math.random(), Math.random(), Math.random());
+      scene.add(rock);
+      addCircleCollider(p[0], p[1], r);
+    });
   }
 
   function scatterVegetation(){
@@ -2452,9 +2534,9 @@
       const x = Math.cos(angle)*radius, z = Math.sin(angle)*radius;
       if (Math.abs(x) < 4 && z > 0) continue; // keep the entrance approach clear
       if (Math.abs(x) < 9 && Math.abs(z - 24) < 7) continue; // keep the Istana Melaka's footprint clear
-      if (x > -23 && x < -11 && z > 9 && z < 21) continue; // keep the rumah tradisional's yard clear
+      if (x > -29 && x < -11 && z > 9 && z < 21) continue; // keep the rumah's yard + grove behind it clear
       if (x > 9.5 && x < 16.5 && z > 12 && z < 18) continue; // keep the kereta lembu's spot clear
-      if (x > 17 && x < 31 && z > 10 && z < 24) continue; // keep the Sukhoi's apron clear
+      if (x > -35 && x < -15 && z > -8 && z < 12) continue; // keep the sawah padi flats clear
       const r = Math.random();
       if (r < 0.4) buildCoconutPalm(x,z);
       else if (r < 0.7) buildBananaPlant(x,z);
@@ -2481,9 +2563,15 @@
     buildRumahMelayu(-17, 15, Math.PI/2);
     // east of the path opposite the rumah, oxen facing it
     buildKeretaLembu(13.2, 15, -Math.PI/2);
-    // parked on the grass behind the cart, nose toward the path -- the
-    // old and the new kenderaan side by side
-    buildSukhoi(24, 17, -Math.PI/2);
+    buildMountains();
+    buildSawahPadi();
+    buildLowPolyGrove();
+    // one more lembu grazing loose near the sawah's edge
+    const grazer = buildLembu(0x9a6a3d, true);
+    grazer.position.set(-14.6, 0, 4.2);
+    grazer.rotation.y = 2.5;
+    scene.add(grazer);
+    addCircleCollider(-14.6, 4.2, 0.5);
   }
 
   // ---------- one bertingkat (stepped pyramidal roof) cluster: the real Istana
@@ -3287,8 +3375,8 @@
         desc:'The traditional Malay stilt house (rumah tiang) is raised on hardwood posts set on stone or concrete footings, lifting the floor clear of floods, pests and damp ground while cooling air flows beneath. Plank walls with slatted shutters keep the interior shaded and ventilated, the steep bumbung panjang roof sheds tropical rain, and guests enter by a covered stair (anjung). The space under the house is used for storage, daily work and keeping animals -- and the whole structure, joined with tanggam joints, could be dismantled and carried to a new site by the village.' },
       { key:'kereta', name:'KERETA LEMBU', sub:'Kenderaan Tradisional Melayu', pos:[11.0, 1.3, 15], noMarker:true, noLabel:true, silent:true,
         desc:'The kereta lembu (bullock cart) was the everyday transport of the Malay kampung for centuries: a timber cart on two great spoked wheels, drawn by a pair of oxen, hauling padi from the fields, goods to market and families between villages. Melaka\'s carts became famous for their tall arched attap canopies and gaily painted panels, and decorated bullock carts still parade at cultural festivals today as a heritage icon of the state.' },
-      { key:'sukhoi', name:'SUKHOI SU-30MKM', sub:'Kenderaan Udara Moden', pos:[18.6, 1.3, 16.2], noMarker:true, noLabel:true, silent:true,
-        desc:'From the kereta lembu beside it to this twin-engine multirole fighter: Malay transport across the centuries in one glance. The Sukhoi Su-30MKM has served with the Tentera Udara Diraja Malaysia (TUDM) since 2007, flown by two crew from Gong Kedak air base -- a supersonic aircraft with thrust-vectoring engines, specially configured for Malaysia. In 2007 TUDM cosmonaut Dr Sheikh Muszaphar Shukor also carried Malaysia into space, the same spirit of engineering ambition this gallery\'s student builders share.' },
+      { key:'sawah', name:'SAWAH PADI', sub:'Bendang — Padi Field', pos:[-16.8, 1.3, 1.5], noMarker:true, noLabel:true, silent:true,
+        desc:'Rice is the heart of the Malay table, and the sawah padi (wet padi field) shaped kampung life around it: fields flooded and ploughed (traditionally behind a kerbau or lembu), seedlings transplanted by hand into the mud, and the whole village turning out for the harvest. The bendang cycle set the rhythm of festivals and cooperation (gotong-royong), and states like Kedah and Perlis -- the rice bowl of Malaysia -- are still carpeted in these fields today.' },
       { key:'istana', name:'ISTANA KESULTANAN MELAKA', sub:'Seni Bina Diraja', pos:[0, 1.3, 17.6], noMarker:true, noLabel:true, silent:true,
         desc:'A reconstruction of the 15th-century palace of Sultan Mansur Shah, based on its description in the Sejarah Melayu (Malay Annals): a great timber hall raised on carved posts, crowned with tiered bertingkat roofs, and famously built without a single nail. The palace was the heart of the Melaka Sultanate at its golden age -- court ceremonies, royal audiences and the nobat ensemble all took place here. The modern replica at the foot of Bukit St. Paul in Melaka houses the Cultural Museum, whose throne-hall diorama this interior follows.' },
     ];
