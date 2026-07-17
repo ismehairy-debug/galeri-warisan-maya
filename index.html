@@ -574,6 +574,7 @@
     if (listener.context.state === 'suspended') listener.context.resume().catch(() => {});
     audioReady = true;
     ambienceStarted = true;
+    unmuteStationMedia();
     startBackgroundMusic();
     startIstanaMusic();
     startOutsideAmbience();
@@ -704,15 +705,15 @@
     panel.classList.toggle('visible', !!station);
   }
 
-  // ---------- unmute station video audio (needs a user gesture) ----------
+  // ---------- prime station video playback rights (needs a user gesture).
+  // Runs at the MASUK click, i.e. while the intro video is playing, so the
+  // videos stay MUTED here -- otherwise every station's soundtrack blasts
+  // at raw full volume over the intro. unmuteStationMedia() below lifts the
+  // mute when the world actually opens (enterWorld). ----------
   function unlockStationMedia(){
     stationsRef.forEach(st => {
       const video = st.performer && st.performer.userData && st.performer.userData.videoEl;
       if (!video) return;
-      // SONGKET & BATIK stay muted permanently -- both clips are silent,
-      // visual-only loops, with anak ayam the only audio heard at this
-      // station (see ensureStationAudio's matching 'pakaian' skip below)
-      if (st.def.key !== 'pakaian') video.muted = false;
       // playing every video here, synchronously inside the real user
       // gesture, is what grants each element the right to autoplay
       // unmuted later -- but leaving them all running afterwards means
@@ -732,6 +733,19 @@
           setTimeout(() => { if (st.active < 0.05) video.pause(); }, 500);
         }).catch(() => {});
       }
+    });
+  }
+
+  // ---------- lift the priming mute once the guest is in the world; the
+  // proximity logic then decides which station is audibly playing ----------
+  function unmuteStationMedia(){
+    stationsRef.forEach(st => {
+      const video = st.performer && st.performer.userData && st.performer.userData.videoEl;
+      if (!video) return;
+      // SONGKET & BATIK stay muted permanently -- both clips are silent,
+      // visual-only loops, with anak ayam the only audio heard at this
+      // station (see ensureStationAudio's matching 'silent' skip below)
+      if (st.def.key !== 'pakaian') video.muted = false;
     });
   }
 
@@ -821,7 +835,9 @@
     for (const st of stationsRef){
       const u = st.performer && st.performer.userData;
       if (!u) continue;
-      [u.videoEl, u.videoEl2].forEach(v => { if (v && !v.paused) v.pause(); });
+      // re-mute as well: the next guest's MASUK re-primes every video, and
+      // that priming burst must stay silent under their intro too
+      [u.videoEl, u.videoEl2].forEach(v => { if (v){ v.muted = true; if (!v.paused) v.pause(); } });
     }
 
     // next guest starts from the spawn point, facing the gallery; on a
@@ -967,7 +983,7 @@
     camera.position.set(0, 1.6, 8.6);
 
     // audioReady gates the proximity video playback in updateFrame; the
-    // station videos are muted until unlockStationMedia() (never called
+    // station videos are muted until unmuteStationMedia() (never called
     // here), so this makes videos play silently near the guest's position
     // while the AudioContext itself stays suspended -- no sound at all.
     audioReady = true;
@@ -3687,6 +3703,7 @@
                 audioReady = true;
               }
               unlockStationMedia();
+              unmuteStationMedia(); // entering VR means the world is open -- no intro to protect
               startBackgroundMusic();
               startIstanaMusic();
               startOutsideAmbience();
