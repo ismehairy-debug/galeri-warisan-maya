@@ -326,7 +326,7 @@
   let istanaGainNode = null;
   let istanaVolCurrent = 0;
   let insideIstanaSmooth = 0;
-  const ISTANA_BASE_VOL = 0.6;
+  const ISTANA_BASE_VOL = 0.5;
   let currentInfoKey = null;
   // assigned inside setupIntroScreen; declared up here because init() runs
   // before the statements further down this script ever execute
@@ -2996,6 +2996,13 @@
       { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-3.4, 1.3, ROOM.depth/2-0.6], labelY:1.6, noMarker:true },
       { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1] },
       { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 2.2, ROOM.depth/2-0.6], noMarker:true },
+      // description-only triggers for the two outside buildings: both already
+      // carry their own always-visible signs, so these show just the info
+      // panel when a visitor walks up to their entrances
+      { key:'rumah',  name:'RUMAH TRADISIONAL MELAYU', sub:'Seni Bina Kampung', pos:[-11.9, 1.3, 14.2], noMarker:true, noLabel:true, silent:true,
+        desc:'The traditional Malay stilt house (rumah tiang) is raised on hardwood posts set on stone or concrete footings, lifting the floor clear of floods, pests and damp ground while cooling air flows beneath. Plank walls with slatted shutters keep the interior shaded and ventilated, the steep bumbung panjang roof sheds tropical rain, and guests enter by a covered stair (anjung). The space under the house is used for storage, daily work and keeping animals -- and the whole structure, joined with tanggam joints, could be dismantled and carried to a new site by the village.' },
+      { key:'istana', name:'ISTANA KESULTANAN MELAKA', sub:'Seni Bina Diraja', pos:[0, 1.3, 17.6], noMarker:true, noLabel:true, silent:true,
+        desc:'A reconstruction of the 15th-century palace of Sultan Mansur Shah, based on its description in the Sejarah Melayu (Malay Annals): a great timber hall raised on carved posts, crowned with tiered bertingkat roofs, and famously built without a single nail. The palace was the heart of the Melaka Sultanate at its golden age -- court ceremonies, royal audiences and the nobat ensemble all took place here. The modern replica at the foot of Bukit St. Paul in Melaka houses the Cultural Museum, whose throne-hall diorama this interior follows.' },
     ];
     return defs.map(buildHotspot);
   }
@@ -3031,6 +3038,7 @@
     // tiang seri overrides with labelY so its sign reads at the camera's own
     // eye height (1.6) rather than floating above the low stilt marker
     label.position.set(0, def.labelY != null ? def.labelY : def.pos[1] + 0.5, 0);
+    if (def.noLabel) label.visible = false; // desc-only trigger; a static sign already names the building
     group.add(label);
 
     return { def, group, marker, label, active: 0, worldPos: new THREE.Vector3() };
@@ -3838,9 +3846,11 @@
       const dist = camWorld.distanceTo(st.worldPos);
       const targetActive = dist < 3.0 ? 1 : 0;
       st.active += (targetActive - st.active) * Math.min(1, dt*4);
-      // SONGKET & BATIK carries no audio of its own now, so it shouldn't
-      // duck anak ayam the way stations with real station audio do
-      if (st.def.key !== 'pakaian') maxActive = Math.max(maxActive, st.active);
+      // silent stations (songket & batik, kraf, makanan, filem) carry no
+      // audio of their own, so they shouldn't duck anak ayam the way
+      // stations with real station audio do -- the kampung song keeps
+      // playing while a visitor reads those exhibits
+      if (!st.def.silent) maxActive = Math.max(maxActive, st.active);
       if (st.def.desc && st.active > bestActive){ bestActive = st.active; bestStation = st; }
 
       // glow (ring for stations, marker for architecture hotspots)
