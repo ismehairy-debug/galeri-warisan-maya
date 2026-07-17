@@ -2562,6 +2562,12 @@
         () => addCircleCollider(spot.x, spot.z, 0.55));
     });
 
+    // kampung chickens pecking around the rumah's yard (~0.4 m tall)
+    [{ x: -13.6, z: 17.2, rotY: 0.8 }, { x: -12.6, z: 18.4, rotY: -2.1 }, { x: -14.7, z: 19.4, rotY: 2.9 }].forEach(spot => {
+      loadImportedModel('assets/models/chicken/scene.gltf', 0.42 / 1.07, spot,
+        () => addCircleCollider(spot.x, spot.z, 0.18));
+    });
+
     // knee-high grass drifts: one brushing the sawah's path edge, one on
     // the east field near the cart (walk-through, no colliders)
     loadImportedModel('assets/models/patch_of_grass/scene_merged.gltf', 9 / 204, { x: -13.2, z: 10.6, sink: -0.05 });
