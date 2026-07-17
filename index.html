@@ -2176,6 +2176,145 @@
     scene.add(sign);
   }
 
+  // ---------- kereta lembu: the traditional Malay bullock cart, parked in
+  // the kampung east of the entrance path -- big spoked timber wheels, an
+  // arched attap canopy in the Melaka style, a draw pole with yoke, and a
+  // pair of pale oxen standing in harness ----------
+  function buildOx(){
+    const g = new THREE.Group();
+    const hideMat = new THREE.MeshStandardMaterial({ color: 0xd8c9a8, roughness: 0.85 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x5a4a38, roughness: 0.8 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), hideMat);
+    body.scale.set(1.55, 1, 0.95);
+    body.position.y = 0.62;
+    g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 10), hideMat);
+    head.position.set(0.62, 0.72, 0);
+    g.add(head);
+    const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.14, 8), darkMat);
+    muzzle.rotation.z = -Math.PI/2;
+    muzzle.position.set(0.76, 0.68, 0);
+    g.add(muzzle);
+    // horns: shallow curved cones swept outward
+    [-1, 1].forEach(s => {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.26, 6),
+        new THREE.MeshStandardMaterial({ color: 0xe8e0cc, roughness: 0.5 }));
+      horn.position.set(0.60, 0.86, s * 0.14);
+      horn.rotation.set(s * -0.9, 0, -0.5);
+      g.add(horn);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), hideMat);
+      ear.scale.set(1.4, 0.6, 1);
+      ear.position.set(0.55, 0.76, s * 0.17);
+      g.add(ear);
+    });
+    // legs
+    [[0.32, 0.14], [0.32, -0.14], [-0.32, 0.14], [-0.32, -0.14]].forEach(p => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.5, 8), hideMat);
+      leg.position.set(p[0], 0.25, p[1]);
+      g.add(leg);
+    });
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.012, 0.42, 6), hideMat);
+    tail.position.set(-0.52, 0.5, 0);
+    tail.rotation.z = 0.35;
+    g.add(tail);
+    return g;
+  }
+
+  function buildKeretaLembu(x, z, rotY){
+    // rotY must stay a multiple of 90deg (axis-aligned colliders, as with
+    // buildRumahMelayu)
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    g.rotation.y = rotY;
+    scene.add(g);
+    const cos = Math.round(Math.cos(rotY)), sin = Math.round(Math.sin(rotY));
+    const worldOf = (lx, lz) => [x + lx*cos + lz*sin, z - lx*sin + lz*cos];
+    const swapped = sin !== 0;
+
+    const woodTex = makeWallPlankTexture('#513a22');
+    const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.85 });
+    const darkWood = new THREE.MeshStandardMaterial({ color: 0x35230f, roughness: 0.8 });
+    const attapTex = makeAttapTexture();
+    const attapMat = new THREE.MeshStandardMaterial({ map: attapTex, bumpMap: attapTex, bumpScale: 0.02, roughness: 0.9, side: THREE.DoubleSide });
+
+    const bedY = 0.85;
+
+    // bed + low side rails
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.1, 2.2), woodMat);
+    bed.position.y = bedY;
+    g.add(bed);
+    [-1, 1].forEach(s => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 2.2), woodMat);
+      rail.position.set(s * 0.64, bedY + 0.2, 0);
+      g.add(rail);
+    });
+    const tailboard = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.3, 0.07), woodMat);
+    tailboard.position.set(0, bedY + 0.2, -1.07);
+    g.add(tailboard);
+
+    // arched attap canopy (Melaka style): half-cylinder shell over the bed
+    const canopy = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.78, 0.78, 1.9, 14, 1, true, Math.PI/2, Math.PI), attapMat);
+    canopy.rotation.x = Math.PI/2;
+    canopy.position.set(0, bedY + 0.28, -0.1);
+    g.add(canopy);
+
+    // axle + two big spoked wheels
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.7, 8), darkWood);
+    axle.rotation.z = Math.PI/2;
+    axle.position.set(0, 0.78, -0.1);
+    g.add(axle);
+    [-1, 1].forEach(s => {
+      const wheel = new THREE.Group();
+      wheel.position.set(s * 0.78, 0.78, -0.1);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.055, 10, 24), woodMat);
+      rim.rotation.y = Math.PI/2;
+      wheel.add(rim);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.16, 10), darkWood);
+      hub.rotation.z = Math.PI/2;
+      wheel.add(hub);
+      for (let i = 0; i < 8; i++){
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.045, 1.38, 0.035), woodMat);
+        spoke.rotation.x = i * Math.PI / 8;
+        wheel.add(spoke);
+      }
+      g.add(wheel);
+    });
+
+    // draw pole (bom) + yoke across the oxen's necks
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 2.0, 8), darkWood);
+    pole.rotation.x = Math.PI/2 - 0.12;
+    pole.position.set(0, 0.72, 1.05);
+    g.add(pole);
+    const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.25, 8), darkWood);
+    yoke.rotation.z = Math.PI/2;
+    yoke.position.set(0, 0.92, 1.85);
+    g.add(yoke);
+
+    // the pair of oxen, faces forward (+z local)
+    [-1, 1].forEach(s => {
+      const ox = buildOx();
+      ox.rotation.y = -Math.PI/2; // buildOx faces +x; turn to face +z (away from the cart)
+      ox.position.set(s * 0.44, 0, 1.95);
+      g.add(ox);
+      const [wx, wz] = worldOf(s * 0.44, 1.95);
+      addCircleCollider(wx, wz, 0.4);
+    });
+
+    {
+      const [wx, wz] = worldOf(0, 0);
+      addBoxCollider(wx, wz, swapped ? 1.25 : 0.95, swapped ? 0.95 : 1.25);
+    }
+
+    // gateway-style static sign facing the path
+    const sign = makeLabel('KERETA LEMBU', 'Kenderaan Tradisional Melayu', true);
+    const [sx, sz] = worldOf(-1.1, 2.9);
+    sign.position.set(sx, 1.9, sz);
+    sign.rotation.y = rotY;
+    sign.material.opacity = 1;
+    scene.add(sign);
+  }
+
   function scatterVegetation(){
     const halfW = ROOM.width/2, halfD = ROOM.depth/2;
     for (let i=0;i<18;i++){
@@ -2185,6 +2324,7 @@
       if (Math.abs(x) < 4 && z > 0) continue; // keep the entrance approach clear
       if (Math.abs(x) < 9 && Math.abs(z - 24) < 7) continue; // keep the Istana Melaka's footprint clear
       if (x > -23 && x < -11 && z > 9 && z < 21) continue; // keep the rumah tradisional's yard clear
+      if (x > 9.5 && x < 16.5 && z > 12 && z < 18) continue; // keep the kereta lembu's spot clear
       const r = Math.random();
       if (r < 0.4) buildCoconutPalm(x,z);
       else if (r < 0.7) buildBananaPlant(x,z);
@@ -2209,6 +2349,8 @@
     buildIstanaMelaka(0, 24);
     // west of the entrance path, front (and its covered stair) facing it
     buildRumahMelayu(-17, 15, Math.PI/2);
+    // east of the path opposite the rumah, oxen facing it
+    buildKeretaLembu(13.2, 15, -Math.PI/2);
   }
 
   // ---------- one bertingkat (stepped pyramidal roof) cluster: the real Istana
@@ -3010,6 +3152,8 @@
       // panel when a visitor walks up to their entrances
       { key:'rumah',  name:'RUMAH TRADISIONAL MELAYU', sub:'Seni Bina Kampung', pos:[-11.9, 1.3, 14.2], noMarker:true, noLabel:true, silent:true,
         desc:'The traditional Malay stilt house (rumah tiang) is raised on hardwood posts set on stone or concrete footings, lifting the floor clear of floods, pests and damp ground while cooling air flows beneath. Plank walls with slatted shutters keep the interior shaded and ventilated, the steep bumbung panjang roof sheds tropical rain, and guests enter by a covered stair (anjung). The space under the house is used for storage, daily work and keeping animals -- and the whole structure, joined with tanggam joints, could be dismantled and carried to a new site by the village.' },
+      { key:'kereta', name:'KERETA LEMBU', sub:'Kenderaan Tradisional Melayu', pos:[11.0, 1.3, 15], noMarker:true, noLabel:true, silent:true,
+        desc:'The kereta lembu (bullock cart) was the everyday transport of the Malay kampung for centuries: a timber cart on two great spoked wheels, drawn by a pair of oxen, hauling padi from the fields, goods to market and families between villages. Melaka\'s carts became famous for their tall arched attap canopies and gaily painted panels, and decorated bullock carts still parade at cultural festivals today as a heritage icon of the state.' },
       { key:'istana', name:'ISTANA KESULTANAN MELAKA', sub:'Seni Bina Diraja', pos:[0, 1.3, 17.6], noMarker:true, noLabel:true, silent:true,
         desc:'A reconstruction of the 15th-century palace of Sultan Mansur Shah, based on its description in the Sejarah Melayu (Malay Annals): a great timber hall raised on carved posts, crowned with tiered bertingkat roofs, and famously built without a single nail. The palace was the heart of the Melaka Sultanate at its golden age -- court ceremonies, royal audiences and the nobat ensemble all took place here. The modern replica at the foot of Bukit St. Paul in Melaka houses the Cultural Museum, whose throne-hall diorama this interior follows.' },
     ];
