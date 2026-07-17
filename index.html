@@ -2183,90 +2183,8 @@
   // the kampung east of the entrance path -- big spoked timber wheels, an
   // arched attap canopy in the Melaka style, a draw pole with yoke, and a
   // pair of pale oxen standing in harness ----------
-  // ---------- lembu: a proper 3D-modelled kampung zebu (humped Malaysian
-  // cattle) -- barrel body, shoulder hump, dewlap, lowered head with curved
-  // horns, hooves and a tufted tail. Faces +x; pass grazing:true for a
-  // head-down pose. ----------
-  function buildLembu(hideColor, grazing){
-    const g = new THREE.Group();
-    const hide = new THREE.MeshStandardMaterial({ color: hideColor, roughness: 0.85 });
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.8 });
-    const hornMat = new THREE.MeshStandardMaterial({ color: 0xe8e0cc, roughness: 0.5 });
-
-    // barrel body: capsule from a cylinder plus rump/chest spheres
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.34, 0.85, 12), hide);
-    barrel.rotation.z = Math.PI/2;
-    barrel.position.set(-0.02, 0.78, 0);
-    g.add(barrel);
-    const rump = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), hide);
-    rump.scale.set(1.1, 1, 0.95);
-    rump.position.set(-0.46, 0.78, 0);
-    g.add(rump);
-    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.30, 12, 10), hide);
-    chest.position.set(0.42, 0.75, 0);
-    g.add(chest);
-    // the zebu's shoulder hump (bonggol)
-    const hump = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), hide);
-    hump.scale.set(1, 0.9, 0.8);
-    hump.position.set(0.30, 1.03, 0);
-    g.add(hump);
-
-    // neck + head, lowered to the grass when grazing
-    const headGroup = new THREE.Group();
-    headGroup.position.set(0.58, 0.82, 0);
-    headGroup.rotation.z = grazing ? -0.95 : -0.2;
-    g.add(headGroup);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, 0.42, 10), hide);
-    neck.rotation.z = -Math.PI/2;
-    neck.position.set(0.16, 0, 0);
-    headGroup.add(neck);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.22, 0.19), hide);
-    head.position.set(0.42, 0.01, 0);
-    headGroup.add(head);
-    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.15, 0.15), darkMat);
-    muzzle.position.set(0.62, -0.03, 0);
-    headGroup.add(muzzle);
-    // dewlap hanging under the neck
-    const dewlap = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), hide);
-    dewlap.scale.set(1.5, 1, 0.45);
-    dewlap.position.set(0.14, -0.17, 0);
-    headGroup.add(dewlap);
-    [-1, 1].forEach(s => {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.024, 6, 6), darkMat);
-      eye.position.set(0.46, 0.1, s * 0.1);
-      headGroup.add(eye);
-      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), hide);
-      ear.scale.set(1.5, 0.5, 1);
-      ear.position.set(0.34, 0.1, s * 0.16);
-      ear.rotation.z = 0.3;
-      headGroup.add(ear);
-      // curved horn: a torus arc sweeping up and outward
-      const horn = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.022, 6, 10, Math.PI * 0.8), hornMat);
-      horn.position.set(0.36, 0.16, s * 0.09);
-      horn.rotation.set(s * 0.9, s * Math.PI/2, 0.2);
-      headGroup.add(horn);
-    });
-
-    // legs with dark hooves
-    [[0.36, 0.16], [0.36, -0.16], [-0.42, 0.16], [-0.42, -0.16]].forEach(p => {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.56, 8), hide);
-      leg.position.set(p[0], 0.3, p[1]);
-      g.add(leg);
-      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.1, 8), darkMat);
-      hoof.position.set(p[0], 0.05, p[1]);
-      g.add(hoof);
-    });
-    // tail with a dark tuft
-    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.014, 0.5, 6), hide);
-    tail.position.set(-0.66, 0.62, 0);
-    tail.rotation.z = 0.3;
-    g.add(tail);
-    const tuftEnd = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), darkMat);
-    tuftEnd.scale.set(1, 1.8, 1);
-    tuftEnd.position.set(-0.73, 0.38, 0);
-    g.add(tuftEnd);
-    return g;
-  }
+  // (the procedural zebu builder is gone -- every lembu in the kampung is
+  // now the imported cow model, placed by buildImportedScenery)
 
   function buildKeretaLembu(x, z, rotY){
     // rotY must stay a multiple of 90deg (axis-aligned colliders, as with
@@ -2339,15 +2257,9 @@
     yoke.position.set(0, 0.92, 1.85);
     g.add(yoke);
 
-    // the pair of lembu in harness, one brown and one fawn, facing forward
-    [-1, 1].forEach(s => {
-      const lembu = buildLembu(s < 0 ? 0x8a5a33 : 0xc9a678, false);
-      lembu.rotation.y = -Math.PI/2; // buildLembu faces +x; turn to face +z (away from the cart)
-      lembu.position.set(s * 0.46, 0, 1.95);
-      g.add(lembu);
-      const [wx, wz] = worldOf(s * 0.46, 1.95);
-      addCircleCollider(wx, wz, 0.42);
-    });
+    // the pair of lembu in harness is the real imported cow model, placed
+    // in world space by buildImportedScenery (its spots are computed from
+    // this cart's position/rotation)
 
     {
       const [wx, wz] = worldOf(0, 0);
@@ -2361,42 +2273,6 @@
     sign.rotation.y = rotY;
     sign.material.opacity = 1;
     scene.add(sign);
-  }
-
-  // ---------- distant mountain ring: hazy low-poly peaks around the
-  // horizon. They sit at radius ~42-45 -- inside the 50 m sky dome and the
-  // 60 m far plane, but past the 40 m walk clamp -- and the exp2 fog fades
-  // them into blue-green silhouettes like hills seen across padi flats.
-  // Each gets a collider so the walkable corners can't clip into them. ----------
-  function buildMountains(){
-    const mats = [0x4f6a5e, 0x5a7a68, 0x475f66].map(c =>
-      new THREE.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true }));
-    const N = 14;
-    for (let i = 0; i < N; i++){
-      const a = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
-      const r = 42 + Math.random() * 3;
-      const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      const h = 7 + Math.random() * 8;
-      const base = 7 + Math.random() * 4;
-      const peak = new THREE.Mesh(new THREE.ConeGeometry(base, h, 5 + Math.floor(Math.random() * 3)), mats[i % 3]);
-      peak.position.set(x, h/2 - 0.4, z);
-      peak.rotation.y = Math.random() * Math.PI;
-      scene.add(peak);
-      addCircleCollider(x, z, base * 0.75);
-      // a lower foothill drifted in front of every other peak, for depth
-      if (i % 2 === 0){
-        const fh = 2.5 + Math.random() * 2.5;
-        const fb = 4 + Math.random() * 3;
-        const fr = r - base * 0.9;
-        const fx = Math.cos(a + (Math.random() - 0.5) * 0.14) * fr;
-        const fz = Math.sin(a + (Math.random() - 0.5) * 0.14) * fr;
-        if (fx > -38 && fx < -14 && fz > -9 && fz < 13) continue; // never on the sawah flats
-        const hill = new THREE.Mesh(new THREE.ConeGeometry(fb, fh, 6), mats[(i + 1) % 3]);
-        hill.position.set(fx, fh/2 - 0.3, fz);
-        scene.add(hill);
-        addCircleCollider(fx, fz, fb * 0.7);
-      }
-    }
   }
 
   // ---------- sawah padi: flooded rice plots south-west of the kampung,
@@ -2495,40 +2371,6 @@
     scene.add(sign);
   }
 
-  // ---------- low-poly grove behind the rumah tradisional: faceted fruit
-  // trees and a few boulders, the kampung backyard ----------
-  function buildLowPolyGrove(){
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 0.9 });
-    const leafMats = [0x4e7d3a, 0x5f9147, 0x3f6f31].map(c =>
-      new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, flatShading: true }));
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8a84, roughness: 1, flatShading: true });
-
-    [[-23.5, 11.5], [-25.6, 13.6], [-26.8, 16.2], [-25.2, 18.6], [-22.9, 20.0], [-27.6, 19.2]].forEach((p, i) => {
-      const h = 1.3 + Math.random() * 0.7;
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, h, 7), trunkMat);
-      trunk.position.set(p[0], h/2, p[1]);
-      scene.add(trunk);
-      const layers = 2 + (i % 2);
-      for (let l = 0; l < layers; l++){
-        const rad = 0.95 - l * 0.28;
-        const canopy = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 0), leafMats[(i + l) % 3]);
-        canopy.position.set(p[0] + (Math.random() - 0.5) * 0.2, h + 0.4 + l * 0.55, p[1] + (Math.random() - 0.5) * 0.2);
-        canopy.rotation.set(Math.random(), Math.random(), Math.random());
-        scene.add(canopy);
-      }
-      addCircleCollider(p[0], p[1], 0.28);
-    });
-
-    [[-21.9, 13.0], [-26.9, 12.1], [-24.0, 19.8]].forEach(p => {
-      const r = 0.3 + Math.random() * 0.22;
-      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), rockMat);
-      rock.position.set(p[0], r * 0.5, p[1]);
-      rock.rotation.set(Math.random(), Math.random(), Math.random());
-      scene.add(rock);
-      addCircleCollider(p[0], p[1], r);
-    });
-  }
-
   // ---------- imported scenery: the visitor-supplied Sketchfab models
   // (each compacted offline -- transforms baked, meshes merged per
   // material, textures downscaled to 1024 -- so the Quest browser gets a
@@ -2555,37 +2397,88 @@
   }
 
   function buildImportedScenery(){
-    // two real cows joining the procedural zebu pair: one by the sawah's
-    // edge, one loose near the kereta lembu (~1.4 m at the shoulder)
-    [{ x: -12.4, z: 7.2, rotY: 2.3 }, { x: 16.4, z: 12.2, rotY: -1.9 }].forEach(spot => {
-      loadImportedModel('assets/models/cow_skin/scene.gltf', 1.4 / 178.8, spot,
-        () => addCircleCollider(spot.x, spot.z, 0.55));
+    // every lembu in the kampung is the real cow model (~1.4 m tall): one
+    // loaded, the rest cheap clones sharing its geometry and textures. The
+    // first two stand in the kereta lembu's harness -- world spots derived
+    // from the cart at (13.2, 15) rotY -PI/2, ahead of the draw pole.
+    loadImportedModel('assets/models/cow_skin/scene.gltf', 1.4 / 178.8,
+      { x: 11.25, z: 14.54, rotY: -Math.PI/2 }, holder => {
+      addCircleCollider(11.25, 14.54, 0.42);
+      [
+        { x: 11.25, z: 15.46, rotY: -Math.PI/2, r: 0.42 }, // harness partner
+        { x: -12.4, z: 7.2,  rotY: 2.3,  r: 0.55 },        // grazing by the sawah
+        { x: -14.6, z: 4.2,  rotY: 2.5,  r: 0.55 },        // second sawah grazer
+        { x: 16.4,  z: 12.2, rotY: -1.9, r: 0.55 },        // loose near the cart
+      ].forEach(s => {
+        const c = holder.clone();
+        c.position.set(s.x, 0, s.z);
+        c.rotation.y = s.rotY;
+        scene.add(c);
+        addCircleCollider(s.x, s.z, s.r);
+      });
     });
 
     // kampung chickens pecking around the rumah's yard (~0.4 m tall)
-    [{ x: -13.6, z: 17.2, rotY: 0.8 }, { x: -12.6, z: 18.4, rotY: -2.1 }, { x: -14.7, z: 19.4, rotY: 2.9 }].forEach(spot => {
-      loadImportedModel('assets/models/chicken/scene.gltf', 0.42 / 1.07, spot,
-        () => addCircleCollider(spot.x, spot.z, 0.18));
+    loadImportedModel('assets/models/chicken/scene.gltf', 0.42 / 1.07,
+      { x: -13.6, z: 17.2, rotY: 0.8 }, holder => {
+      addCircleCollider(-13.6, 17.2, 0.18);
+      [{ x: -12.6, z: 18.4, rotY: -2.1 }, { x: -14.7, z: 19.4, rotY: 2.9 }].forEach(s => {
+        const c = holder.clone();
+        c.position.set(s.x, 0, s.z);
+        c.rotation.y = s.rotY;
+        scene.add(c);
+        addCircleCollider(s.x, s.z, 0.18);
+      });
     });
 
-    // knee-high grass drifts: one brushing the sawah's path edge, one on
-    // the east field near the cart (walk-through, no colliders)
-    loadImportedModel('assets/models/patch_of_grass/scene_merged.gltf', 9 / 204, { x: -13.2, z: 10.6, sink: -0.05 });
-    loadImportedModel('assets/models/patch_of_grass/scene_merged.gltf', 11 / 204, { x: 8.5, z: 20.5, rotY: 1.2, sink: -0.05 });
+    // knee-high grass drifts, tinted toward the sawah padi's softer
+    // yellow-green so the imported grass and the padi rows read as one
+    // family of plants (walk-through, no colliders)
+    loadImportedModel('assets/models/patch_of_grass/scene_merged.gltf', 9 / 204,
+      { x: -13.2, z: 10.6, sink: -0.05 }, holder => {
+      holder.traverse(o => {
+        if (o.isMesh && o.material && o.material.color) o.material.color.setRGB(1.3, 1.15, 0.78);
+      });
+      const c = holder.clone();
+      c.scale.setScalar(11 / 9);
+      c.position.set(8.5, 0, 20.5);
+      c.rotation.y = 1.2;
+      scene.add(c);
+    });
 
-    // forest hillside filling the north-east quadrant behind the cart;
-    // its walkable edge is fenced so nobody wanders into the terrain skirt
+    // forest hillsides: north-east quadrant behind the cart, plus a clone
+    // on the south-west corner; walkable edges fenced so nobody wanders
+    // into the terrain skirt (rotations stay at 0/180 for the AABB colliders)
     loadImportedModel('assets/models/low_poly_tree_scene_free/scene_merged.gltf', 0.45,
-      { x: 38, z: 32, sink: -0.25 },
-      () => addBoxCollider(38, 32, 20, 12.5));
+      { x: 38, z: 32, sink: -0.25 }, holder => {
+      addBoxCollider(38, 32, 20, 12.5);
+      const c = holder.clone();
+      c.position.set(-36, 0, -26);
+      c.rotation.y = Math.PI;
+      scene.add(c);
+      addBoxCollider(-36, -26, 20, 12.5);
+    });
 
     // mountain-forest diorama as the western backdrop beyond the sawah
     loadImportedModel('assets/models/the_landscape_is_a_forest_in_the_mountains/scene_merged.gltf', 1.6,
       { x: -62, z: 6, rotY: Math.PI / 2 });
 
-    // the grand mountain range across the whole northern horizon, behind
-    // the Istana (native tile is 1 x 0.17 x 1, so the scale is per-axis)
-    loadImportedModel('assets/models/mountain_range_01/scene.gltf', [150, 90, 55], { x: 0, z: 76 });
+    // the grand mountain range rings the whole horizon: loaded once for
+    // the north behind the Istana, then cloned to the other three sides
+    // (native tile is 1 x 0.17 x 1, so the scale is per-axis)
+    loadImportedModel('assets/models/mountain_range_01/scene.gltf', [150, 90, 55],
+      { x: 0, z: 76 }, holder => {
+      [
+        { x: 0,   z: -76, rotY: Math.PI },
+        { x: -76, z: 0,   rotY: Math.PI/2 },
+        { x: 76,  z: 0,   rotY: -Math.PI/2 },
+      ].forEach(s => {
+        const c = holder.clone();
+        c.position.set(s.x, 0, s.z);
+        c.rotation.y = s.rotY;
+        scene.add(c);
+      });
+    });
   }
 
   function scatterVegetation(){
@@ -2625,16 +2518,8 @@
     buildRumahMelayu(-17, 15, Math.PI/2);
     // east of the path opposite the rumah, oxen facing it
     buildKeretaLembu(13.2, 15, -Math.PI/2);
-    buildMountains();
     buildSawahPadi();
-    buildLowPolyGrove();
     buildImportedScenery();
-    // one more lembu grazing loose near the sawah's edge
-    const grazer = buildLembu(0x9a6a3d, true);
-    grazer.position.set(-14.6, 0, 4.2);
-    grazer.rotation.y = 2.5;
-    scene.add(grazer);
-    addCircleCollider(-14.6, 4.2, 0.5);
   }
 
   // ---------- one bertingkat (stepped pyramidal roof) cluster: the real Istana
