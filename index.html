@@ -3064,19 +3064,25 @@
   // just below a process video as a physical-sample reference ----------
   function buildFabricSwatch(textureSrc){
     const group = new THREE.Group();
+    // DoubleSide gold border + a second rear-facing fabric plane: songket &
+    // batik stand free in the hall, so the sample cards must read from the
+    // back of the station too, not vanish to backface culling
     const border = new THREE.Mesh(
       new THREE.PlaneGeometry(0.56, 0.72),
-      new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.25, roughness: 0.5 })
+      new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xc9a227, emissiveIntensity: 0.25, roughness: 0.5, side: THREE.DoubleSide })
     );
     border.position.z = -0.01;
     group.add(border);
 
     const tex = new THREE.TextureLoader().load(textureSrc);
-    const swatch = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.5, 0.66),
-      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75 })
-    );
+    const swatchMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75 });
+    const swatchGeo = new THREE.PlaneGeometry(0.5, 0.66);
+    const swatch = new THREE.Mesh(swatchGeo, swatchMat);
     group.add(swatch);
+    const backSwatch = new THREE.Mesh(swatchGeo, swatchMat);
+    backSwatch.rotation.y = Math.PI;
+    backSwatch.position.z = -0.02;
+    group.add(backSwatch);
     return group;
   }
 
