@@ -196,10 +196,6 @@
     border:1px solid rgba(242,217,138,0.6); font-weight:700; letter-spacing:1px;
     font-family: Georgia, serif; cursor:pointer;
   }
-  #hostCodeLine {
-    display:none; margin-top:8px; font-size:11px; letter-spacing:0.5px;
-    color:#f2d98a; word-break:break-all;
-  }
   /* spectator-mode status line (only element shown over the mirrored view) */
   #spectateStatus {
     position:fixed; left:0; right:0; bottom:34px; z-index:25; display:none;
@@ -262,7 +258,6 @@
     <button id="gyro-button">GUNA GYRO / ENABLE GYRO</button>
     <br>
     <button id="restart-button">⟲ TETAMU BARU / NEW GUEST</button>
-    <div id="hostCodeLine">PAUTAN PENONTON / SPECTATOR LINK:<br><b id="hostCodeValue"></b></div>
   </div>
 </div>
 
@@ -326,7 +321,7 @@
   let istanaGainNode = null;
   let istanaVolCurrent = 0;
   let insideIstanaSmooth = 0;
-  const ISTANA_BASE_VOL = 0.5;
+  const ISTANA_BASE_VOL = 0.2;
   let currentInfoKey = null;
   // assigned inside setupIntroScreen; declared up here because init() runs
   // before the statements further down this script ever execute
@@ -858,7 +853,6 @@
     sessionCode = 'tetamu-' + sessionDigits;
     document.getElementById('guestName').value = '';
     updateSpectatorLink();
-    document.getElementById('hostCodeLine').style.display = 'none';
 
     // back to the details screen; their MASUK will replay the intro
     resetIntro();
@@ -887,7 +881,6 @@
   function updateSpectatorLink(){
     const link = sessionCode ? spectatorLink() : '—';
     document.getElementById('sessionLink').textContent = link;
-    document.getElementById('hostCodeValue').textContent = link;
     const qrBox = document.getElementById('qrBox');
     qrBox.innerHTML = '';
     if (sessionCode && typeof QRCode !== 'undefined'){
@@ -904,8 +897,6 @@
   // sendPoseUpdate(), called every frame from updateFrame.
   function startHosting(){
     if (peerHost || !sessionCode || typeof Peer === 'undefined') return;
-    document.getElementById('hostCodeLine').style.display = 'block';
-    updateSpectatorLink();
 
     peerHost = new Peer(PEER_PREFIX + sessionCode);
     peerHost.on('connection', conn => {
@@ -2458,20 +2449,23 @@
     [-4.4, 4.4].forEach(px => {
       const payung = new THREE.Group();
       payung.position.set(px, 0, -payungOut);
-      const pPole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.6, 8), darkWoodMat);
-      pPole.position.y = 1.3;
+      // taller pole with the canopy lifted clear of the facade's photo
+      // plaques -- at the old 2.45 canopy height the umbrellas sat right in
+      // a standing visitor's sightline to the reference photos
+      const pPole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 3.2, 8), darkWoodMat);
+      pPole.position.y = 1.6;
       payung.add(pPole);
       const canopyMatY = new THREE.MeshStandardMaterial({ color: 0xf2c11c, emissive: 0x8a6a10, emissiveIntensity: 0.2, roughness: 0.6, side: THREE.DoubleSide });
       const pCanopy = new THREE.Mesh(new THREE.ConeGeometry(0.85, 0.5, 12, 1, true), canopyMatY);
-      pCanopy.position.y = 2.45;
+      pCanopy.position.y = 3.05;
       payung.add(pCanopy);
       // hanging valance ring around the canopy's rim
       const fringe = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.87, 0.1, 12, 1, true),
         new THREE.MeshStandardMaterial({ color: 0xd9a410, roughness: 0.7, side: THREE.DoubleSide }));
-      fringe.position.y = 2.17;
+      fringe.position.y = 2.77;
       payung.add(fringe);
       const pFinial = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 8), goldMat);
-      pFinial.position.y = 2.8;
+      pFinial.position.y = 3.4;
       payung.add(pFinial);
       group.add(payung);
       addCircleCollider(x + px, z - payungOut, 0.12);
