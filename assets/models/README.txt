@@ -11,6 +11,9 @@ metallic-roughness maps stripped -- invisible through the distance haze.
 
 keris/            loaded by the KERIS & ANYAMAN station (replaces the photo)
 cow_skin/         two lembu grazing near the sawah and the kereta lembu
+merchants_npc/    merchant pair trading beside the kereta lembu
+                  ("Low Poly Middle Eastern Merchants NPC" by Nisa Nurul
+                  Azizah, sketchfab.com/nisanurulazizah, CC-BY-4.0)
 patch_of_grass/   walk-through grass drifts by the sawah and the east field
 low_poly_tree_scene_free/                 forest hillside, north-east quadrant
 the_landscape_is_a_forest_in_the_mountains/  western backdrop beyond the sawah
