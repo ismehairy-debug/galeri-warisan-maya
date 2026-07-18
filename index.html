@@ -830,8 +830,9 @@
       // DOM intro video is invisible inside a headset anyway. Phones keep
       // gyro + joystick, desktops keep mouse + WASD, both via the intro.
       if (isHeadsetBrowser && vrSupported){
-        // headset refused the session -> fall back to the normal flat flow
-        startVRSession().catch(() => { startHosting(); playIntro(); });
+        // once inside, the intro video plays on a cinema screen in-world;
+        // if the headset refused the session, fall back to the flat flow
+        startVRSession().then(startVrIntro).catch(() => { startHosting(); playIntro(); });
         return;
       }
       if (isTouchDevice) requestGyroPermission();
@@ -3423,18 +3424,23 @@
   // synchronously during init(), which executes above, so a module-level
   // const down here would still be in the temporal dead zone ----------
   function buildDescStands(points){
+    // every stand sits at the front-side corner of its exhibit and its
+    // placard is angled at the guest's natural viewing spot (a couple of
+    // metres in front of the display, where they stand to look at it) --
+    // so the guest reads the board and sees the display item in one glance
+    // instead of the board standing between them and the exhibit
     const STAND_SPOTS = {
-      tarian:    [-4.75, -5.45],
-      alatmuzik: [ 7.25, -5.45],
-      silat:     [ 1.25, -6.45],
-      pakaian:   [-6.75, -0.45],
-      kraf:      [-6.75,  6.55],
-      makanan:   [ 9.25, -0.45],
-      adat:      [ 9.25,  6.55],
-      filem:     [ 2.35,  1.4 ],
-      tiang:     [-2.2,   8.05],
-      tanggam:   [ 1.3,   8.05],
-      bumbung:   [-1.7,  -6.4 ],
+      tarian:    [-4.75, -5.45, -6,  -4.2],
+      alatmuzik: [ 7.25, -5.45,  6,  -4.2],
+      silat:     [ 1.25, -6.45,  0,  -5.2],
+      pakaian:   [-6.75, -0.45, -8,   0.8],
+      kraf:      [-6.75,  6.55, -8,   7.8],
+      makanan:   [ 9.25, -0.45,  8,   0.8],
+      adat:      [ 9.25,  6.55,  8,   7.8],
+      filem:     [ 2.35,  1.4,   0,   2.8],
+      tiang:     [-2.2,   8.05,  0,   8.6],
+      tanggam:   [ 1.3,   8.05,  0,   8.6],
+      bumbung:   [-1.7,  -6.4,   0,  -5.2],
       rumah:     [-10.8, 13.5,  0,   8  ],
       kereta:    [ 9.9,  14.3,  0,   8  ],
       sawah:     [-15.7,  1.5,  0,   1.5],
@@ -4357,6 +4363,68 @@
         ambienceStarted = true;
         startHosting(); // guest may enter VR without clicking MASUK first
       });
+  }
+
+  // ---------- VR intro cinema: the flat DOM intro overlay can't be seen
+  // inside a headset, so on auto-entry the same intro video plays on a big
+  // screen floating in the balai right where the guest spawns -- filling
+  // their view, with sound. Pulling the trigger skips; the video ending,
+  // skipping, or leaving VR all tear the screen down the same way. ----------
+  function startVrIntro(){
+    const video = document.getElementById('introVideo');
+    const session = renderer.xr.getSession();
+    if (!video || !session) return;
+
+    const videoTex = new THREE.VideoTexture(video);
+    videoTex.encoding = THREE.sRGBEncoding; // same flag as the station clips
+    const screen = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: videoTex, toneMapped: false })
+    );
+    // size the screen to the video's own aspect so nothing stretches --
+    // ~6.4m wide for landscape, height-capped for a portrait phone clip
+    const aspect = (video.videoWidth && video.videoHeight) ? video.videoWidth/video.videoHeight : 16/9;
+    const sw = Math.min(6.4, 3.6*aspect), sh = sw/aspect;
+    screen.scale.set(sw, sh, 1);
+    // spawn is (0, 0, 8.6) facing north into the balai -- the screen hangs
+    // ~4.3m ahead at that heading, under the 4.5m roof, ~73deg of view
+    screen.position.set(0, Math.max(1.9, sh/2 + 0.55), 4.3);
+    scene.add(screen);
+    const skipLabel = makeLabel('TEKAN PICU / PRESS TRIGGER', 'untuk langkau • to skip', true);
+    skipLabel.material.opacity = 1;
+    skipLabel.scale.set(0.65, 0.65, 1);
+    skipLabel.position.set(0, 0.34, 4.4);
+    scene.add(skipLabel);
+
+    // the gallery's own soundtrack waits until the film ends
+    document.getElementById('bgMusic').pause();
+
+    let done = false;
+    function endVrIntro(){
+      if (done) return;
+      done = true;
+      video.pause();
+      video.removeEventListener('ended', endVrIntro);
+      video.removeEventListener('error', endVrIntro);
+      session.removeEventListener('select', endVrIntro);
+      session.removeEventListener('end', endVrIntro);
+      scene.remove(screen);
+      scene.remove(skipLabel);
+      videoTex.dispose();
+      screen.material.dispose();
+      screen.geometry.dispose();
+      startBackgroundMusic();
+    }
+    video.addEventListener('ended', endVrIntro);
+    video.addEventListener('error', endVrIntro);
+    session.addEventListener('select', endVrIntro);
+    session.addEventListener('end', endVrIntro);
+
+    video.muted = false;
+    video.currentTime = 0;
+    video.play()
+      .catch(() => { video.muted = true; return video.play(); }) // sound refused -> at least show it
+      .catch(endVrIntro); // video unplayable -> straight to the world
   }
 
   function setupVRButton(){
