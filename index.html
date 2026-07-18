@@ -387,6 +387,7 @@
   const flames = [];         // { sprite, baseX, baseY, phase } pelita flame sprites
   const flagWaves = [];      // { mesh, poleSide, phase } cloth flags with vertex ripple
   const idleFigures = [];    // { node, phase } figures breathing/swaying subtly
+  const npcConvo = [];       // { holder, inner, baseYaw, phase } merchants in conversation
   let firefliesRef = null, motesRef = null;
   let bobPhase = 0;
   const prevPlayerPos = new THREE.Vector3();
@@ -2476,19 +2477,71 @@
     });
 
     // merchant NPCs (the visitor-supplied Sketchfab pair, CC-BY Nisa
-    // Nurul Azizah) trading beside the kereta lembu -- Middle Eastern
-    // merchants at a Melaka kampung retell the spice-trade story the
-    // hidangan exhibit describes. Native size unknown, so the pair is
-    // measured after load and scaled to human height; the inner model
-    // node (unit scale) joins idleFigures for the breathing sway, since
-    // that animation writes scale.y ~1 and would squash the sized holder
+    // Nurul Azizah) in conversation beside the kereta lembu -- Middle
+    // Eastern merchants at a Melaka kampung retell the spice-trade story
+    // the hidangan exhibit describes. The file carries BOTH merchants as
+    // sibling node clusters, so they're split into two single-figure
+    // holders posed face to face and animated as a conversation (see the
+    // npcConvo loop in the render update). Native size unknown: measured
+    // after load and scaled to human height.
     loadImportedModel('assets/models/merchants_npc/scene.gltf', 1,
-      { x: 13.4, z: 12.6, rotY: -1.9 }, holder => {
+      { x: 13.0, z: 12.35 }, holder => {
       const box = new THREE.Box3().setFromObject(holder);
       const h = box.max.y - box.min.y;
       if (h > 0.001) holder.scale.setScalar(1.8 / h);
-      addCircleCollider(13.4, 12.6, 0.6);
-      idleFigures.push({ node: holder.children[0], phase: Math.random()*Math.PI*2 });
+      holder.updateMatrixWorld(true);
+
+      // cluster the root-level nodes (bodies, hair, beard, hat...) into
+      // the two figures by where they sit along the axis they spread on
+      let rootNode = null;
+      holder.traverse(o => { if (!rootNode && o.name === 'RootNode') rootNode = o; });
+      const parts = rootNode ? rootNode.children.slice() : [];
+      if (!parts.length) return;
+      const centers = parts.map(p => new THREE.Box3().setFromObject(p).getCenter(new THREE.Vector3()));
+      const spread = a => Math.max(...centers.map(c => c[a])) - Math.min(...centers.map(c => c[a]));
+      const axis = spread('x') >= spread('z') ? 'x' : 'z';
+      const mid = centers.reduce((s, c) => s + c[axis], 0) / centers.length;
+      const namesA = [], namesB = [];
+      parts.forEach((p, i) => (centers[i][axis] <= mid ? namesA : namesB).push(p.name));
+      if (!namesA.length || !namesB.length){
+        // clustering failed (figures overlap?) -- keep the intact pair
+        // with the breathing idle rather than a broken split
+        idleFigures.push({ node: holder.children[0], phase: Math.random()*Math.PI*2 });
+        addCircleCollider(13.0, 12.35, 0.6);
+        return;
+      }
+
+      const holder2 = holder.clone(true); // shares geometry + materials
+      scene.add(holder2);
+      const hideSet = (root, names) =>
+        root.traverse(o => { if (names.indexOf(o.name) !== -1) o.visible = false; });
+      hideSet(holder, namesB);
+      hideSet(holder2, namesA);
+
+      // recentre each lone figure over its holder origin -- the shared
+      // normalisation centred the PAIR, so an un-shifted single figure
+      // would orbit its holder instead of turning in place
+      [[holder, namesA], [holder2, namesB]].forEach(pair => {
+        const hd = pair[0], names = pair[1];
+        hd.updateMatrixWorld(true);
+        const b = new THREE.Box3();
+        hd.traverse(o => { if (o.name && names.indexOf(o.name) !== -1) b.expandByObject(o); });
+        const c = b.getCenter(new THREE.Vector3());
+        const model = hd.children[0];
+        model.position.x -= (c.x - hd.position.x) / hd.scale.x;
+        model.position.z -= (c.z - hd.position.z) / hd.scale.z;
+      });
+
+      // conversation spots: ~1.1m apart, each turned to face the other
+      const spots = [{ hd: holder, x: 13.0, z: 12.35 }, { hd: holder2, x: 13.95, z: 12.95 }];
+      spots.forEach((s, i) => {
+        const other = spots[1 - i];
+        s.hd.position.set(s.x, 0, s.z);
+        const yaw = Math.atan2(other.x - s.x, other.z - s.z);
+        s.hd.rotation.y = yaw;
+        npcConvo.push({ holder: s.hd, inner: s.hd.children[0], baseYaw: yaw, phase: i * Math.PI });
+        addCircleCollider(s.x, s.z, 0.4);
+      });
     });
 
     // the grass patch IS the padi: one squared-off fill per flooded plot,
@@ -4771,6 +4824,16 @@
     for (const fig of idleFigures){
       fig.node.rotation.z = Math.sin(t*1.1 + fig.phase)*0.03;
       fig.node.scale.y = 1 + Math.sin(t*2.1 + fig.phase)*0.012;
+    }
+
+    // the merchant pair converse: opposite phases make them take turns --
+    // the "speaker" leans in with little nods and yaw sways while the
+    // "listener" settles to a quieter version of the same motion
+    for (const m of npcConvo){
+      const turn = Math.sin(t*0.7 + m.phase) > 0 ? 1 : 0.35;
+      m.holder.rotation.y = m.baseYaw + Math.sin(t*1.3 + m.phase)*0.1*turn;
+      m.holder.rotation.x = Math.max(0, Math.sin(t*2.3 + m.phase))*0.05*turn;
+      m.inner.scale.y = 1 + Math.sin(t*2.1 + m.phase)*0.012; // breathing
     }
 
     // fireflies wander; dust motes hang and drift in the lamp light
