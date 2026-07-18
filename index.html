@@ -4255,12 +4255,25 @@
     player.position.z = headPos.z - dx * sin + dz * cos;
   }
 
+  let vrExitBtnWas = false; // X held last frame -- makes the exit edge-triggered
   function vrMove(dt){
     if (!renderer.xr.isPresenting) return;
     const session = renderer.xr.getSession();
     if (!session) return;
     for (const src of session.inputSources){
       if (!src.gamepad) continue;
+      // X on the left keris (xr-standard button index 4) hands the booth
+      // over: end the VR session and return to the start screen, reset and
+      // ready for the next guest
+      if (src.handedness === 'left' && src.gamepad.buttons.length > 4){
+        const pressed = src.gamepad.buttons[4].pressed;
+        if (pressed && !vrExitBtnWas){
+          vrExitBtnWas = pressed;
+          resetWorldForNewGuest();
+          return;
+        }
+        vrExitBtnWas = pressed;
+      }
       const axes = src.gamepad.axes;
       const ax = axes.length >= 4 ? axes[2] : axes[0];
       const ay = axes.length >= 4 ? axes[3] : axes[1];
