@@ -332,7 +332,7 @@
   let bgGainNode = null;
   let bgVolCurrent = 0;
   let insideSmooth = 1;
-  const BG_BASE_VOL = 0.6;
+  const BG_BASE_VOL = 0.85; // anak ayam read as too quiet at 0.6 in the balai
   let istanaGainNode = null;
   let istanaVolCurrent = 0;
   let insideIstanaSmooth = 0;
@@ -3583,11 +3583,15 @@
       // used to hide at the back-west pillar between tarian and songket &
       // batik), facing arriving visitors the same way tanggam does; both
       // are pure signs (noMarker) since the glowing sphere read as clutter
-      { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-3.4, 1.3, ROOM.depth/2-0.6], labelY:1.6, noMarker:true,
+      // the three architecture hotspots are marked silent so walking up to
+      // them doesn't duck anak ayam -- critically, the spawn point sits
+      // inside tanggam's radius, which used to mute the song at entry
+      // until the guest walked away from the gateway
+      { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-3.4, 1.3, ROOM.depth/2-0.6], labelY:1.6, noMarker:true, silent:true,
         desc:'Traditional Malay buildings stand on hardwood posts (tiang) resting on stone footings rather than buried in the ground. Raising the floor lifts the house clear of floods, mud and pests, lets cooling air sweep underneath, and leaves a shaded space (kolong) below for daily work, storage and animals. The tiang seri -- the principal post -- is the first one raised when a house is built, honoured with its own ceremony as the spiritual heart of the home.' },
-      { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1],
+      { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1], silent:true,
         desc:'The steep bumbung panjang (long gable roof) sheds heavy tropical rain in an instant, while its high gable ends vent the hot air rising off the hall so the space below stays cool without any machinery. Under the eaves run bands of kerawang -- carved openwork fretwork -- that let every breeze pass through while casting patterned shade, turning ventilation itself into decoration.' },
-      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 2.2, ROOM.depth/2-0.6], noMarker:true,
+      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 2.2, ROOM.depth/2-0.6], noMarker:true, silent:true,
         desc:'Tanggam is the traditional Malay system of timber joinery: mortise-and-tenon and interlocking joints cut so precisely that an entire house holds together without a single nail. Joined this way the frame can flex in wind and settle with the ground, and a whole house could even be dismantled, carried by the village in a gotong-royong effort (usung rumah) and reassembled on a new site.' },
       // description-only triggers for the two outside buildings: both already
       // carry their own always-visible signs, so these show just the info
@@ -4265,11 +4269,21 @@
       // X on the left keris (xr-standard button index 4) hands the booth
       // over: end the VR session and return to the start screen, reset and
       // ready for the next guest
-      if (src.handedness === 'left' && src.gamepad.buttons.length > 4){
-        const pressed = src.gamepad.buttons[4].pressed;
+      if (src.handedness === 'left'){
+        // X sits at xr-standard index 4, but scan every button past the
+        // reserved trigger/squeeze/pad/stick slots too, in case this
+        // browser exposes the layout differently
+        const btns = src.gamepad.buttons;
+        let pressed = false;
+        for (let b = 4; b < btns.length; b++){ if (btns[b] && btns[b].pressed){ pressed = true; break; } }
         if (pressed && !vrExitBtnWas){
-          vrExitBtnWas = pressed;
-          resetWorldForNewGuest();
+          vrExitBtnWas = true;
+          try { resetWorldForNewGuest(); }
+          catch (e) {
+            // whatever else failed, still leave VR so the guest sees the UI
+            const s = renderer.xr.getSession();
+            if (s) s.end().catch(() => {});
+          }
           return;
         }
         vrExitBtnWas = pressed;
@@ -4892,10 +4906,12 @@
     // exhibit interaction; outside the balai, wind + bird chirps take over
     if (ambienceStarted){
       const insideAmount = computeInsideAmount(camWorld);
-      insideSmooth += (insideAmount - insideSmooth) * Math.min(1, dt*2);
+      // fast ramps: a guest stepping into the balai hears anak ayam within
+      // a fraction of a second, not a slow multi-second swell
+      insideSmooth += (insideAmount - insideSmooth) * Math.min(1, dt*5);
 
       const targetBgVol = BG_BASE_VOL * insideSmooth * (1 - maxActive);
-      bgVolCurrent += (targetBgVol - bgVolCurrent) * Math.min(1, dt*3);
+      bgVolCurrent += (targetBgVol - bgVolCurrent) * Math.min(1, dt*6);
       const safeVol = Math.max(0, Math.min(1, bgVolCurrent));
       if (bgGainNode && bgGainNode.context.state === 'running'){
         bgGainNode.gain.value = Number.isFinite(safeVol) ? safeVol : 0;
