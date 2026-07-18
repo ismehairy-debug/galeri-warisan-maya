@@ -3342,6 +3342,103 @@
     ctx.closePath();
   }
 
+  // ---------- VR description board: the #infoPanel DOM overlay doesn't
+  // exist inside an immersive session, and the station signs hang at
+  // 2.6m -- far above a standing visitor's head at close range. In VR the
+  // nearest station's description instead appears on this in-world board,
+  // anchored straight ahead at the visitor's own eye height. ----------
+  let vrDescPanel = null;
+  function ensureVrDescPanel(){
+    if (vrDescPanel) return vrDescPanel;
+    const c = document.createElement('canvas');
+    c.width = 1024; c.height = 768;
+    const mat = new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(c), transparent: true, opacity: 0,
+      toneMapped: false, side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.125), mat);
+    mesh.visible = false;
+    scene.add(mesh);
+    vrDescPanel = { mesh, ctx: c.getContext('2d'), key: null, anchorKey: null };
+    return vrDescPanel;
+  }
+
+  function wrapLines(ctx, str, maxWidth){
+    const lines = [];
+    let line = '';
+    for (const w of str.split(' ')){
+      const trial = line ? line + ' ' + w : w;
+      if (line && ctx.measureText(trial).width > maxWidth){ lines.push(line); line = w; }
+      else line = trial;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function drawVrDesc(station){
+    const p = ensureVrDescPanel();
+    const ctx = p.ctx, W = 1024, H = 768;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(10,8,4,0.82)';
+    roundRect(ctx, 6, 6, W-12, H-12, 26); ctx.fill();
+    ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 5;
+    roundRect(ctx, 6, 6, W-12, H-12, 26); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f2e2b6';
+    let titleSize = 52;
+    ctx.font = `700 ${titleSize}px Georgia`;
+    while (ctx.measureText(station.def.name).width > W-120 && titleSize > 28){
+      titleSize -= 2;
+      ctx.font = `700 ${titleSize}px Georgia`;
+    }
+    ctx.fillText(station.def.name, W/2, 88);
+    ctx.font = 'italic 30px Georgia';
+    ctx.fillStyle = '#c9a961';
+    ctx.fillText(station.def.sub || '', W/2, 134);
+    // body text: shrink until the wrapped lines fit above the bottom border
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#efe6cd';
+    let size = 34, lines;
+    for (;;){
+      ctx.font = `${size}px Georgia`;
+      lines = wrapLines(ctx, station.def.desc, W-140);
+      if (200 + lines.length * (size + 12) <= H - 46 || size <= 22) break;
+      size -= 2;
+    }
+    lines.forEach((ln, i) => ctx.fillText(ln, 70, 210 + i*(size+12)));
+    p.mesh.material.map.needsUpdate = true;
+    p.key = station.def.key;
+  }
+
+  const vrDescHead = new THREE.Vector3(), vrDescFwd = new THREE.Vector3();
+  function updateVrDescPanel(station, dt){
+    if (!vrDescPanel && !station) return;
+    const p = ensureVrDescPanel();
+    const mat = p.mesh.material;
+    if (station){
+      if (station.def.key !== p.key) drawVrDesc(station);
+      // (re-)anchor when the board first appears or switches station: park
+      // it a couple of metres ahead at the visitor's own eye height, then
+      // leave it fixed in the world so they can lean in to read
+      if (station.def.key !== p.anchorKey || mat.opacity < 0.05){
+        camera.getWorldPosition(vrDescHead);
+        camera.getWorldDirection(vrDescFwd);
+        vrDescFwd.y = 0;
+        if (vrDescFwd.lengthSq() < 1e-4) vrDescFwd.set(0, 0, -1);
+        vrDescFwd.normalize();
+        const panelY = THREE.MathUtils.clamp(vrDescHead.y - 0.1, 0.9, 2.1);
+        p.mesh.position.set(vrDescHead.x + vrDescFwd.x*1.8, panelY, vrDescHead.z + vrDescFwd.z*1.8);
+        p.mesh.lookAt(vrDescHead.x, panelY, vrDescHead.z);
+        p.anchorKey = station.def.key;
+      }
+    } else {
+      p.anchorKey = null;
+    }
+    const target = station ? 1 : 0;
+    mat.opacity += (target - mat.opacity) * Math.min(1, dt*6);
+    p.mesh.visible = mat.opacity > 0.02;
+  }
+
   function buildTitleSprite(){
     // static-facing plane, same as every station/hotspot sign, instead of a
     // camera-facing sprite -- its default front (+Z) already faces south,
@@ -4378,6 +4475,9 @@
 
     // spectator view stays clean -- no description panel over the mirror
     if (!SPECTATE_ID) updateInfoPanel(bestStation);
+    // in an immersive session the DOM overlay above is invisible, so the
+    // description rides an in-world board at the visitor's eye height instead
+    if (!SPECTATE_ID) updateVrDescPanel(renderer.xr.isPresenting ? bestStation : null, dt);
 
     // anak ayam only plays inside the balai, and fades out while near any
     // exhibit interaction; outside the balai, wind + bird chirps take over
