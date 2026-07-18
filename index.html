@@ -4459,6 +4459,48 @@
     reflection.position.set(0, -screenY, screenZ);
     scene.add(reflection);
 
+    // ambilight: a soft halo hanging just behind the screen, tinted live
+    // from the film's own average colour (sampled small every 150ms and
+    // eased, TV-ambilight style) -- drawn as an alpha gradient so the
+    // colour reads against the pure white void, where additive light can't
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = glowCanvas.height = 256;
+    const gctx = glowCanvas.getContext('2d');
+    const ggrad = gctx.createRadialGradient(128, 128, 20, 128, 128, 126);
+    ggrad.addColorStop(0, 'rgba(255,255,255,0.85)');
+    ggrad.addColorStop(0.65, 'rgba(255,255,255,0.35)');
+    ggrad.addColorStop(1, 'rgba(255,255,255,0)');
+    gctx.fillStyle = ggrad;
+    gctx.fillRect(0, 0, 256, 256);
+    const glow = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(glowCanvas), transparent: true, depthWrite: false, toneMapped: false })
+    );
+    glow.scale.set(sw*1.9, sh*2.3, 1);
+    glow.position.set(0, screenY, screenZ - 0.12);
+    scene.add(glow);
+
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = 16; sampleCanvas.height = 9;
+    const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+    const glowTarget = new THREE.Color(0xffffff);
+    const glowTimer = setInterval(() => {
+      if (video.readyState < 2) return;
+      try {
+        sampleCtx.drawImage(video, 0, 0, 16, 9);
+        const d = sampleCtx.getImageData(0, 0, 16, 9).data;
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < d.length; i += 4){ r += d[i]; g += d[i+1]; b += d[i+2]; }
+        const n = d.length/4;
+        r /= n; g /= n; b /= n;
+        // brighten toward a vivid version of the same hue -- raw frame
+        // averages come out muddy, and the halo should read as light
+        const lift = 215 / Math.max(r, g, b, 1);
+        glowTarget.setRGB(Math.min(1, r*lift/255), Math.min(1, g*lift/255), Math.min(1, b*lift/255));
+      } catch (e) { /* frame not samplable yet -- keep the last colour */ }
+      glow.material.color.lerp(glowTarget, 0.35);
+    }, 150);
+
     // the gallery's own soundtrack waits until the film ends
     document.getElementById('bgMusic').pause();
 
@@ -4471,7 +4513,7 @@
     scene.fog = null;
     const hiddenWorld = [];
     scene.children.forEach(o => {
-      if (o === screen || o === shadow || o === reflection ||
+      if (o === screen || o === shadow || o === reflection || o === glow ||
           o === player || o.isLight || !o.visible) return;
       o.visible = false;
       hiddenWorld.push(o);
@@ -4486,9 +4528,11 @@
       video.removeEventListener('error', endVrIntro);
       session.removeEventListener('select', endVrIntro);
       session.removeEventListener('end', endVrIntro);
+      clearInterval(glowTimer);
       scene.remove(screen);
       scene.remove(shadow);
       scene.remove(reflection);
+      scene.remove(glow);
       videoTex.dispose();
       screen.material.dispose();
       screen.geometry.dispose(); // shared with the reflection mesh
@@ -4496,6 +4540,9 @@
       shadow.material.map.dispose();
       shadow.material.dispose();
       shadow.geometry.dispose();
+      glow.material.map.dispose();
+      glow.material.dispose();
+      glow.geometry.dispose();
       hiddenWorld.forEach(o => { o.visible = true; });
       scene.background = prevBackground;
       scene.fog = prevFog;
