@@ -141,10 +141,10 @@
     margin-top:16px; font-size:13px; letter-spacing:2px; color:#c9a961;
   }
   #introScreen {
-    position:fixed; inset:0; z-index:30; background:#000;
+    position:fixed; inset:0; z-index:30; background:#fff;
     display:flex; align-items:center; justify-content:center;
   }
-  #introScreen video { width:100%; height:100%; object-fit:contain; background:#000; }
+  #introScreen video { width:100%; height:100%; object-fit:contain; background:#fff; }
   #introControls {
     position:fixed; right:22px; bottom:22px; z-index:31; display:flex; gap:10px;
   }
@@ -2878,6 +2878,34 @@
       addCircleCollider(x + px, z - payungOut, 0.12);
     });
 
+    // no-entry barrier across the grand doorway: guests view the throne
+    // hall from outside, museum-style -- two gold-capped posts, a rope
+    // rail spanning the opening, a hanging DILARANG MASUK sign, and a
+    // collider so the doorway genuinely can't be crossed
+    {
+      const railY = 0.78, span = 4.6;
+      [-2.3, 2.3].forEach(px => {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, railY + 0.12, 8), darkWoodMat);
+        post.position.set(px, (railY + 0.12)/2, -innerD/2 - 0.45);
+        group.add(post);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), goldMat);
+        cap.position.set(px, railY + 0.16, -innerD/2 - 0.45);
+        group.add(cap);
+      });
+      const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, span, 8),
+        new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0x6a4a10, emissiveIntensity: 0.25, roughness: 0.6 }));
+      rope.rotation.z = Math.PI/2;
+      rope.position.set(0, railY, -innerD/2 - 0.45);
+      group.add(rope);
+      const noEntry = makeLabel('DILARANG MASUK', 'No entry — lihat dari luar / view from outside', true);
+      noEntry.material.opacity = 1;
+      noEntry.scale.set(0.5, 0.5, 1);
+      noEntry.rotation.y = Math.PI; // face the approaching guests
+      noEntry.position.set(0, railY - 0.28, -innerD/2 - 0.47);
+      group.add(noEntry);
+      addBoxCollider(x, z - innerD/2 - 0.45, span/2 + 0.1, 0.3);
+    }
+
     // roofline matched to the real building's reference photo: one tall
     // central bertingkat (stepped pyramidal) tower over the entrance,
     // flanked by two lower pitched gable wings running the rest of the
@@ -3440,17 +3468,18 @@
       makanan:   [ 9.25, -0.45,  8,   0.8],
       adat:      [ 9.25,  6.55,  8,   7.8],
       filem:     [ 2.35,  1.4,   0,   2.8],
-      // tiang seri and tanggam placards move OUT FRONT of the balai,
-      // flanking the gateway on the entrance path, angled back at the
-      // opening every guest walks through (clear of posts and pelita)
-      tiang:     [-2.8,  10.0,   0,   8.6],
-      tanggam:   [ 2.0,  10.0,   0,   8.6],
+      // tiang seri and tanggam placards flank the gateway out front on the
+      // entrance path, FACING EACH OTHER across it like welcome boards --
+      // a guest walking the path between them can read either side-on
+      tiang:     [-2.8,  10.0,   2.0, 10.0],
+      tanggam:   [ 2.0,  10.0,  -2.8, 10.0],
       bumbung:   [-1.7,  -6.4,   0,  -5.2],
       // beside the rumah's entrance stair foot (stair lands at
       // (-10.8, 13.2) running west; the pelita lamp sits at (-11, 14.1))
       rumah:     [-10.15, 14.35, 0,   8  ],
-      // beside the pair of lembu yoked ahead of the cart
-      kereta:    [ 9.7,  15.0,  0,   8  ],
+      // on the lembu pair's southern flank -- beside the animals, not
+      // parked in front of the team (cows stand at (10.9, 14.4 & 15.6))
+      kereta:    [ 10.7, 13.3,  0,   8  ],
       sawah:     [-15.7,  1.5,  0,   1.5],
       istana:    [ 1.6,  15.9,  0,   8  ],
     };
@@ -4407,6 +4436,20 @@
     // the gallery's own soundtrack waits until the film ends
     document.getElementById('bgMusic').pause();
 
+    // full white surround: the whole world hides behind a clean white void
+    // while the film plays -- the kampung only appears once it ends. Lights
+    // and the player rig (camera, keris hands) stay; only what we hide here
+    // is restored, so anything async-loaded mid-film keeps its own state.
+    const prevBackground = scene.background, prevFog = scene.fog;
+    scene.background = new THREE.Color(0xffffff);
+    scene.fog = null;
+    const hiddenWorld = [];
+    scene.children.forEach(o => {
+      if (o === screen || o === skipLabel || o === player || o.isLight || !o.visible) return;
+      o.visible = false;
+      hiddenWorld.push(o);
+    });
+
     let done = false;
     function endVrIntro(){
       if (done) return;
@@ -4421,6 +4464,9 @@
       videoTex.dispose();
       screen.material.dispose();
       screen.geometry.dispose();
+      hiddenWorld.forEach(o => { o.visible = true; });
+      scene.background = prevBackground;
+      scene.fog = prevFog;
       startBackgroundMusic();
     }
     video.addEventListener('ended', endVrIntro);
