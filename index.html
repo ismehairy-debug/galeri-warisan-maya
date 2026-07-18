@@ -361,6 +361,11 @@
   let specHasPose = false;
 
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  // a standalone headset's own browser (Quest reports OculusBrowser; Pico
+  // and Wolvic likewise) -- NOT the same as WebXR support, which desktop
+  // Chrome with a linked headset and even phones (Cardboard) also report
+  const isHeadsetBrowser = /OculusBrowser|Quest|Pico|Wolvic/i.test(navigator.userAgent);
+  let vrSupported = false; // set once isSessionSupported('immersive-vr') resolves
   let gyroActive = false;
   let deviceAlpha = 0, deviceBeta = 0, deviceGamma = 0;
   let alphaOffset = null;
@@ -401,6 +406,7 @@
   let palmTrunkMat = null;
   let bananaLeafAssets = null;
   let flameTexture = null;
+  const kerisGrips = []; // filled by buildKerisControllers, also during init
 
   init();
 
@@ -426,7 +432,9 @@
     // ratios than desktop -- both are common causes of laggy animation
     // on mobile, so trade a bit of visual crispness for frame rate there
     renderer = new THREE.WebGLRenderer({ antialias: !isTouchDevice });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
+    // 1.5 everywhere: 2.0 on a hi-dpi desktop monitor meant pushing ~4x the
+    // pixels of 1.0 through a full scene + shadow pass, the main desktop lag
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputEncoding = THREE.sRGBEncoding;
     // filmic tone mapping compresses highlights the way a camera does --
@@ -468,6 +476,13 @@
     firefliesRef = buildFireflies();
     motesRef = buildDustMotes();
     enableShadows();
+    // the sun is the scene's only shadow caster and the scenery is static,
+    // so stop re-rendering the whole scene's shadow depth pass every frame;
+    // a once-a-second refresh tick in updateFrame catches async-loaded
+    // scenery and the slow performer animations instead
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
+    buildKerisControllers();
     prevPlayerPos.copy(player.position);
 
     window.addEventListener('resize', onResize);
@@ -810,6 +825,15 @@
       // appears after the intro video (enterWorld)
       if (listener.context.state === 'suspended') listener.context.resume();
       unlockStationMedia();
+      // auto-detect how this guest is entering: a standalone headset's own
+      // browser (Quest etc.) jumps straight into the VR world -- the flat
+      // DOM intro video is invisible inside a headset anyway. Phones keep
+      // gyro + joystick, desktops keep mouse + WASD, both via the intro.
+      if (isHeadsetBrowser && vrSupported){
+        // headset refused the session -> fall back to the normal flat flow
+        startVRSession().catch(() => { startHosting(); playIntro(); });
+        return;
+      }
       if (isTouchDevice) requestGyroPermission();
       startHosting(); // session always exists now, so casting is always live
       playIntro();
@@ -3394,25 +3418,28 @@
   // doesn't exist at all). Positions are world-space, hand-placed so no
   // stand blocks its exhibit or a walkway; the optional second pair of
   // numbers is a point the placard should face -- stands without one
-  // face south (+z), the way every exhibit in the balai already does ----------
-  const STAND_SPOTS = {
-    tarian:    [-4.75, -5.45],
-    alatmuzik: [ 7.25, -5.45],
-    silat:     [ 1.25, -6.45],
-    pakaian:   [-6.75, -0.45],
-    kraf:      [-6.75,  6.55],
-    makanan:   [ 9.25, -0.45],
-    adat:      [ 9.25,  6.55],
-    filem:     [ 2.35,  1.4 ],
-    tiang:     [-2.2,   8.05],
-    tanggam:   [ 1.3,   8.05],
-    bumbung:   [-1.7,  -6.4 ],
-    rumah:     [-10.8, 13.5,  0,   8  ],
-    kereta:    [ 9.9,  14.3,  0,   8  ],
-    sawah:     [-15.7,  1.5,  0,   1.5],
-    istana:    [ 1.6,  15.9,  0,   8  ],
-  };
+  // face south (+z), the way every exhibit in the balai already does.
+  // The spot table lives inside the function: buildDescStands runs
+  // synchronously during init(), which executes above, so a module-level
+  // const down here would still be in the temporal dead zone ----------
   function buildDescStands(points){
+    const STAND_SPOTS = {
+      tarian:    [-4.75, -5.45],
+      alatmuzik: [ 7.25, -5.45],
+      silat:     [ 1.25, -6.45],
+      pakaian:   [-6.75, -0.45],
+      kraf:      [-6.75,  6.55],
+      makanan:   [ 9.25, -0.45],
+      adat:      [ 9.25,  6.55],
+      filem:     [ 2.35,  1.4 ],
+      tiang:     [-2.2,   8.05],
+      tanggam:   [ 1.3,   8.05],
+      bumbung:   [-1.7,  -6.4 ],
+      rumah:     [-10.8, 13.5,  0,   8  ],
+      kereta:    [ 9.9,  14.3,  0,   8  ],
+      sawah:     [-15.7,  1.5,  0,   1.5],
+      istana:    [ 1.6,  15.9,  0,   8  ],
+    };
     const woodMat = new THREE.MeshStandardMaterial({ color: 0x3d2817, roughness: 0.8 });
     points.forEach(st => {
       const spot = STAND_SPOTS[st.def.key];
@@ -4190,6 +4217,76 @@
     clampToRoom();
   }
 
+  // ---------- VR controllers rendered as a pair of keris, so the guest's
+  // hands carry the gallery's own heritage instead of floating unseen
+  // (kerisGrips itself is declared with the pre-init state up top) ----------
+  function buildKerisModel(){
+    const g = new THREE.Group();
+    const hiltMat = new THREE.MeshStandardMaterial({ color: 0x4a2c14, roughness: 0.55 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.8, roughness: 0.3 });
+    const bladeMat = new THREE.MeshStandardMaterial({
+      color: 0xb9c2cc, metalness: 0.9, roughness: 0.25,
+      emissive: 0x30363d, emissiveIntensity: 0.35 // stays readable in the dim balai
+    });
+
+    // hulu (hilt): a short grip tipped forward like a pistol grip, the way
+    // a keris handle bends off the blade's axis, ending in a carved pommel
+    const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.019, 0.1, 10), hiltMat);
+    hilt.rotation.x = Math.PI/2 - 0.4;
+    hilt.position.set(0, 0.012, 0.035);
+    g.add(hilt);
+    const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8), hiltMat);
+    pommel.position.set(0, 0.032, 0.081);
+    pommel.scale.set(1, 0.75, 1.2);
+    g.add(pommel);
+
+    // sampir (the boat-shaped guard where blade meets hilt)
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.014, 0.03), goldMat);
+    guard.position.set(0, 0, -0.015);
+    g.add(guard);
+
+    // wavy blade (luk): a tapering outline swinging around a sinusoidal
+    // centreline, extruded thin -- drawn in x/y, then rotated to point
+    // forward (-z) out of the fist
+    const steps = 20, len = 0.33, amp = 0.011, luk = 3;
+    const shape = new THREE.Shape();
+    for (let s = 0; s <= steps; s++){
+      const t = s/steps;
+      const cx = Math.sin(t*Math.PI*2*luk) * amp * (1-t);
+      const w = 0.019 * (1-t) + 0.0022;
+      if (s === 0) shape.moveTo(cx - w, t*len);
+      else shape.lineTo(cx - w, t*len);
+    }
+    for (let s = steps; s >= 0; s--){
+      const t = s/steps;
+      const cx = Math.sin(t*Math.PI*2*luk) * amp * (1-t);
+      const w = 0.019 * (1-t) + 0.0022;
+      shape.lineTo(cx + w, t*len);
+    }
+    const blade = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(shape, { depth: 0.005, bevelEnabled: true, bevelThickness: 0.002, bevelSize: 0.002, bevelSegments: 1 }),
+      bladeMat
+    );
+    blade.rotation.x = -Math.PI/2; // shape's +y (blade length) -> world -z
+    blade.position.set(0, 0.0025, -0.02);
+    g.add(blade);
+    return g;
+  }
+
+  function buildKerisControllers(){
+    for (let i = 0; i < 2; i++){
+      const grip = renderer.xr.getControllerGrip(i);
+      grip.add(buildKerisModel());
+      // start hidden: three only manages grip visibility while presenting,
+      // and an unparented grip sits at the rig origin (the player's feet)
+      grip.visible = false;
+      // child of the rig, not the scene -- controller poses are in tracking
+      // space, so they must inherit the same transform the headset camera does
+      player.add(grip);
+      kerisGrips.push(grip);
+    }
+  }
+
   function clampToRoom(){
     const m = 40;
     player.position.x = Math.max(-m, Math.min(m, player.position.x));
@@ -4229,7 +4326,39 @@
     }
   }
 
-  // ---------- VR button ----------
+  // ---------- VR entry ----------
+  // shared by the ENTER VR button and the MASUK auto-detect path; must be
+  // called from inside a user-gesture handler (requestSession requires one)
+  let currentVRSession = null;
+  function startVRSession(){
+    return navigator.xr.requestSession('immersive-vr', { optionalFeatures:['local-floor','bounded-floor'] })
+      .then(session => {
+        const button = document.getElementById('vr-button');
+        session.addEventListener('end', () => {
+          currentVRSession = null;
+          if (!button.disabled) button.textContent = 'ENTER VR';
+          // a headset guest dropping back to the flat browser still needs a
+          // way to walk -- restore the touch joystick hidden at auto-detect
+          if (isTouchDevice && audioReady) document.getElementById('joystick-base').style.display = 'block';
+        });
+        renderer.xr.setSession(session);
+        currentVRSession = session;
+        if (!button.disabled) button.textContent = 'EXIT VR';
+        if (!audioReady){
+          document.getElementById('startScreen').style.display = 'none';
+          document.getElementById('overlay').classList.add('visible');
+          audioReady = true;
+        }
+        unlockStationMedia();
+        unmuteStationMedia(); // entering VR means the world is open -- no intro to protect
+        startBackgroundMusic();
+        startIstanaMusic();
+        startOutsideAmbience();
+        ambienceStarted = true;
+        startHosting(); // guest may enter VR without clicking MASUK first
+      });
+  }
+
   function setupVRButton(){
     const button = document.getElementById('vr-button');
     if (!('xr' in navigator)){
@@ -4239,34 +4368,23 @@
     }
     navigator.xr.isSessionSupported('immersive-vr').then(supported => {
       if (!supported){ button.textContent = 'VR TIDAK DISOKONG'; button.disabled = true; return; }
+      vrSupported = true;
       button.disabled = false;
       button.textContent = 'ENTER VR';
-      let currentSession = null;
       button.onclick = () => {
-        if (!currentSession){
-          navigator.xr.requestSession('immersive-vr', { optionalFeatures:['local-floor','bounded-floor'] })
-            .then(session => {
-              session.addEventListener('end', () => { currentSession = null; button.textContent = 'ENTER VR'; });
-              renderer.xr.setSession(session);
-              currentSession = session;
-              button.textContent = 'EXIT VR';
-              if (!audioReady){
-                document.getElementById('startScreen').style.display = 'none';
-                document.getElementById('overlay').classList.add('visible');
-                audioReady = true;
-              }
-              unlockStationMedia();
-              unmuteStationMedia(); // entering VR means the world is open -- no intro to protect
-              startBackgroundMusic();
-              startIstanaMusic();
-              startOutsideAmbience();
-              ambienceStarted = true;
-              startHosting(); // guest may enter VR without clicking MASUK first
-            });
-        } else {
-          currentSession.end();
-        }
+        if (!currentVRSession) startVRSession().catch(() => {});
+        else currentVRSession.end();
       };
+      // a real headset browser goes straight into VR from MASUK -- tell the
+      // guest on the start screen instead of pointing them at ENTER VR
+      if (isHeadsetBrowser){
+        document.querySelector('#startScreen small').textContent =
+          'VR headset dikesan / VR headset detected: MASUK membawa anda terus ke dalam galeri VR. ENTER GALLERY takes you straight into the gallery in VR.';
+        // Quest counts as a touch device, but its guest never needs the
+        // phone-only controls the touch branch just switched on
+        document.getElementById('gyro-button').style.display = 'none';
+        document.getElementById('joystick-base').style.display = 'none';
+      }
     }).catch(() => { button.textContent = 'VR TIDAK DISOKONG'; button.disabled = true; });
   }
 
@@ -4295,7 +4413,23 @@
     renderer.render(scene, camera);
   }
 
+  let shadowRefreshTimer = 0;
   function updateFrame(points, clouds, birds, dt, t){
+    // the shadow map is frozen (autoUpdate=false, see init); refresh it
+    // about once a second to catch async-loaded GLTF scenery and the slow
+    // performer animations, at a fraction of the every-frame cost
+    if (renderer.shadowMap.enabled){
+      shadowRefreshTimer += dt;
+      if (shadowRefreshTimer >= 1){
+        shadowRefreshTimer = 0;
+        renderer.shadowMap.needsUpdate = true;
+      }
+    }
+    // three only manages controller-grip visibility while presenting --
+    // outside VR the keris would linger wherever the grips last tracked
+    if (!renderer.xr.isPresenting){
+      kerisGrips.forEach(g => g.visible = false);
+    }
     if (SPECTATE_ID){
       // spectator: the camera is a passive mirror of the guest's synced
       // pose -- no local movement, look controls, or head-bob at all
