@@ -455,6 +455,7 @@
     stationsRef = stations;
     const hotspots = buildArchitectureHotspots();
     const allPoints = stations.concat(hotspots);
+    buildDescStands(allPoints);
     const listener = new THREE.AudioListener();
     camera.add(listener);
     stations.forEach(s => attachAudio(s, listener));
@@ -3342,27 +3343,6 @@
     ctx.closePath();
   }
 
-  // ---------- VR description board: the #infoPanel DOM overlay doesn't
-  // exist inside an immersive session, and the station signs hang at
-  // 2.6m -- far above a standing visitor's head at close range. In VR the
-  // nearest station's description instead appears on this in-world board,
-  // anchored straight ahead at the visitor's own eye height. ----------
-  let vrDescPanel = null;
-  function ensureVrDescPanel(){
-    if (vrDescPanel) return vrDescPanel;
-    const c = document.createElement('canvas');
-    c.width = 1024; c.height = 768;
-    const mat = new THREE.MeshBasicMaterial({
-      map: new THREE.CanvasTexture(c), transparent: true, opacity: 0,
-      toneMapped: false, side: THREE.DoubleSide
-    });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.125), mat);
-    mesh.visible = false;
-    scene.add(mesh);
-    vrDescPanel = { mesh, ctx: c.getContext('2d'), key: null, anchorKey: null };
-    return vrDescPanel;
-  }
-
   function wrapLines(ctx, str, maxWidth){
     const lines = [];
     let line = '';
@@ -3375,11 +3355,12 @@
     return lines;
   }
 
-  function drawVrDesc(station){
-    const p = ensureVrDescPanel();
-    const ctx = p.ctx, W = 1024, H = 768;
+  // ---------- shared placard artwork: title, subtitle and the full
+  // auto-wrapped description, shrunk until it fits the canvas ----------
+  function drawDescCanvas(ctx, def){
+    const W = 1024, H = 768;
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = 'rgba(10,8,4,0.82)';
+    ctx.fillStyle = 'rgba(10,8,4,0.92)';
     roundRect(ctx, 6, 6, W-12, H-12, 26); ctx.fill();
     ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 5;
     roundRect(ctx, 6, 6, W-12, H-12, 26); ctx.stroke();
@@ -3387,56 +3368,86 @@
     ctx.fillStyle = '#f2e2b6';
     let titleSize = 52;
     ctx.font = `700 ${titleSize}px Georgia`;
-    while (ctx.measureText(station.def.name).width > W-120 && titleSize > 28){
+    while (ctx.measureText(def.name).width > W-120 && titleSize > 28){
       titleSize -= 2;
       ctx.font = `700 ${titleSize}px Georgia`;
     }
-    ctx.fillText(station.def.name, W/2, 88);
+    ctx.fillText(def.name, W/2, 88);
     ctx.font = 'italic 30px Georgia';
     ctx.fillStyle = '#c9a961';
-    ctx.fillText(station.def.sub || '', W/2, 134);
-    // body text: shrink until the wrapped lines fit above the bottom border
+    ctx.fillText(def.sub || '', W/2, 134);
     ctx.textAlign = 'left';
     ctx.fillStyle = '#efe6cd';
     let size = 34, lines;
     for (;;){
       ctx.font = `${size}px Georgia`;
-      lines = wrapLines(ctx, station.def.desc, W-140);
+      lines = wrapLines(ctx, def.desc, W-140);
       if (200 + lines.length * (size + 12) <= H - 46 || size <= 22) break;
       size -= 2;
     }
     lines.forEach((ln, i) => ctx.fillText(ln, 70, 210 + i*(size+12)));
-    p.mesh.material.map.needsUpdate = true;
-    p.key = station.def.key;
   }
 
-  const vrDescHead = new THREE.Vector3(), vrDescFwd = new THREE.Vector3();
-  function updateVrDescPanel(station, dt){
-    if (!vrDescPanel && !station) return;
-    const p = ensureVrDescPanel();
-    const mat = p.mesh.material;
-    if (station){
-      if (station.def.key !== p.key) drawVrDesc(station);
-      // (re-)anchor when the board first appears or switches station: park
-      // it a couple of metres ahead at the visitor's own eye height, then
-      // leave it fixed in the world so they can lean in to read
-      if (station.def.key !== p.anchorKey || mat.opacity < 0.05){
-        camera.getWorldPosition(vrDescHead);
-        camera.getWorldDirection(vrDescFwd);
-        vrDescFwd.y = 0;
-        if (vrDescFwd.lengthSq() < 1e-4) vrDescFwd.set(0, 0, -1);
-        vrDescFwd.normalize();
-        const panelY = THREE.MathUtils.clamp(vrDescHead.y - 0.1, 0.9, 2.1);
-        p.mesh.position.set(vrDescHead.x + vrDescFwd.x*1.8, panelY, vrDescHead.z + vrDescFwd.z*1.8);
-        p.mesh.lookAt(vrDescHead.x, panelY, vrDescHead.z);
-        p.anchorKey = station.def.key;
-      }
-    } else {
-      p.anchorKey = null;
-    }
-    const target = station ? 1 : 0;
-    mat.opacity += (target - mat.opacity) * Math.min(1, dt*6);
-    p.mesh.visible = mat.opacity > 0.02;
+  // ---------- reading stands: a wooden lectern beside every segment
+  // holding its full description as real in-world signage, readable the
+  // same way on desktop, phone and VR (where the #infoPanel DOM overlay
+  // doesn't exist at all). Positions are world-space, hand-placed so no
+  // stand blocks its exhibit or a walkway; the optional second pair of
+  // numbers is a point the placard should face -- stands without one
+  // face south (+z), the way every exhibit in the balai already does ----------
+  const STAND_SPOTS = {
+    tarian:    [-4.75, -5.45],
+    alatmuzik: [ 7.25, -5.45],
+    silat:     [ 1.25, -6.45],
+    pakaian:   [-6.75, -0.45],
+    kraf:      [-6.75,  6.55],
+    makanan:   [ 9.25, -0.45],
+    adat:      [ 9.25,  6.55],
+    filem:     [ 2.35,  1.4 ],
+    tiang:     [-2.2,   8.05],
+    tanggam:   [ 1.3,   8.05],
+    bumbung:   [-1.7,  -6.4 ],
+    rumah:     [-10.8, 13.5,  0,   8  ],
+    kereta:    [ 9.9,  14.3,  0,   8  ],
+    sawah:     [-15.7,  1.5,  0,   1.5],
+    istana:    [ 1.6,  15.9,  0,   8  ],
+  };
+  function buildDescStands(points){
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x3d2817, roughness: 0.8 });
+    points.forEach(st => {
+      const spot = STAND_SPOTS[st.def.key];
+      if (!spot || !st.def.desc) return;
+      const [sx, sz, fx, fz] = spot;
+      const g = new THREE.Group();
+      g.position.set(sx, 0, sz);
+      g.rotation.y = fx !== undefined ? Math.atan2(fx - sx, fz - sz) : 0;
+      scene.add(g);
+
+      [-0.3, 0.3].forEach(lx => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.95, 0.07), woodMat);
+        leg.position.set(lx, 0.475, 0);
+        g.add(leg);
+      });
+      // desk tilts its top edge back like a museum lectern, so the placard
+      // faces slightly upward toward a standing reader's eyes
+      const desk = new THREE.Group();
+      desk.position.y = 1.06;
+      desk.rotation.x = -0.42;
+      g.add(desk);
+      desk.add(new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.76, 0.05), woodMat));
+
+      const c = document.createElement('canvas');
+      c.width = 1024; c.height = 768;
+      drawDescCanvas(c.getContext('2d'), st.def);
+      const face = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.9, 0.675),
+        new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, toneMapped: false })
+      );
+      face.position.z = 0.028;
+      desk.add(face);
+
+      addBoxCollider(sx, sz, 0.4, 0.35);
+    });
   }
 
   function buildTitleSprite(){
@@ -3481,9 +3492,12 @@
       // used to hide at the back-west pillar between tarian and songket &
       // batik), facing arriving visitors the same way tanggam does; both
       // are pure signs (noMarker) since the glowing sphere read as clutter
-      { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-3.4, 1.3, ROOM.depth/2-0.6], labelY:1.6, noMarker:true },
-      { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1] },
-      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 2.2, ROOM.depth/2-0.6], noMarker:true },
+      { key:'tiang',   name:'TIANG SERI',        sub:'Stilts — flood, pest & airflow', pos:[-3.4, 1.3, ROOM.depth/2-0.6], labelY:1.6, noMarker:true,
+        desc:'Traditional Malay buildings stand on hardwood posts (tiang) resting on stone footings rather than buried in the ground. Raising the floor lifts the house clear of floods, mud and pests, lets cooling air sweep underneath, and leaves a shaded space (kolong) below for daily work, storage and animals. The tiang seri -- the principal post -- is the first one raised when a house is built, honoured with its own ceremony as the spiritual heart of the home.' },
+      { key:'bumbung', name:'BUMBUNG & KERAWANG',sub:'Breathable roof & shady eaves',  pos:[0, ROOM.height+0.6, -ROOM.depth/2+1],
+        desc:'The steep bumbung panjang (long gable roof) sheds heavy tropical rain in an instant, while its high gable ends vent the hot air rising off the hall so the space below stays cool without any machinery. Under the eaves run bands of kerawang -- carved openwork fretwork -- that let every breeze pass through while casting patterned shade, turning ventilation itself into decoration.' },
+      { key:'tanggam', name:'TANGGAM',           sub:'Wooden joints, no nails',        pos:[0, 2.2, ROOM.depth/2-0.6], noMarker:true,
+        desc:'Tanggam is the traditional Malay system of timber joinery: mortise-and-tenon and interlocking joints cut so precisely that an entire house holds together without a single nail. Joined this way the frame can flex in wind and settle with the ground, and a whole house could even be dismantled, carried by the village in a gotong-royong effort (usung rumah) and reassembled on a new site.' },
       // description-only triggers for the two outside buildings: both already
       // carry their own always-visible signs, so these show just the info
       // panel when a visitor walks up to their entrances
@@ -4474,10 +4488,9 @@
     });
 
     // spectator view stays clean -- no description panel over the mirror
+    // (VR needs no panel at all: every segment carries a physical reading
+    // stand, built in buildDescStands, that shows the same description)
     if (!SPECTATE_ID) updateInfoPanel(bestStation);
-    // in an immersive session the DOM overlay above is invisible, so the
-    // description rides an in-world board at the visitor's eye height instead
-    if (!SPECTATE_ID) updateVrDescPanel(renderer.xr.isPresenting ? bestStation : null, dt);
 
     // anak ayam only plays inside the balai, and fades out while near any
     // exhibit interaction; outside the balai, wind + bird chirps take over
