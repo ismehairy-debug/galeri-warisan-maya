@@ -185,27 +185,14 @@
   }
   #guestName::placeholder { color:#8a7a5a; }
   #guestName:focus { border-color:#f2d98a; box-shadow:0 0 12px rgba(242,217,138,0.35); }
-  #sessionCodeRow { margin-top:12px; font-size:11px; letter-spacing:2px; color:#c9a961; }
-  #sessionCodeRow span {
-    display:inline-block; margin-top:6px; font-size:13px; letter-spacing:0.5px;
-    color:#f2d98a; font-weight:700; text-shadow:0 2px 8px rgba(0,0,0,.6);
-    word-break:break-all; max-width:min(440px, 86vw);
+  /* admin-only cast link, tucked small at the very bottom of the start
+     screen -- guests aren't shown the spectator link/QR/copy UI anymore;
+     booth staff open this on the monitor to watch the guest's view */
+  #adminCast {
+    position:fixed; left:0; right:0; bottom:8px; text-align:center;
+    font-size:10px; letter-spacing:1px; color:#6a5c42;
   }
-  /* QR of the spectator link -- staff/visitors scan it straight off the
-     guest's screen instead of typing anything */
-  /* qrcodejs sets display:block inline on its <img>, which escapes
-     text-align centering -- flex centers it no matter what the lib emits */
-  #qrBox { margin:12px auto 0; min-height:0; display:flex; justify-content:center; }
-  #qrBox img, #qrBox canvas {
-    background:#fff; padding:6px; border-radius:8px;
-    box-shadow:0 2px 10px rgba(0,0,0,.5); display:inline-block;
-  }
-  #copyLinkBtn {
-    display:block; margin:10px auto 0; padding:8px 18px; border-radius:999px;
-    background:rgba(20,14,6,0.65); color:#f2e2b6; font-size:11px;
-    border:1px solid rgba(242,217,138,0.6); font-weight:700; letter-spacing:1px;
-    font-family: Georgia, serif; cursor:pointer;
-  }
+  #adminCast a { color:#8a7a5a; text-decoration:underline; word-break:break-all; }
   /* spectator-mode status line (only element shown over the mirrored view) */
   #spectateStatus {
     position:fixed; left:0; right:0; bottom:34px; z-index:25; display:none;
@@ -239,14 +226,9 @@
   <p>"Walking through time, stepping into culture."</p>
   <input id="guestName" type="text" maxlength="24" autocomplete="off"
          placeholder="NAMA TETAMU / GUEST NAME">
-  <div id="sessionCodeRow">
-    PAUTAN PENONTON / SPECTATOR LINK<br>
-    <span id="sessionLink">—</span>
-    <div id="qrBox"></div>
-    <button id="copyLinkBtn">⧉ SALIN PAUTAN / COPY LINK</button>
-  </div>
   <button id="enterBtn">MASUK GALERI / ENTER GALLERY</button>
   <small>Desktop: click to enable mouse-look, then WASD to walk. On a Meta Quest browser, use the ENTER VR button that appears top-right once you're inside.</small>
+  <div id="adminCast">PAUTAN ADMIN / ADMIN CAST: <a id="sessionLink" href="#" target="_blank" rel="noopener">—</a></div>
 </div>
 
 <div id="overlay">
@@ -290,9 +272,6 @@
      keris exhibit; everything degrades to the photo plaque without it -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
-<!-- QR encoder for the spectator link (guarded with typeof checks -- if the
-     CDN is unreachable the text link + copy button still work) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 (function(){
 
@@ -799,8 +778,9 @@
 
     // guest login: a session always exists (random suffix keeps the peer ID
     // unique on the public broker); typing a name just personalises the
-    // spectator link. Nobody types a code anymore -- spectators open the
-    // link directly (or scan its QR off this screen).
+    // cast link. The link is admin-only now: a small footer line on the
+    // start screen that booth staff open on the monitor to watch the
+    // guest's view -- guests are never shown a spectator link/QR.
     const nameInput = document.getElementById('guestName');
     sessionCode = 'tetamu-' + sessionDigits;
     updateSpectatorLink();
@@ -813,27 +793,6 @@
       // don't leak typing (W/A/S/D...) into the movement key state
       e.stopPropagation();
       if (e.key === 'Enter') document.getElementById('enterBtn').click();
-    });
-
-    const copyBtn = document.getElementById('copyLinkBtn');
-    copyBtn.addEventListener('click', () => {
-      const link = spectatorLink();
-      const done = () => {
-        copyBtn.textContent = '✓ DISALIN / COPIED';
-        setTimeout(() => { copyBtn.textContent = '⧉ SALIN PAUTAN / COPY LINK'; }, 1600);
-      };
-      const fallback = () => {
-        const ta = document.createElement('textarea');
-        ta.value = link;
-        ta.style.cssText = 'position:fixed; opacity:0';
-        document.body.appendChild(ta);
-        ta.select();
-        try { if (document.execCommand('copy')) done(); } catch (e) {}
-        ta.remove();
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText){
-        navigator.clipboard.writeText(link).then(done).catch(fallback);
-      } else fallback();
     });
 
     document.getElementById('enterBtn').addEventListener('click', (e) => {
@@ -932,17 +891,10 @@
   }
 
   function updateSpectatorLink(){
+    const a = document.getElementById('sessionLink');
     const link = sessionCode ? spectatorLink() : '—';
-    document.getElementById('sessionLink').textContent = link;
-    const qrBox = document.getElementById('qrBox');
-    qrBox.innerHTML = '';
-    if (sessionCode && typeof QRCode !== 'undefined'){
-      new QRCode(qrBox, {
-        text: link, width: 108, height: 108,
-        colorDark: '#150c07', colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
-      });
-    }
+    a.textContent = link;
+    a.href = sessionCode ? link : '#';
   }
 
   // Opens this browser as PeerJS peer "gwm-<sessionCode>" and collects
@@ -4609,6 +4561,7 @@
       );
       veil.renderOrder = 999;
       veil.position.copy(player.position);
+      veil.userData.hold = 0.8; // beat of pure white before the dissolve begins
       scene.add(veil);
       vrRevealVeil = veil;
       startBackgroundMusic();
@@ -4683,7 +4636,12 @@
   let vrRevealVeil = null; // white flashback veil dissolving after the VR intro
   function updateFrame(points, clouds, birds, dt, t){
     if (vrRevealVeil){
-      vrRevealVeil.material.opacity -= dt / 2.5;
+      // a short beat of solid white, then the kampung dissolves in
+      if (vrRevealVeil.userData.hold > 0){
+        vrRevealVeil.userData.hold -= dt;
+      } else {
+        vrRevealVeil.material.opacity -= dt / 2.5;
+      }
       if (vrRevealVeil.material.opacity <= 0){
         scene.remove(vrRevealVeil);
         vrRevealVeil.geometry.dispose();
