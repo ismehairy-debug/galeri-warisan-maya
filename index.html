@@ -436,7 +436,10 @@
     // real-time sun shadows on desktop only -- phone GPUs already run close
     // to their frame budget here, and a whole-scene shadow pass would sink it
     renderer.shadowMap.enabled = !isTouchDevice;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // plain PCF: the soft variant's wider per-pixel sampling was a steady
+    // frame cost on integrated desktop GPUs, for a difference the dusk
+    // lighting mostly hides
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.xr.enabled = true;
     if (renderer.xr.setReferenceSpaceType) renderer.xr.setReferenceSpaceType('local-floor');
     document.body.appendChild(renderer.domElement);
@@ -1182,7 +1185,7 @@
     sun.position.set(30, 28, 18);
     if (renderer.shadowMap.enabled){
       sun.castShadow = true;
-      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.mapSize.set(1024, 1024); // 2048 cost real fillrate on weak desktop GPUs
       const cam = sun.shadow.camera;
       cam.left = -42; cam.right = 42; cam.top = 42; cam.bottom = -42;
       cam.near = 1; cam.far = 130;
@@ -4667,12 +4670,14 @@
         vrRevealVeil = null;
       }
     }
-    // the shadow map is frozen (autoUpdate=false, see init); refresh it
-    // about once a second to catch async-loaded GLTF scenery and the slow
-    // performer animations, at a fraction of the every-frame cost
-    if (renderer.shadowMap.enabled){
+    // the shadow map is frozen (autoUpdate=false, see init). Refresh every
+    // couple of seconds during the first minute -- long enough to catch
+    // every async GLTF arrival -- then never again: the scenery is static,
+    // and the old permanent once-a-second full-scene depth pass read as a
+    // rhythmic stutter on weaker desktop GPUs
+    if (renderer.shadowMap.enabled && t < 60){
       shadowRefreshTimer += dt;
-      if (shadowRefreshTimer >= 1){
+      if (shadowRefreshTimer >= 2){
         shadowRefreshTimer = 0;
         renderer.shadowMap.needsUpdate = true;
       }
