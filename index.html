@@ -17,6 +17,10 @@
     opacity:0; transition: opacity 0.9s ease;
   }
   #overlay.visible { opacity:1; }
+  /* the FCoEE/UniMAP logo + GALERI WARISAN MAYA pop-up that used to slide
+     in with the overlay is retired -- the in-world signage carries the
+     branding; the hint/controls block on the right stays */
+  #leftPanel { display:none; }
   #titleblock { pointer-events:none; }
   #titleblock h1 {
     margin:0; font-size:20px; letter-spacing:2px; font-weight:700;
@@ -145,6 +149,12 @@
     display:flex; align-items:center; justify-content:center;
   }
   #introScreen video { width:100%; height:100%; object-fit:contain; background:#fff; }
+  /* flashback veil: flashes white as the intro ends, then dissolves to
+     reveal the world -- the flat-screen twin of the VR white-veil reveal */
+  #flashFade {
+    position:fixed; inset:0; z-index:25; background:#fff;
+    opacity:0; pointer-events:none;
+  }
   #introControls {
     position:fixed; right:22px; bottom:22px; z-index:31; display:flex; gap:10px;
   }
@@ -262,6 +272,8 @@
 </div>
 
 <div id="spectateStatus"></div>
+
+<div id="flashFade"></div>
 
 <div id="infoPanel">
   <h2 id="infoPanelTitle"></h2>
@@ -546,6 +558,15 @@
       introControls.style.display = 'none';
       soundHint.style.display = 'none';
       video.pause();
+      // flashback reveal: flash to white as the film ends, then dissolve
+      // over the kampung -- the flat-screen twin of the VR veil
+      const flash = document.getElementById('flashFade');
+      flash.style.transition = 'none';
+      flash.style.opacity = '1';
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        flash.style.transition = 'opacity 2.4s ease-out';
+        flash.style.opacity = '0';
+      }));
       enterWorld(listener);
     }
 
@@ -4484,8 +4505,12 @@
     sampleCanvas.width = 16; sampleCanvas.height = 9;
     const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
     const glowTarget = new THREE.Color(0xffffff);
+    // sampling reads the video frame back off the GPU, which can stall a
+    // stereo frame on Quest (a dropped frame shows up as one-eye judder
+    // under reprojection) -- so sample RARELY, and ease the colour on its
+    // own cheap tick so the halo still glides between samples
     const glowTimer = setInterval(() => {
-      if (video.readyState < 2) return;
+      if (video.readyState < 2 || video.seeking) return;
       try {
         sampleCtx.drawImage(video, 0, 0, 16, 9);
         const d = sampleCtx.getImageData(0, 0, 16, 9).data;
@@ -4498,8 +4523,8 @@
         const lift = 215 / Math.max(r, g, b, 1);
         glowTarget.setRGB(Math.min(1, r*lift/255), Math.min(1, g*lift/255), Math.min(1, b*lift/255));
       } catch (e) { /* frame not samplable yet -- keep the last colour */ }
-      glow.material.color.lerp(glowTarget, 0.35);
-    }, 150);
+    }, 600);
+    const glowLerpTimer = setInterval(() => glow.material.color.lerp(glowTarget, 0.1), 60);
 
     // the gallery's own soundtrack waits until the film ends
     document.getElementById('bgMusic').pause();
@@ -4529,6 +4554,7 @@
       session.removeEventListener('select', endVrIntro);
       session.removeEventListener('end', endVrIntro);
       clearInterval(glowTimer);
+      clearInterval(glowLerpTimer);
       scene.remove(screen);
       scene.remove(shadow);
       scene.remove(reflection);
@@ -4546,6 +4572,18 @@
       hiddenWorld.forEach(o => { o.visible = true; });
       scene.background = prevBackground;
       scene.fog = prevFog;
+      // flashback reveal: don't cut from the void straight to the kampung.
+      // A white veil stays over everything and dissolves across ~2.5s
+      // (faded per-frame in updateFrame), so the world of zaman silam
+      // materialises out of the white like an old film flashback
+      const veil = new THREE.Mesh(
+        new THREE.SphereGeometry(15, 24, 16),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.BackSide, transparent: true, opacity: 1, depthTest: false, depthWrite: false, fog: false })
+      );
+      veil.renderOrder = 999;
+      veil.position.copy(player.position);
+      scene.add(veil);
+      vrRevealVeil = veil;
       startBackgroundMusic();
     }
     video.addEventListener('ended', endVrIntro);
@@ -4615,7 +4653,17 @@
   }
 
   let shadowRefreshTimer = 0;
+  let vrRevealVeil = null; // white flashback veil dissolving after the VR intro
   function updateFrame(points, clouds, birds, dt, t){
+    if (vrRevealVeil){
+      vrRevealVeil.material.opacity -= dt / 2.5;
+      if (vrRevealVeil.material.opacity <= 0){
+        scene.remove(vrRevealVeil);
+        vrRevealVeil.geometry.dispose();
+        vrRevealVeil.material.dispose();
+        vrRevealVeil = null;
+      }
+    }
     // the shadow map is frozen (autoUpdate=false, see init); refresh it
     // about once a second to catch async-loaded GLTF scenery and the slow
     // performer animations, at a fraction of the every-frame cost
