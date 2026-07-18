@@ -4424,14 +4424,44 @@
     const sw = Math.min(6.4, 3.6*aspect), sh = sw/aspect;
     screen.scale.set(sw, sh, 1);
     // spawn is (0, 0, 8.6) facing north into the balai -- the screen hangs
-    // ~4.3m ahead at that heading, under the 4.5m roof, ~73deg of view
-    screen.position.set(0, Math.max(1.9, sh/2 + 0.55), 4.3);
+    // ~5.8m ahead, floating just above the floor so its reflection reads
+    const screenY = Math.max(1.85, sh/2 + 0.35), screenZ = 2.8;
+    screen.position.set(0, screenY, screenZ);
     scene.add(screen);
     const skipLabel = makeLabel('TEKAN PICU / PRESS TRIGGER', 'untuk langkau • to skip', true);
     skipLabel.material.opacity = 1;
-    skipLabel.scale.set(0.65, 0.65, 1);
-    skipLabel.position.set(0, 0.34, 4.4);
+    skipLabel.scale.set(0.85, 0.85, 1);
+    skipLabel.position.set(0, 0.4, screenZ + 0.15);
     scene.add(skipLabel);
+
+    // showcase polish for the white void: a soft shadow pooled beneath the
+    // screen, and a faded upside-down mirror of the film below it, as if
+    // the screen floats over a sheet of glass
+    const shadowCanvas = document.createElement('canvas');
+    shadowCanvas.width = 256; shadowCanvas.height = 128;
+    const sctx = shadowCanvas.getContext('2d');
+    sctx.translate(128, 64); sctx.scale(1, 0.5);
+    const sgrad = sctx.createRadialGradient(0, 0, 10, 0, 0, 120);
+    sgrad.addColorStop(0, 'rgba(0,0,0,0.38)');
+    sgrad.addColorStop(1, 'rgba(0,0,0,0)');
+    sctx.fillStyle = sgrad;
+    sctx.fillRect(-128, -128, 256, 256);
+    const shadow = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shadowCanvas), transparent: true, depthWrite: false, toneMapped: false })
+    );
+    shadow.rotation.x = -Math.PI/2;
+    shadow.scale.set(sw*1.15, sw*0.4, 1);
+    shadow.position.set(0, 0.02, screenZ);
+    scene.add(shadow);
+
+    const reflection = new THREE.Mesh(
+      screen.geometry,
+      new THREE.MeshBasicMaterial({ map: videoTex, transparent: true, opacity: 0.22, depthWrite: false, toneMapped: false, side: THREE.DoubleSide })
+    );
+    reflection.scale.set(sw, -sh, 1); // vertical flip = mirror image
+    reflection.position.set(0, -screenY, screenZ);
+    scene.add(reflection);
 
     // the gallery's own soundtrack waits until the film ends
     document.getElementById('bgMusic').pause();
@@ -4445,7 +4475,8 @@
     scene.fog = null;
     const hiddenWorld = [];
     scene.children.forEach(o => {
-      if (o === screen || o === skipLabel || o === player || o.isLight || !o.visible) return;
+      if (o === screen || o === skipLabel || o === shadow || o === reflection ||
+          o === player || o.isLight || !o.visible) return;
       o.visible = false;
       hiddenWorld.push(o);
     });
@@ -4461,9 +4492,15 @@
       session.removeEventListener('end', endVrIntro);
       scene.remove(screen);
       scene.remove(skipLabel);
+      scene.remove(shadow);
+      scene.remove(reflection);
       videoTex.dispose();
       screen.material.dispose();
-      screen.geometry.dispose();
+      screen.geometry.dispose(); // shared with the reflection mesh
+      reflection.material.dispose();
+      shadow.material.map.dispose();
+      shadow.material.dispose();
+      shadow.geometry.dispose();
       hiddenWorld.forEach(o => { o.visible = true; });
       scene.background = prevBackground;
       scene.fog = prevFog;
