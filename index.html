@@ -245,7 +245,7 @@
   <div id="hint">
     <div id="hintText">WASD — jalan &nbsp;|&nbsp; Click — lihat sekeliling</div>
     <div>Berjalan dekat setiap pameran untuk mengaktifkannya</div>
-    <button id="vr-button" disabled>MEMERIKSA VR…</button>
+    <button id="vr-button" disabled style="display:none">MEMERIKSA VR…</button>
     <br>
     <button id="gyro-button">GUNA GYRO / ENABLE GYRO</button>
     <br>
@@ -4580,15 +4580,17 @@
 
   function setupVRButton(){
     const button = document.getElementById('vr-button');
+    // no VR here (typical phone/desktop): hide the button entirely rather
+    // than showing a disabled VR TIDAK DISOKONG stub
     if (!('xr' in navigator)){
-      button.textContent = 'VR TIDAK DISOKONG';
-      button.disabled = true;
+      button.style.display = 'none';
       return;
     }
     navigator.xr.isSessionSupported('immersive-vr').then(supported => {
-      if (!supported){ button.textContent = 'VR TIDAK DISOKONG'; button.disabled = true; return; }
+      if (!supported){ button.style.display = 'none'; return; }
       vrSupported = true;
       button.disabled = false;
+      button.style.display = ''; // hidden from markup until VR is confirmed
       button.textContent = 'ENTER VR';
       button.onclick = () => {
         if (!currentVRSession) startVRSession().catch(() => {});
@@ -4604,7 +4606,7 @@
         document.getElementById('gyro-button').style.display = 'none';
         document.getElementById('joystick-base').style.display = 'none';
       }
-    }).catch(() => { button.textContent = 'VR TIDAK DISOKONG'; button.disabled = true; });
+    }).catch(() => { button.style.display = 'none'; });
   }
 
   // ---------- resize ----------
