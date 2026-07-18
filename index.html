@@ -4037,9 +4037,13 @@
 
   // rotating the rig pivots around its origin, which in room-scale VR is the
   // floor center, not the player -- re-anchor so the head stays put
+  // (use the rig-parented user camera: calling getWorldPosition on the
+  // parentless XR ArrayCamera recomposes its matrix from a never-set
+  // position/quaternion, so it reports the world origin, and turning
+  // then orbits the player around (0,0) instead of around their head)
   const headPos = new THREE.Vector3();
   function vrTurn(angle){
-    renderer.xr.getCamera(camera).getWorldPosition(headPos);
+    camera.getWorldPosition(headPos);
     yaw += angle;
     player.rotation.y = yaw;
     const dx = player.position.x - headPos.x;
