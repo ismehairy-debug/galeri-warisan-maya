@@ -4424,15 +4424,11 @@
     const sw = Math.min(6.4, 3.6*aspect), sh = sw/aspect;
     screen.scale.set(sw, sh, 1);
     // spawn is (0, 0, 8.6) facing north into the balai -- the screen hangs
-    // ~5.8m ahead, floating just above the floor so its reflection reads
-    const screenY = Math.max(1.85, sh/2 + 0.35), screenZ = 2.8;
+    // ~7.4m ahead, floating just above the floor so its reflection reads
+    // (no visible skip sign; pulling the trigger still quietly skips)
+    const screenY = Math.max(1.85, sh/2 + 0.35), screenZ = 1.2;
     screen.position.set(0, screenY, screenZ);
     scene.add(screen);
-    const skipLabel = makeLabel('TEKAN PICU / PRESS TRIGGER', 'untuk langkau • to skip', true);
-    skipLabel.material.opacity = 1;
-    skipLabel.scale.set(0.85, 0.85, 1);
-    skipLabel.position.set(0, 0.4, screenZ + 0.15);
-    scene.add(skipLabel);
 
     // showcase polish for the white void: a soft shadow pooled beneath the
     // screen, and a faded upside-down mirror of the film below it, as if
@@ -4475,7 +4471,7 @@
     scene.fog = null;
     const hiddenWorld = [];
     scene.children.forEach(o => {
-      if (o === screen || o === skipLabel || o === shadow || o === reflection ||
+      if (o === screen || o === shadow || o === reflection ||
           o === player || o.isLight || !o.visible) return;
       o.visible = false;
       hiddenWorld.push(o);
@@ -4491,7 +4487,6 @@
       session.removeEventListener('select', endVrIntro);
       session.removeEventListener('end', endVrIntro);
       scene.remove(screen);
-      scene.remove(skipLabel);
       scene.remove(shadow);
       scene.remove(reflection);
       videoTex.dispose();
