@@ -641,7 +641,7 @@
   const FILM_SLIDES = [ // ordered to shadow the narration: the Malay world -> adat, hospitality & kuih -> music & dance -> silat -> craftsmanship -> the legacy passed on
     'assets/images/Gemini_Generated_Image_9gqwaj9gqwaj9gqw.png',
     'assets/images/Gemini_Generated_Image_v6x74pv6x74pv6x7.png',
-    'assets/images/poster_kuih.png',
+    'assets/images/Gemini_Generated_Image_5ayjzd5ayjzd5ayj.png',
     'assets/images/Gemini_Generated_Image_vvds7bvvds7bvvds.png',
     'assets/images/Gemini_Generated_Image_w6k2vdw6k2vdw6k2.png',
     'assets/images/Gemini_Generated_Image_hbcqgnhbcqgnhbcq.png',
@@ -4481,19 +4481,11 @@
       // (the procedural anyaman tray is retired -- this station now shows
       // imported 3D models only: the keris and the framed wau bulan)
     } else if (def.key === 'makanan'){
-      const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.06, 24),
-        new THREE.MeshStandardMaterial({ color: 0x4a2f1c, roughness: 0.6 }));
-      tray.position.y = -0.3;
-      const dish1 = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.22, 10), partsMat);
-      dish1.position.set(-0.22, -0.15, 0);
-      const dish2 = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.05, 8, 16), partsMat);
-      dish2.rotation.x = Math.PI/2;
-      dish2.position.set(0.05, -0.2, 0.15);
-      const dish3 = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), partsMat);
-      dish3.scale.y = 0.6;
-      dish3.position.set(0.2, -0.18, -0.15);
-      performer.add(tray, dish1, dish2, dish3);
-      performer.userData.dishes = [dish1, dish2, dish3];
+      // the kuih-muih poster in the same gold frame as the filem cards,
+      // replacing the old procedural tray of abstract dishes
+      const card = buildFilemCard('assets/images/poster_kuih.png');
+      card.group.position.set(0, 0.7, 0);
+      performer.add(card.group);
     } else if (def.key === 'adat'){
       // 0.57s crops a dead intro cut off the front of the clip
       buildVideoPosterCard(performer, def, 'assets/videos/pantun_budi.mp4', 0.57);
@@ -5274,8 +5266,6 @@
         } else if (st.def.key === 'kraf'){
           st.performer.rotation.z = Math.sin(t*1.2)*0.08;
           st.performer.rotation.y = t*0.3;
-        } else if (st.def.key === 'makanan'){
-          st.performer.userData.dishes.forEach((d,i) => { d.position.y = -0.15 - 0.03*i + Math.sin(t*2+i)*0.01; });
         }
       }
 
