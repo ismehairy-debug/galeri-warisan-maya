@@ -149,6 +149,9 @@
     display:flex; align-items:center; justify-content:center;
   }
   #introScreen video { width:100%; height:100%; object-fit:contain; background:#fff; }
+  /* the short-film slideshow canvas takes the video's place on the same
+     screen once the intro clip ends (display flipped in JS) */
+  #introScreen canvas { width:100%; height:100%; object-fit:contain; background:#fff; display:none; }
   /* flashback veil: flashes white as the intro ends, then dissolves to
      reveal the world -- the flat-screen twin of the VR white-veil reveal */
   #flashFade {
@@ -215,6 +218,7 @@
      intro can start WITH sound -->
 <div id="introScreen" style="display:none">
   <video id="introVideo" src="assets/videos/intro_opening.mp4" preload="auto" playsinline></video>
+  <canvas id="filmCanvas"></canvas>
 </div>
 <div id="tapForSoundHint" style="display:none">🔊 KETIK SKRIN UNTUK BUNYI / TAP SCREEN FOR SOUND</div>
 <div id="introControls" style="display:none">
@@ -320,6 +324,14 @@
   // assigned inside setupIntroScreen; declared up here because init() runs
   // before the statements further down this script ever execute
   let playIntro = () => {}, resetIntro = () => {};
+  // short-film slideshow state (same init()-ordering reason as playIntro):
+  // filmListener is stashed by setupIntroScreen for the volume GainNodes,
+  // the rest is lazily filled by primeFilm()/playShortFilm() so spectator
+  // tabs never download the film's images or soundtrack
+  let filmListener = null;
+  let filmAudio = null;   // { music, voice, musicGain, voiceGain }
+  let filmImages = null;  // Image() list, preloading kicked off at MASUK
+  let filmState = null;   // live playback state while the slideshow runs
 
   /* ---------------- guest spectator sync (PeerJS) ----------------
      Two roles, both living in this one file so the spectator renders the
@@ -522,27 +534,44 @@
     setTimeout(hideLoading, 6000); // fallback if the video stalls
   }
 
-  // ---------- intro video ----------
+  // ---------- intro video + short film ----------
   // Visit order: details screen (name -> spectator code) -> MASUK -> intro
-  // video -> the world. setupStartScreen calls playIntro() on MASUK, and
-  // endIntro() hands over to enterWorld(). resetIntro() rewinds everything
-  // for the next guest (restart button). playIntro/resetIntro themselves
-  // are declared with the other top-level state (before the init() call).
+  // video -> short-film slideshow (same screen) -> the world.
+  // setupStartScreen calls playIntro() on MASUK, the video's end hands over
+  // to startFilmPhase(), the film's end to finishIntro() -> enterWorld().
+  // SKIP moves one phase forward: video -> film, film -> world.
+  // resetIntro() rewinds everything for the next guest (restart button).
+  // playIntro/resetIntro themselves are declared with the other top-level
+  // state (before the init() call).
   function setupIntroScreen(listener){
     const introScreen = document.getElementById('introScreen');
     const introControls = document.getElementById('introControls');
     const soundHint = document.getElementById('tapForSoundHint');
     const video = document.getElementById('introVideo');
+    const filmCanvas = document.getElementById('filmCanvas');
     const skipBtn = document.getElementById('skipIntroBtn');
+    filmListener = listener;
 
-    function endIntro(){
+    function startFilmPhase(){
+      if (introScreen.style.display === 'none' || filmState) return; // not showing, or film already rolling
+      video.pause();
+      video.style.display = 'none';
+      filmCanvas.style.display = 'block';
+      playShortFilm({ onDone: finishIntro });
+    }
+
+    function finishIntro(){
       if (introScreen.style.display === 'none') return; // not showing (or already ended)
       introScreen.style.display = 'none';
       introControls.style.display = 'none';
       soundHint.style.display = 'none';
       video.pause();
-      // flashback reveal: flash to white as the film ends, then dissolve
-      // over the kampung -- the flat-screen twin of the VR veil
+      stopShortFilm();
+      video.style.display = '';
+      filmCanvas.style.display = 'none';
+      // flashback reveal: the film has already faded itself to white, so
+      // the flash lands seamlessly, then dissolves over the kampung -- the
+      // flat-screen twin of the VR veil
       const flash = document.getElementById('flashFade');
       flash.style.transition = 'none';
       flash.style.opacity = '1';
@@ -564,29 +593,209 @@
       video.play().catch(() => {
         video.muted = true;
         soundHint.style.display = 'block';
-        // video itself unplayable (missing/unsupported) -> straight to the world
-        video.play().catch(endIntro);
+        // video itself unplayable (missing/unsupported) -> the short film
+        // still carries the opening on its own
+        video.play().catch(startFilmPhase);
       });
     };
 
     resetIntro = function(){
       video.pause();
       try { video.currentTime = 0; } catch (e) {}
+      stopShortFilm();
+      video.style.display = '';
+      filmCanvas.style.display = 'none';
       introScreen.style.display = 'none';
       introControls.style.display = 'none';
       soundHint.style.display = 'none';
     };
 
-    video.addEventListener('ended', endIntro);
-    video.addEventListener('error', endIntro);
-    skipBtn.addEventListener('click', endIntro);
+    video.addEventListener('ended', startFilmPhase);
+    video.addEventListener('error', startFilmPhase);
+    skipBtn.addEventListener('click', () => { filmState ? finishIntro() : startFilmPhase(); });
 
-    // tapping the video itself (not Skip, a sibling element so this won't
-    // fire for that click) unmutes it without ending the intro
+    // tapping the screen (not Skip, a sibling element so this won't fire
+    // for that click) unmutes without ending the intro; during the film it
+    // also restarts any track an autoplay policy refused
     introScreen.addEventListener('click', () => {
       video.muted = false;
       soundHint.style.display = 'none';
+      if (filmState && filmAudio){
+        [filmAudio.music, filmAudio.voice].forEach(a => { if (a.paused) a.play().catch(() => {}); });
+      }
     });
+  }
+
+  // ---------- short-film slideshow ----------
+  // Plays right after the intro video on the same screen (the DOM intro
+  // overlay flat, the VR cinema screen in-headset): the AI-illustrated
+  // heritage stills crossfade with a slow Ken Burns drift, under the
+  // cinematic score (30%) and the WhatsApp video soundtrack (60%). The
+  // film is drawn onto #filmCanvas, so both presentations share one
+  // renderer -- VR just wraps the canvas in a texture.
+  const FILM_SLIDES = [ // story order: kampung -> trade -> craft -> silat -> istana -> teaching the next generation -> the whole warisan together
+    'assets/images/Gemini_Generated_Image_9gqwaj9gqwaj9gqw.png',
+    'assets/images/Gemini_Generated_Image_v6x74pv6x74pv6x7.png',
+    'assets/images/Gemini_Generated_Image_5ayjzd5ayjzd5ayj.png',
+    'assets/images/Gemini_Generated_Image_hbcqgnhbcqgnhbcq.png',
+    'assets/images/Gemini_Generated_Image_w6k2vdw6k2vdw6k2.png',
+    'assets/images/Gemini_Generated_Image_vvds7bvvds7bvvds.png',
+    'assets/images/Gemini_Generated_Image_37lf2t37lf2t37lf.png',
+    'assets/images/WhatsApp Image 2026-07-19 at 20.15.13.jpeg',
+  ];
+  const FILM_MUSIC_SRC = 'assets/audio/cinematic-and-emotional-background-music-for-documentary-videos-film_M9ieMja7.mp3';
+  const FILM_VOICE_SRC = 'assets/audio/WhatsApp Video 2026-07-17 at 12.34.16.mp3';
+  const FILM_MUSIC_VOL = 0.3;
+  const FILM_VOICE_VOL = 0.6;
+  const FILM_XFADE = 1.2;   // seconds of crossfade between stills
+  const FILM_OUT = 1.8;     // seconds of white-out + audio fade at the end
+
+  function ensureFilmAudio(){
+    if (filmAudio) return filmAudio;
+    const music = new Audio(FILM_MUSIC_SRC);
+    music.loop = true; // the score carries however long the voice track runs
+    music.preload = 'auto';
+    const voice = new Audio(FILM_VOICE_SRC);
+    voice.preload = 'auto';
+    filmAudio = { music, voice, musicGain: null, voiceGain: null };
+    return filmAudio;
+  }
+
+  // element .volume is ignored on iOS Safari (same reason bgMusic routes
+  // through a GainNode above), so the 30%/60% mix lives in Web Audio
+  function connectFilmGains(){
+    const fa = ensureFilmAudio();
+    if (fa.musicGain || !filmListener) return;
+    try {
+      const ctx = filmListener.context;
+      [['musicGain', fa.music, FILM_MUSIC_VOL], ['voiceGain', fa.voice, FILM_VOICE_VOL]].forEach(([key, el, vol]) => {
+        const gain = ctx.createGain();
+        gain.gain.value = vol;
+        ctx.createMediaElementSource(el).connect(gain);
+        gain.connect(ctx.destination);
+        fa[key] = gain;
+      });
+    } catch (e) { /* keep element-volume fallback set in playShortFilm */ }
+  }
+
+  // called inside the MASUK click: a muted play/pause earns both tracks
+  // the right to start unmuted later (the film begins on a video 'ended'
+  // event, which is not a user gesture), and the stills preload while the
+  // intro video is still running
+  function primeFilm(){
+    const fa = ensureFilmAudio();
+    [fa.music, fa.voice].forEach(a => {
+      a.muted = true;
+      const p = a.play();
+      if (p && p.then) p.then(() => { a.pause(); a.currentTime = 0; a.muted = false; }).catch(() => { a.muted = false; });
+    });
+    if (!filmImages) filmImages = FILM_SLIDES.map(src => { const img = new Image(); img.src = src; return img; });
+  }
+
+  // draw one still cover-fitted with a slow Ken Burns drift; p runs 0->1
+  // across the still's screen time, parity flips the drift direction
+  function drawFilmSlide(ctx2d, img, p, parity, alpha){
+    const cw = ctx2d.canvas.width, ch = ctx2d.canvas.height;
+    const scale = Math.max(cw / img.naturalWidth, ch / img.naturalHeight) * (1.06 + 0.08 * (parity ? p : 1 - p));
+    const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+    const drift = (p - 0.5) * (parity ? 1 : -1);
+    ctx2d.globalAlpha = alpha;
+    ctx2d.drawImage(img, (cw - w) / 2 + drift * (w - cw) * 0.4, (ch - h) / 2 + drift * (h - ch) * 0.4, w, h);
+    ctx2d.globalAlpha = 1;
+  }
+
+  function playShortFilm(opts){
+    stopShortFilm();
+    if (!filmImages) primeFilm(); // normally already primed at MASUK
+    connectFilmGains();
+    const fa = ensureFilmAudio();
+    const canvas = document.getElementById('filmCanvas');
+    canvas.width = 1600; canvas.height = 900;
+    const ctx2d = canvas.getContext('2d');
+    ctx2d.fillStyle = '#fff';
+    ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+
+    // spread the stills evenly across the voice track when its length is
+    // known; otherwise a steady 6s per still
+    const n = FILM_SLIDES.length;
+    let slideDur = 6;
+    const vd = fa.voice.duration;
+    if (isFinite(vd) && vd > 8) slideDur = Math.min(11, Math.max(3.5, vd / n));
+    const total = n * slideDur + FILM_OUT;
+
+    [fa.music, fa.voice].forEach(a => {
+      a.muted = false;
+      try { a.currentTime = 0; } catch (e) {}
+      // element volume is the fallback mix for browsers where the
+      // GainNode routing failed; with gains connected it stays at 1
+      a.play().catch(() => {});
+    });
+    fa.music.volume = fa.musicGain ? 1 : FILM_MUSIC_VOL;
+    fa.voice.volume = fa.voiceGain ? 1 : FILM_VOICE_VOL;
+    if (fa.musicGain) fa.musicGain.gain.value = FILM_MUSIC_VOL;
+    if (fa.voiceGain) fa.voiceGain.gain.value = FILM_VOICE_VOL;
+
+    const state = { raf: 0, done: false };
+    filmState = state;
+    const start = performance.now();
+
+    function frame(){
+      if (filmState !== state || state.done) return;
+      const t = (performance.now() - start) / 1000;
+      const idx = Math.min(n - 1, Math.floor(t / slideDur));
+      const local = t - idx * slideDur;
+      ctx2d.fillStyle = '#fff';
+      ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+      const prev = idx > 0 ? filmImages[idx - 1] : null;
+      const cur = filmImages[idx];
+      // during the crossfade the outgoing still holds its final framing
+      // underneath; the very first still fades in from the white screen
+      if (prev && local < FILM_XFADE && prev.complete && prev.naturalWidth){
+        drawFilmSlide(ctx2d, prev, 1, (idx - 1) % 2, 1);
+      }
+      if (cur && cur.complete && cur.naturalWidth){
+        const p = Math.min(1, local / slideDur);
+        const alpha = local < FILM_XFADE ? local / FILM_XFADE : 1;
+        drawFilmSlide(ctx2d, cur, p, idx % 2, alpha);
+      }
+      // ending: fade the picture to white and the mix to silence together,
+      // so the flash/veil handover reads as one continuous reveal
+      const outK = Math.max(0, (t - (total - FILM_OUT)) / FILM_OUT);
+      if (outK > 0){
+        ctx2d.globalAlpha = Math.min(1, outK);
+        ctx2d.fillStyle = '#fff';
+        ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+        ctx2d.globalAlpha = 1;
+        const fade = Math.max(0, 1 - outK);
+        if (fa.musicGain) fa.musicGain.gain.value = FILM_MUSIC_VOL * fade;
+        else fa.music.volume = FILM_MUSIC_VOL * fade;
+        if (fa.voiceGain) fa.voiceGain.gain.value = FILM_VOICE_VOL * fade;
+        else fa.voice.volume = FILM_VOICE_VOL * fade;
+      }
+      if (opts && opts.onFrame) opts.onFrame();
+      if (t >= total){
+        state.done = true;
+        if (opts && opts.onDone) opts.onDone();
+        return;
+      }
+      state.raf = requestAnimationFrame(frame);
+    }
+    state.raf = requestAnimationFrame(frame);
+  }
+
+  function stopShortFilm(){
+    if (!filmState) return;
+    cancelAnimationFrame(filmState.raf);
+    filmState = null;
+    if (filmAudio){
+      [filmAudio.music, filmAudio.voice].forEach(a => {
+        a.pause();
+        try { a.currentTime = 0; } catch (e) {}
+      });
+      // restore the base mix for the next guest's run
+      if (filmAudio.musicGain) filmAudio.musicGain.gain.value = FILM_MUSIC_VOL;
+      if (filmAudio.voiceGain) filmAudio.voiceGain.gain.value = FILM_VOICE_VOL;
+    }
   }
 
   // ---------- world entry (after the intro ends or is skipped) ----------
@@ -809,6 +1018,10 @@
       // appears after the intro video (enterWorld)
       if (listener.context.state === 'suspended') listener.context.resume();
       unlockStationMedia();
+      // the short film starts on a video 'ended' event (not a gesture), so
+      // its two tracks earn their autoplay rights here, and its stills
+      // preload while the intro video plays
+      primeFilm();
       // auto-detect how this guest is entering: a standalone headset's own
       // browser (Quest etc.) jumps straight into the VR world -- the flat
       // DOM intro video is invisible inside a headset anyway. Phones keep
@@ -4477,8 +4690,10 @@
   // ---------- VR intro cinema: the flat DOM intro overlay can't be seen
   // inside a headset, so on auto-entry the same intro video plays on a big
   // screen floating in the balai right where the guest spawns -- filling
-  // their view, with sound. Pulling the trigger skips; the video ending,
-  // skipping, or leaving VR all tear the screen down the same way. ----------
+  // their view, with sound. The video then hands the SAME screen, in the
+  // same white room, to the short-film slideshow. Pulling the trigger
+  // skips one phase (video -> film, film -> world); the film ending or
+  // leaving VR tears everything down the same way. ----------
   function startVrIntro(){
     const video = document.getElementById('introVideo');
     const session = renderer.xr.getSession();
@@ -4561,9 +4776,14 @@
     // under reprojection) -- so sample RARELY, and ease the colour on its
     // own cheap tick so the halo still glides between samples
     const glowTimer = setInterval(() => {
-      if (video.readyState < 2 || video.seeking) return;
       try {
-        sampleCtx.drawImage(video, 0, 0, 16, 9);
+        // once the short film owns the screen, tint from its canvas instead
+        if (filmTex){
+          sampleCtx.drawImage(document.getElementById('filmCanvas'), 0, 0, 16, 9);
+        } else {
+          if (video.readyState < 2 || video.seeking) return;
+          sampleCtx.drawImage(video, 0, 0, 16, 9);
+        }
         const d = sampleCtx.getImageData(0, 0, 16, 9).data;
         let r = 0, g = 0, b = 0;
         for (let i = 0; i < d.length; i += 4){ r += d[i]; g += d[i+1]; b += d[i+2]; }
@@ -4596,13 +4816,43 @@
     });
 
     let done = false;
+    let filmTex = null;
+
+    // the intro video's end hands the same cinema screen to the short
+    // film: playShortFilm draws the stills + mix onto #filmCanvas, and the
+    // screen (with its mirror and halo) reshapes to the film's 16:9 frame
+    function vrStartFilm(){
+      if (done || filmTex) return;
+      video.pause();
+      const filmCanvas = document.getElementById('filmCanvas');
+      playShortFilm({
+        onFrame: () => { if (filmTex) filmTex.needsUpdate = true; },
+        onDone: endVrIntro
+      });
+      filmTex = new THREE.CanvasTexture(filmCanvas);
+      filmTex.encoding = THREE.sRGBEncoding;
+      const fsw = 6.4, fsh = fsw * 9/16;
+      const fy = Math.max(1.85, fsh/2 + 0.35);
+      screen.material.map = filmTex;
+      screen.scale.set(fsw, fsh, 1);
+      screen.position.y = fy;
+      reflection.material.map = filmTex;
+      reflection.scale.set(fsw, -fsh, 1);
+      reflection.position.y = -fy;
+      glow.scale.set(fsw*1.9, fsh*2.3, 1);
+      glow.position.y = fy;
+    }
+
+    function onVrSelect(){ filmTex ? endVrIntro() : vrStartFilm(); }
+
     function endVrIntro(){
       if (done) return;
       done = true;
       video.pause();
-      video.removeEventListener('ended', endVrIntro);
-      video.removeEventListener('error', endVrIntro);
-      session.removeEventListener('select', endVrIntro);
+      stopShortFilm();
+      video.removeEventListener('ended', vrStartFilm);
+      video.removeEventListener('error', vrStartFilm);
+      session.removeEventListener('select', onVrSelect);
       session.removeEventListener('end', endVrIntro);
       clearInterval(glowTimer);
       clearInterval(glowLerpTimer);
@@ -4611,6 +4861,7 @@
       scene.remove(reflection);
       scene.remove(glow);
       videoTex.dispose();
+      if (filmTex) filmTex.dispose();
       screen.material.dispose();
       screen.geometry.dispose(); // shared with the reflection mesh
       reflection.material.dispose();
@@ -4638,16 +4889,16 @@
       vrRevealVeil = veil;
       startBackgroundMusic();
     }
-    video.addEventListener('ended', endVrIntro);
-    video.addEventListener('error', endVrIntro);
-    session.addEventListener('select', endVrIntro);
+    video.addEventListener('ended', vrStartFilm);
+    video.addEventListener('error', vrStartFilm);
+    session.addEventListener('select', onVrSelect);
     session.addEventListener('end', endVrIntro);
 
     video.muted = false;
     video.currentTime = 0;
     video.play()
       .catch(() => { video.muted = true; return video.play(); }) // sound refused -> at least show it
-      .catch(endVrIntro); // video unplayable -> straight to the world
+      .catch(vrStartFilm); // video unplayable -> the short film still carries the opening
   }
 
   function setupVRButton(){
