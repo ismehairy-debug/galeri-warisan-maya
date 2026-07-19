@@ -811,7 +811,14 @@
     for (const c of FILM_CAPTIONS){ capStarts.push(capTotal * capAcc / capSum); capAcc += c.length; }
     let capCache = { key: '', lines: [] };
 
-    const state = { raf: 0, done: false };
+    // inside an immersive WebXR session the browser stops firing
+    // window.requestAnimationFrame (only the session's own rAF ticks), so
+    // the VR path hands in the session's scheduler here -- otherwise the
+    // film freezes on its first white fill and, because the audio mix only
+    // rises inside this loop, plays silent in the headset
+    const scheduleFrame = (opts && opts.scheduleFrame) || (cb => requestAnimationFrame(cb));
+    const cancelFrame = (opts && opts.cancelFrame) || (id => cancelAnimationFrame(id));
+    const state = { raf: 0, done: false, cancel: cancelFrame };
     filmState = state;
     const start = performance.now();
 
@@ -893,14 +900,14 @@
         if (opts && opts.onDone) opts.onDone();
         return;
       }
-      state.raf = requestAnimationFrame(frame);
+      state.raf = scheduleFrame(frame);
     }
-    state.raf = requestAnimationFrame(frame);
+    state.raf = scheduleFrame(frame);
   }
 
   function stopShortFilm(){
     if (!filmState) return;
-    cancelAnimationFrame(filmState.raf);
+    try { filmState.cancel(filmState.raf); } catch (e) { /* XR session already gone */ }
     filmState = null;
     if (filmAudio){
       [filmAudio.music, filmAudio.voice].forEach(a => {
@@ -4933,6 +4940,11 @@
       video.pause();
       const filmCanvas = document.getElementById('filmCanvas');
       playShortFilm({
+        // window rAF is suspended while the headset presents, so the film's
+        // draw loop must ride the XR session's own rAF; the callback drops
+        // the (time, xrFrame) args the session passes
+        scheduleFrame: cb => session.requestAnimationFrame(() => cb()),
+        cancelFrame: id => session.cancelAnimationFrame(id),
         onFrame: () => { if (filmTex) filmTex.needsUpdate = true; },
         onDone: endVrIntro
       });
