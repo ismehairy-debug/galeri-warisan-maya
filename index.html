@@ -562,7 +562,9 @@
       video.pause();
       video.style.display = 'none';
       filmCanvas.style.display = 'block';
-      playShortFilm({ onDone: finishIntro });
+      // anak ayam eases in under the film's last 0.3s, so the balai's own
+      // song is already singing when the white-out hands over to the world
+      playShortFilm({ onDone: finishIntro, onEndCue: startBackgroundMusic });
     }
 
     function finishIntro(){
@@ -818,8 +820,21 @@
     // rises inside this loop, plays silent in the headset
     const scheduleFrame = (opts && opts.scheduleFrame) || (cb => requestAnimationFrame(cb));
     const cancelFrame = (opts && opts.cancelFrame) || (id => cancelAnimationFrame(id));
-    const state = { raf: 0, done: false, cancel: cancelFrame };
+    const state = { raf: 0, done: false, cued: false, cancel: cancelFrame };
     filmState = state;
+    // the immersive transition on Quest sometimes lands here with the
+    // AudioContext freshly suspended, or with the first play() refused --
+    // either way the film runs silent. Retry a couple of beats in (plain
+    // timers keep firing inside XR sessions, unlike window rAF).
+    state.retryTimers = [400, 1200].map(ms => setTimeout(() => {
+      if (filmState !== state || state.done) return;
+      if (filmListener && filmListener.context.state !== 'running'){
+        filmListener.context.resume().catch(() => {});
+      }
+      [fa.music, fa.voice].forEach(a => {
+        if (a.paused){ a.muted = false; a.play().catch(() => {}); }
+      });
+    }, ms));
     const start = performance.now();
 
     function frame(){
@@ -895,6 +910,13 @@
         ctx2d.globalAlpha = 1;
       }
       if (opts && opts.onFrame) opts.onFrame();
+      // hand the closing beat to the caller just before the white-out
+      // completes, so the gallery's own music can enter under the film's
+      // last breath instead of after a gap
+      if (!state.cued && t >= total - 0.3){
+        state.cued = true;
+        if (opts && opts.onEndCue) opts.onEndCue();
+      }
       if (t >= total){
         state.done = true;
         if (opts && opts.onDone) opts.onDone();
@@ -908,6 +930,7 @@
   function stopShortFilm(){
     if (!filmState) return;
     try { filmState.cancel(filmState.raf); } catch (e) { /* XR session already gone */ }
+    (filmState.retryTimers || []).forEach(clearTimeout);
     filmState = null;
     if (filmAudio){
       [filmAudio.music, filmAudio.voice].forEach(a => {
@@ -4916,18 +4939,24 @@
 
     // full white surround: the whole world hides behind a clean white void
     // while the film plays -- the kampung only appears once it ends. Lights
-    // and the player rig (camera, keris hands) stay; only what we hide here
-    // is restored, so anything async-loaded mid-film keeps its own state.
+    // and the player rig (camera, keris hands) stay. GLTFs and NPCs keep
+    // arriving async well into the film, so a single hide pass isn't
+    // enough: the sweep re-runs every frame (via vrIntroSweep in
+    // updateFrame) to catch late arrivals before they can pierce the void.
     const prevBackground = scene.background, prevFog = scene.fog;
     scene.background = new THREE.Color(0xffffff);
     scene.fog = null;
     const hiddenWorld = [];
-    scene.children.forEach(o => {
-      if (o === screen || o === shadow || o === reflection || o === glow ||
-          o === player || o.isLight || !o.visible) return;
-      o.visible = false;
-      hiddenWorld.push(o);
-    });
+    const keepVisible = new Set([screen, shadow, reflection, glow, player]);
+    function sweepWorld(){
+      scene.children.forEach(o => {
+        if (keepVisible.has(o) || o.isLight || !o.visible) return;
+        o.visible = false;
+        hiddenWorld.push(o);
+      });
+    }
+    sweepWorld();
+    vrIntroSweep = sweepWorld;
 
     let done = false;
     let filmTex = null;
@@ -4938,6 +4967,12 @@
     function vrStartFilm(){
       if (done || filmTex) return;
       video.pause();
+      // the immersive handover can leave the shared AudioContext suspended,
+      // which would mute the film's whole Web Audio mix -- nudge it awake
+      // before the tracks start (playShortFilm retries again shortly after)
+      if (filmListener && filmListener.context.state !== 'running'){
+        filmListener.context.resume().catch(() => {});
+      }
       const filmCanvas = document.getElementById('filmCanvas');
       playShortFilm({
         // window rAF is suspended while the headset presents, so the film's
@@ -4946,6 +4981,9 @@
         scheduleFrame: cb => session.requestAnimationFrame(() => cb()),
         cancelFrame: id => session.cancelAnimationFrame(id),
         onFrame: () => { if (filmTex) filmTex.needsUpdate = true; },
+        // anak ayam eases in under the film's last 0.3s -- the balai's song
+        // is already singing when the veil starts dissolving into the world
+        onEndCue: startBackgroundMusic,
         onDone: endVrIntro
       });
       filmTex = new THREE.CanvasTexture(filmCanvas);
@@ -4967,6 +5005,7 @@
     function endVrIntro(){
       if (done) return;
       done = true;
+      vrIntroSweep = null; // stop hiding the world before we restore it
       video.pause();
       stopShortFilm();
       video.removeEventListener('ended', vrStartFilm);
@@ -5078,7 +5117,11 @@
 
   let shadowRefreshTimer = 0;
   let vrRevealVeil = null; // white flashback veil dissolving after the VR intro
+  let vrIntroSweep = null; // while the VR intro/film runs: per-frame hide of
+                           // async-loaded world objects, so nothing pierces
+                           // the white void (set/cleared in startVrIntro)
   function updateFrame(points, clouds, birds, dt, t){
+    if (vrIntroSweep) vrIntroSweep();
     if (vrRevealVeil){
       // a short beat of solid white, then the kampung dissolves in
       if (vrRevealVeil.userData.hold > 0){
