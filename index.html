@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Galeri Warisan Maya — VR Prototype</title>
 <link rel="icon" type="image/png" href="assets/images/unimap_logo.png">
+<!-- heritage manuscript-style serif for the short film's captions/title
+     (canvas-drawn); Georgia italic stands in when offline -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,700;1,600&display=swap" rel="stylesheet">
 <style>
   html, body { margin:0; padding:0; overflow:hidden; height:100%; background:#150c07; }
   canvas { display:block; }
@@ -633,16 +638,28 @@
   // cinematic score (30%) and the WhatsApp video soundtrack (60%). The
   // film is drawn onto #filmCanvas, so both presentations share one
   // renderer -- VR just wraps the canvas in a texture.
-  const FILM_SLIDES = [ // story order: kampung -> trade -> craft -> silat -> istana -> teaching the next generation -> the whole warisan together
+  const FILM_SLIDES = [ // ordered to shadow the narration: the Malay world -> adat & hospitality -> music & dance -> silat -> craftsmanship -> the legacy passed on
     'assets/images/Gemini_Generated_Image_9gqwaj9gqwaj9gqw.png',
     'assets/images/Gemini_Generated_Image_v6x74pv6x74pv6x7.png',
     'assets/images/Gemini_Generated_Image_5ayjzd5ayjzd5ayj.png',
-    'assets/images/Gemini_Generated_Image_hbcqgnhbcqgnhbcq.png',
-    'assets/images/Gemini_Generated_Image_w6k2vdw6k2vdw6k2.png',
     'assets/images/Gemini_Generated_Image_vvds7bvvds7bvvds.png',
+    'assets/images/Gemini_Generated_Image_w6k2vdw6k2vdw6k2.png',
+    'assets/images/Gemini_Generated_Image_hbcqgnhbcqgnhbcq.png',
     'assets/images/Gemini_Generated_Image_37lf2t37lf2t37lf.png',
     'assets/images/WhatsApp Image 2026-07-19 at 20.15.13.jpeg',
   ];
+  // the narration, shown as translucent subtitles; each sentence's share
+  // of the runtime is weighted by its length so the pacing roughly tracks
+  // the spoken WhatsApp track
+  const FILM_CAPTIONS = [
+    'To truly understand the soul of Melayu is to experience a living masterpiece where profound tradition meets unmatched artistry.',
+    'It is a culture grounded in adat—the sacred customs of respect and hospitality—and beautifully celebrated through the sweet, patient craft of traditional kuih.',
+    'This vibrant heritage comes alive in the rhythmic melodies of traditional musical instruments, guiding both the fluid grace of traditional dances and the sharp, disciplined mastery of silat.',
+    'This perfect balance of gentleness and strength is woven into the very fabric of their craftsmanship—from the royal gold threads of songket and the expressive storytelling of batik, to the legendary keris, a sacred weapon symbolizing honor, intellect, and sovereignty.',
+    'Rich in history and resilient in spirit, this is the enduring legacy of the Malay world.',
+  ];
+  const FILM_CAPTION_FONT = 'italic 600 42px "Cormorant Garamond", Georgia, serif';
+  const FILM_TITLE_FONT = '700 88px "Cormorant Garamond", Georgia, serif';
   const FILM_MUSIC_SRC = 'assets/audio/cinematic-and-emotional-background-music-for-documentary-videos-film_M9ieMja7.mp3';
   const FILM_VOICE_SRC = 'assets/audio/WhatsApp Video 2026-07-17 at 12.34.16.mp3';
   const FILM_MUSIC_VOL = 0.3;
@@ -690,6 +707,25 @@
       if (p && p.then) p.then(() => { a.pause(); a.currentTime = 0; a.muted = false; }).catch(() => { a.muted = false; });
     });
     if (!filmImages) filmImages = FILM_SLIDES.map(src => { const img = new Image(); img.src = src; return img; });
+    // pull the caption/title font in while the intro video plays, so the
+    // canvas doesn't open on the Georgia fallback and then jump typefaces
+    if (document.fonts && document.fonts.load){
+      document.fonts.load(FILM_CAPTION_FONT).catch(() => {});
+      document.fonts.load(FILM_TITLE_FONT).catch(() => {});
+    }
+  }
+
+  // greedy word-wrap for the caption strip (canvas has no native wrapping)
+  function wrapFilmCaption(ctx2d, text, maxW){
+    const lines = [];
+    let line = '';
+    for (const word of text.split(' ')){
+      const test = line ? line + ' ' + word : word;
+      if (line && ctx2d.measureText(test).width > maxW){ lines.push(line); line = word; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
   }
 
   // draw one still cover-fitted with a slow Ken Burns drift; p runs 0->1
@@ -726,14 +762,37 @@
     [fa.music, fa.voice].forEach(a => {
       a.muted = false;
       try { a.currentTime = 0; } catch (e) {}
-      // element volume is the fallback mix for browsers where the
-      // GainNode routing failed; with gains connected it stays at 1
       a.play().catch(() => {});
     });
-    fa.music.volume = fa.musicGain ? 1 : FILM_MUSIC_VOL;
-    fa.voice.volume = fa.voiceGain ? 1 : FILM_VOICE_VOL;
-    if (fa.musicGain) fa.musicGain.gain.value = FILM_MUSIC_VOL;
-    if (fa.voiceGain) fa.voiceGain.gain.value = FILM_VOICE_VOL;
+    // both tracks ease in from silence over the first beat (setFilmMix in
+    // the frame loop below owns the levels from here on); element volume
+    // is the fallback mix for browsers where the GainNode routing failed
+    fa.music.volume = fa.musicGain ? 1 : 0;
+    fa.voice.volume = fa.voiceGain ? 1 : 0;
+    if (fa.musicGain) fa.musicGain.gain.value = 0;
+    if (fa.voiceGain) fa.voiceGain.gain.value = 0;
+    function setFilmMix(k){
+      if (fa.musicGain) fa.musicGain.gain.value = FILM_MUSIC_VOL * k;
+      else fa.music.volume = FILM_MUSIC_VOL * k;
+      if (fa.voiceGain) fa.voiceGain.gain.value = FILM_VOICE_VOL * k;
+      else fa.voice.volume = FILM_VOICE_VOL * k;
+    }
+
+    // soft darkened corners, cached once: reads as film, not slideshow
+    const vignette = ctx2d.createRadialGradient(
+      canvas.width/2, canvas.height/2, canvas.height * 0.55,
+      canvas.width/2, canvas.height/2, canvas.height * 1.1);
+    vignette.addColorStop(0, 'rgba(20,10,0,0)');
+    vignette.addColorStop(1, 'rgba(20,10,0,0.3)');
+
+    // caption windows across the pre-white-out runtime, sized by sentence
+    // length as a stand-in for the narrator's pacing
+    const capTotal = n * slideDur;
+    const capSum = FILM_CAPTIONS.reduce((a, c) => a + c.length, 0);
+    const capStarts = [];
+    let capAcc = 0;
+    for (const c of FILM_CAPTIONS){ capStarts.push(capTotal * capAcc / capSum); capAcc += c.length; }
+    let capCache = { key: '', lines: [] };
 
     const state = { raf: 0, done: false };
     filmState = state;
@@ -758,19 +817,58 @@
         const alpha = local < FILM_XFADE ? local / FILM_XFADE : 1;
         drawFilmSlide(ctx2d, cur, p, idx % 2, alpha);
       }
+      ctx2d.fillStyle = vignette;
+      ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+      // narration caption strip: light-opacity manuscript italic along the
+      // bottom, fading at each sentence handover
+      const capT = Math.min(t, capTotal - 0.001);
+      let ci = 0;
+      while (ci < capStarts.length - 1 && capT >= capStarts[ci + 1]) ci++;
+      const capEnd = ci < capStarts.length - 1 ? capStarts[ci + 1] : capTotal;
+      const capIn = capT - capStarts[ci];
+      const capA = Math.min(1, capIn / 0.6, Math.max(0, (capEnd - capT) / 0.6)) * 0.82;
+      if (capA > 0.01){
+        ctx2d.font = FILM_CAPTION_FONT;
+        const capKey = ci + '|' + (document.fonts ? document.fonts.status : '');
+        if (capCache.key !== capKey){
+          capCache = { key: capKey, lines: wrapFilmCaption(ctx2d, FILM_CAPTIONS[ci], canvas.width * 0.8) };
+        }
+        ctx2d.globalAlpha = capA;
+        ctx2d.textAlign = 'center';
+        ctx2d.fillStyle = '#f7ead0';
+        ctx2d.shadowColor = 'rgba(10,6,0,0.9)';
+        ctx2d.shadowBlur = 14;
+        const capLh = 54;
+        let capY = canvas.height * 0.92 - (capCache.lines.length - 1) * capLh;
+        for (const line of capCache.lines){ ctx2d.fillText(line, canvas.width/2, capY); capY += capLh; }
+        ctx2d.shadowBlur = 0;
+        ctx2d.globalAlpha = 1;
+      }
+      // closing title card fades in over the final still, then whites out
+      // with it -- the film's last line dissolving into the real gallery
+      if (idx === n - 1){
+        ctx2d.globalAlpha = Math.min(1, local / 1.5);
+        ctx2d.textAlign = 'center';
+        ctx2d.fillStyle = '#f2e2b6';
+        ctx2d.shadowColor = 'rgba(10,6,0,0.85)';
+        ctx2d.shadowBlur = 26;
+        ctx2d.font = FILM_TITLE_FONT;
+        ctx2d.fillText('GALERI WARISAN MAYA', canvas.width/2, canvas.height * 0.46);
+        ctx2d.font = 'italic 600 34px "Cormorant Garamond", Georgia, serif';
+        ctx2d.fillText('The Living Heritage Gallery — Warisan Hidup', canvas.width/2, canvas.height * 0.55);
+        ctx2d.shadowBlur = 0;
+        ctx2d.globalAlpha = 1;
+      }
       // ending: fade the picture to white and the mix to silence together,
-      // so the flash/veil handover reads as one continuous reveal
+      // so the flash/veil handover reads as one continuous reveal; the mix
+      // itself eased in from silence over the film's first beat
       const outK = Math.max(0, (t - (total - FILM_OUT)) / FILM_OUT);
+      setFilmMix(Math.min(1, t / 1.2) * Math.max(0, 1 - outK));
       if (outK > 0){
         ctx2d.globalAlpha = Math.min(1, outK);
         ctx2d.fillStyle = '#fff';
         ctx2d.fillRect(0, 0, canvas.width, canvas.height);
         ctx2d.globalAlpha = 1;
-        const fade = Math.max(0, 1 - outK);
-        if (fa.musicGain) fa.musicGain.gain.value = FILM_MUSIC_VOL * fade;
-        else fa.music.volume = FILM_MUSIC_VOL * fade;
-        if (fa.voiceGain) fa.voiceGain.gain.value = FILM_VOICE_VOL * fade;
-        else fa.voice.volume = FILM_VOICE_VOL * fade;
       }
       if (opts && opts.onFrame) opts.onFrame();
       if (t >= total){
