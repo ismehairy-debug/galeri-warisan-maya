@@ -638,10 +638,10 @@
   // cinematic score (30%) and the WhatsApp video soundtrack (60%). The
   // film is drawn onto #filmCanvas, so both presentations share one
   // renderer -- VR just wraps the canvas in a texture.
-  const FILM_SLIDES = [ // ordered to shadow the narration: the Malay world -> adat & hospitality -> music & dance -> silat -> craftsmanship -> the legacy passed on
+  const FILM_SLIDES = [ // ordered to shadow the narration: the Malay world -> adat, hospitality & kuih -> music & dance -> silat -> craftsmanship -> the legacy passed on
     'assets/images/Gemini_Generated_Image_9gqwaj9gqwaj9gqw.png',
     'assets/images/Gemini_Generated_Image_v6x74pv6x74pv6x7.png',
-    'assets/images/Gemini_Generated_Image_5ayjzd5ayjzd5ayj.png',
+    'assets/images/poster_kuih.png',
     'assets/images/Gemini_Generated_Image_vvds7bvvds7bvvds.png',
     'assets/images/Gemini_Generated_Image_w6k2vdw6k2vdw6k2.png',
     'assets/images/Gemini_Generated_Image_hbcqgnhbcqgnhbcq.png',
@@ -732,11 +732,28 @@
   // across the still's screen time, parity flips the drift direction
   function drawFilmSlide(ctx2d, img, p, parity, alpha){
     const cw = ctx2d.canvas.width, ch = ctx2d.canvas.height;
-    const scale = Math.max(cw / img.naturalWidth, ch / img.naturalHeight) * (1.06 + 0.08 * (parity ? p : 1 - p));
-    const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
     const drift = (p - 0.5) * (parity ? 1 : -1);
     ctx2d.globalAlpha = alpha;
-    ctx2d.drawImage(img, (cw - w) / 2 + drift * (w - cw) * 0.4, (ch - h) / 2 + drift * (h - ch) * 0.4, w, h);
+    if (img.naturalHeight > img.naturalWidth){
+      // portrait art (the kuih poster): a 16:9 cover crop would leave a
+      // meaningless horizontal band, so blur-fill the frame with the art
+      // itself, dim it, and float the whole poster contained on top,
+      // gently breathing instead of panning
+      const cover = Math.max(cw / img.naturalWidth, ch / img.naturalHeight) * 1.1;
+      const bw = img.naturalWidth * cover, bh = img.naturalHeight * cover;
+      try { ctx2d.filter = 'blur(22px)'; } catch (e) {}
+      ctx2d.drawImage(img, (cw - bw) / 2, (ch - bh) / 2, bw, bh);
+      try { ctx2d.filter = 'none'; } catch (e) {}
+      ctx2d.fillStyle = 'rgba(20,10,0,0.45)';
+      ctx2d.fillRect(0, 0, cw, ch);
+      const contain = Math.min(cw / img.naturalWidth, ch / img.naturalHeight) * (0.88 + 0.05 * (parity ? p : 1 - p));
+      const w = img.naturalWidth * contain, h = img.naturalHeight * contain;
+      ctx2d.drawImage(img, (cw - w) / 2 + drift * 40, (ch - h) / 2, w, h);
+    } else {
+      const scale = Math.max(cw / img.naturalWidth, ch / img.naturalHeight) * (1.06 + 0.08 * (parity ? p : 1 - p));
+      const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+      ctx2d.drawImage(img, (cw - w) / 2 + drift * (w - cw) * 0.4, (ch - h) / 2 + drift * (h - ch) * 0.4, w, h);
+    }
     ctx2d.globalAlpha = 1;
   }
 
