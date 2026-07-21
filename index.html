@@ -370,6 +370,11 @@
   const specTargetPos = new THREE.Vector3();   // newest pose received from guest
   const specTargetQuat = new THREE.Quaternion();
   let specHasPose = false;
+  // the guest's two keris hand controllers, when they're actually in VR --
+  // see sendPoseUpdate (host side) and spectatorApplyPose (spectator side)
+  const specGripTargetPos = [new THREE.Vector3(), new THREE.Vector3()];
+  const specGripTargetQuat = [new THREE.Quaternion(), new THREE.Quaternion()];
+  const specGripVisible = [false, false];
 
   // Telegram cast-link notifier: posts the spectator link to a Telegram
   // chat the instant hosting goes live, so booth staff can tap it straight
@@ -1372,6 +1377,7 @@
   // must see exactly what the guest's eyes see, including VR head movement)
   // to every spectator, throttled to ~15 Hz to keep bandwidth negligible.
   const poseVec = new THREE.Vector3(), poseQuat = new THREE.Quaternion(), poseScale = new THREE.Vector3();
+  const gripVec = new THREE.Vector3(), gripQuat = new THREE.Quaternion(), gripScale = new THREE.Vector3();
   function sendPoseUpdate(dt){
     if (!hostConns.length) return;
     syncTimer += dt;
@@ -1390,6 +1396,19 @@
       +poseVec.x.toFixed(3), +poseVec.y.toFixed(3), +poseVec.z.toFixed(3),
       +poseQuat.x.toFixed(4), +poseQuat.y.toFixed(4), +poseQuat.z.toFixed(4), +poseQuat.w.toFixed(4)
     ];
+    // the keris controllers only have a meaningful pose while actually
+    // presenting -- append each grip's world transform so spectators can
+    // mirror them too, instead of the grips just sitting there hidden
+    if (renderer.xr.isPresenting){
+      for (const grip of kerisGrips){
+        grip.matrixWorld.decompose(gripVec, gripQuat, gripScale);
+        msg.push(
+          grip.visible ? 1 : 0,
+          +gripVec.x.toFixed(3), +gripVec.y.toFixed(3), +gripVec.z.toFixed(3),
+          +gripQuat.x.toFixed(4), +gripQuat.y.toFixed(4), +gripQuat.z.toFixed(4), +gripQuat.w.toFixed(4)
+        );
+      }
+    }
     for (const c of hostConns){ if (c.open) c.send(msg); }
   }
 
@@ -1516,6 +1535,18 @@
           camera.position.copy(specTargetPos);
           camera.quaternion.copy(specTargetQuat);
         }
+        // keris grips: only present in the message while the guest is
+        // actually in VR (see sendPoseUpdate) -- absent means hide them
+        for (let i = 0; i < 2; i++){
+          const base = 7 + i * 8;
+          if (d.length >= base + 8 && d[base] === 1){
+            specGripVisible[i] = true;
+            specGripTargetPos[i].set(d[base+1], d[base+2], d[base+3]);
+            specGripTargetQuat[i].set(d[base+4], d[base+5], d[base+6], d[base+7]).normalize();
+          } else {
+            specGripVisible[i] = false;
+          }
+        }
         if (status.style.display !== 'none') status.style.display = 'none';
       });
       conn.on('close', () => scheduleRetry('TETAMU TERPUTUS — MENYAMBUNG SEMULA… / GUEST LEFT — RECONNECTING…'));
@@ -1539,6 +1570,18 @@
     const k = 1 - Math.exp(-dt * 12); // ~smoothing time constant of 80 ms
     camera.position.lerp(specTargetPos, k);
     camera.quaternion.slerp(specTargetQuat, k);
+    // keris grips: three.js only auto-tracks these while actually
+    // presenting (see the unconditional hide a few lines up in
+    // updateFrame), so a spectator has to be driven manually from the
+    // guest's broadcast grip pose instead
+    for (let i = 0; i < kerisGrips.length; i++){
+      const grip = kerisGrips[i];
+      grip.visible = specGripVisible[i];
+      if (specGripVisible[i]){
+        grip.position.lerp(specGripTargetPos[i], k);
+        grip.quaternion.slerp(specGripTargetQuat[i], k);
+      }
+    }
   }
 
   // ---------- gyro look ----------
