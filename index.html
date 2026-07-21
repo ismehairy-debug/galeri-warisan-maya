@@ -329,6 +329,9 @@
   // assigned inside setupIntroScreen; declared up here because init() runs
   // before the statements further down this script ever execute
   let playIntro = () => {}, resetIntro = () => {};
+  // spectator-side counterpart, assigned by setupIntroScreenForSpectator:
+  // replays the intro video/film synced to the guest's broadcast phase
+  let applyIntroPhase = () => {};
   // short-film slideshow state (same init()-ordering reason as playIntro):
   // filmListener is stashed by setupIntroScreen for the volume GainNodes,
   // the rest is lazily filled by primeFilm()/playShortFilm() so spectator
@@ -378,15 +381,23 @@
   const TELEGRAM_CHAT_ID = '7635038198'; // @hairiwasme's private chat with the bot
   let telegramPosted = false;    // one notify per real hosting session
 
+  // intro playback phase, broadcast to spectators so they can replay the
+  // SAME intro (video, then the short film) synced to the guest's actual
+  // position instead of only picking up once the guest reaches the world
+  let introPhase = 'idle';  // 'idle' | 'video' | 'film' | 'world'
+  let introPhaseEpoch = 0;  // Date.now() when introPhase last changed
+
   function postCastLinkToTelegram(link){
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || telegramPosted) return;
     telegramPosted = true;
+    const nameInput = document.getElementById('guestName');
+    const guestName = (nameInput && nameInput.value.trim()) || 'Tetamu';
     fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
-        text: `🎥 Galeri Warisan Maya -- cast link:\n${link}`
+        text: `🎥 Galeri Warisan Maya -- cast link for ${guestName}:\n${link}`
       })
     }).catch(() => {}); // best-effort -- never let this block the gallery
   }
@@ -530,8 +541,10 @@
     document.addEventListener('mousemove', onMouseMove);
 
     if (SPECTATE_ID){
-      // spectator: no controls, no intro, no start screen -- just the
-      // mirrored view driven by the guest's synced camera pose
+      // spectator: the intro video/canvas element is reused (not stripped)
+      // so the spectator can replay the SAME intro, synced to the guest's
+      // actual position -- see setupSpectatorMode/applyIntroPhase
+      setupIntroScreenForSpectator(listener);
       setupSpectatorMode();
     } else {
       setupTouchControls();
@@ -585,6 +598,7 @@
       video.pause();
       video.style.display = 'none';
       filmCanvas.style.display = 'block';
+      broadcastIntroPhase('film');
       // anak ayam eases in under the film's last 0.3s, so the balai's own
       // song is already singing when the white-out hands over to the world
       playShortFilm({ onDone: finishIntro, onEndCue: startBackgroundMusic });
@@ -599,6 +613,7 @@
       stopShortFilm();
       video.style.display = '';
       filmCanvas.style.display = 'none';
+      broadcastIntroPhase('world');
       // flashback reveal: the film has already faded itself to white, so
       // the flash lands seamlessly, then dissolves over the kampung -- the
       // flat-screen twin of the VR veil
@@ -615,6 +630,7 @@
     playIntro = function(){
       introScreen.style.display = 'flex';
       introControls.style.display = 'flex';
+      broadcastIntroPhase('video');
       // the MASUK tap that got us here is a real user gesture, so the intro
       // can usually start unmuted; if the browser still refuses, fall back
       // to muted playback with the tap-for-sound hint
@@ -801,9 +817,12 @@
     if (isFinite(vd) && vd > 8) slideDur = Math.min(11, Math.max(3.5, vd / n));
     const total = n * slideDur + FILM_OUT;
 
+    // a synced spectator joins mid-film -- start both tracks from the same
+    // point in the timeline instead of from the top
+    const startOffset = (opts && opts.startOffset) || 0;
     [fa.music, fa.voice].forEach(a => {
       a.muted = false;
-      try { a.currentTime = 0; } catch (e) {}
+      try { a.currentTime = startOffset % (a.duration || Infinity) || 0; } catch (e) {}
       a.play().catch(() => {});
     });
     // both tracks ease in from silence over the first beat (setFilmMix in
@@ -858,7 +877,7 @@
         if (a.paused){ a.muted = false; a.play().catch(() => {}); }
       });
     }, ms));
-    const start = performance.now();
+    const start = performance.now() - startOffset * 1000;
 
     function frame(){
       if (filmState !== state || state.done) return;
@@ -1247,6 +1266,8 @@
     hostConns = [];
     hostRetries = 0;
     telegramPosted = false;
+    introPhase = 'idle';
+    introPhaseEpoch = 0;
     sessionDigits = String(1000 + Math.floor(Math.random() * 9000));
     sessionCode = 'tetamu-' + sessionDigits;
     document.getElementById('guestName').value = '';
@@ -1295,7 +1316,13 @@
     // regeneration, so this is the right moment to notify Telegram
     peerHost.on('open', () => postCastLinkToTelegram(spectatorLink()));
     peerHost.on('connection', conn => {
-      conn.on('open', () => hostConns.push(conn));
+      conn.on('open', () => {
+        hostConns.push(conn);
+        // a late-joining spectator needs to know where the guest already
+        // is in the intro (or that they're already touring) right away,
+        // not wait for the next natural phase change
+        sendIntroPhase([conn]);
+      });
       const drop = () => {
         const i = hostConns.indexOf(conn);
         if (i !== -1) hostConns.splice(i, 1);
@@ -1323,6 +1350,24 @@
     });
   }
 
+  // intro phase sync: tells every connected spectator (or a single
+  // freshly-opened one) which stage of the intro the guest is in and when
+  // that stage began, so the spectator can play the SAME video/film from
+  // the right offset instead of only catching up once the guest reaches
+  // the gallery. Sent as a plain object -- pose updates are plain arrays,
+  // so the spectator's data handler tells them apart with Array.isArray.
+  function sendIntroPhase(conns){
+    if (!conns.length) return;
+    const msg = { type: 'phase', phase: introPhase, epoch: introPhaseEpoch };
+    for (const c of conns){ if (c.open) c.send(msg); }
+  }
+
+  function broadcastIntroPhase(phase){
+    introPhase = phase;
+    introPhaseEpoch = Date.now();
+    sendIntroPhase(hostConns);
+  }
+
   // Broadcast the camera's WORLD pose (not the player group's -- spectators
   // must see exactly what the guest's eyes see, including VR head movement)
   // to every spectator, throttled to ~15 Hz to keep bandwidth negligible.
@@ -1348,16 +1393,76 @@
     for (const c of hostConns){ if (c.open) c.send(msg); }
   }
 
+  // spectator's own copy of the intro: reuses the exact same #introVideo /
+  // #filmCanvas / playShortFilm as the guest, but driven by phase messages
+  // from the host (see broadcastIntroPhase) instead of local MASUK/SKIP
+  // clicks -- a spectator can't control the guest's playback, only watch it.
+  function setupIntroScreenForSpectator(listener){
+    filmListener = listener;
+    const introScreen = document.getElementById('introScreen');
+    const video = document.getElementById('introVideo');
+    const filmCanvas = document.getElementById('filmCanvas');
+    const soundHint = document.getElementById('tapForSoundHint');
+    const status = document.getElementById('spectateStatus');
+
+    // the spectator's own tab needs its own autoplay-policy gesture,
+    // separate from whatever gesture the guest used on their device -- the
+    // film's music/voice route through this same AudioContext, so a tap
+    // here also wakes it up if the browser left it suspended
+    introScreen.addEventListener('click', () => {
+      video.muted = false;
+      soundHint.style.display = 'none';
+      if (listener.context.state === 'suspended') listener.context.resume().catch(() => {});
+      if (filmAudio){
+        [filmAudio.music, filmAudio.voice].forEach(a => { if (a.paused) a.play().catch(() => {}); });
+      }
+    });
+
+    applyIntroPhase = function(phase, epoch){
+      const elapsed = Math.max(0, (Date.now() - (epoch || Date.now())) / 1000);
+      if (phase === 'video'){
+        status.style.display = 'none';
+        introScreen.style.display = 'flex';
+        stopShortFilm();
+        filmCanvas.style.display = 'none';
+        video.style.display = '';
+        video.muted = false;
+        video.currentTime = elapsed;
+        video.play().catch(() => {
+          video.muted = true;
+          soundHint.style.display = 'block';
+          video.play().catch(() => {});
+        });
+      } else if (phase === 'film'){
+        status.style.display = 'none';
+        introScreen.style.display = 'flex';
+        video.pause();
+        video.style.display = 'none';
+        filmCanvas.style.display = 'block';
+        // same nudge startVrIntro's vrStartFilm uses -- a suspended context
+        // would otherwise play the film's Web Audio mix silently
+        if (listener.context.state !== 'running') listener.context.resume().catch(() => {});
+        playShortFilm({ startOffset: elapsed, onDone: () => { introScreen.style.display = 'none'; } });
+      } else if (phase === 'world'){
+        introScreen.style.display = 'none';
+        soundHint.style.display = 'none';
+        video.pause();
+        stopShortFilm();
+      } else {
+        // 'idle' -- guest hasn't tapped MASUK yet
+        introScreen.style.display = 'none';
+      }
+    };
+  }
+
   // ---------- guest spectator sync: spectator side ----------
   // Entered via index.html?spectate=<code>. Renders the same scene but
   // strips every control and UI layer; the camera is a passive mirror of
   // the guest's synced pose.
   function setupSpectatorMode(){
-    // cancel the intro video download entirely -- the spectator never plays it
-    const introVideo = document.getElementById('introVideo');
-    introVideo.removeAttribute('src');
-    introVideo.load();
-    ['loadingScreen','introScreen','introControls','tapForSoundHint','startScreen','joystick-base']
+    // skip/pause aren't meaningful for a passive spectator -- only the
+    // guest can advance their own intro, so that control stays hidden
+    ['loadingScreen','introControls','startScreen','joystick-base']
       .forEach(id => { document.getElementById(id).style.display = 'none'; });
     // (#overlay and #infoPanel only appear via their .visible class, which
     //  is never added in spectator mode)
@@ -1396,6 +1501,12 @@
       const conn = peer.connect(PEER_PREFIX + SPECTATE_ID, { reliable: true, serialization: 'json' });
       conn.on('open', () => showStatus('MENUNGGU PANDANGAN TETAMU… / WAITING FOR GUEST VIEW…'));
       conn.on('data', d => {
+        // control message (intro phase sync) vs. a pose array -- see
+        // broadcastIntroPhase/sendIntroPhase on the host side
+        if (d && typeof d === 'object' && !Array.isArray(d)){
+          if (d.type === 'phase') applyIntroPhase(d.phase, d.epoch);
+          return;
+        }
         if (!Array.isArray(d) || d.length < 7) return;
         specTargetPos.set(d[0], d[1], d[2]);
         specTargetQuat.set(d[3], d[4], d[5], d[6]).normalize();
@@ -4995,6 +5106,7 @@
     function vrStartFilm(){
       if (done || filmTex) return;
       video.pause();
+      broadcastIntroPhase('film');
       // the immersive handover can leave the shared AudioContext suspended,
       // which would mute the film's whole Web Audio mix -- nudge it awake
       // before the tracks start (playShortFilm retries again shortly after)
@@ -5033,6 +5145,7 @@
     function endVrIntro(){
       if (done) return;
       done = true;
+      broadcastIntroPhase('world');
       vrIntroSweep = null; // stop hiding the world before we restore it
       video.pause();
       stopShortFilm();
@@ -5080,6 +5193,7 @@
     session.addEventListener('select', onVrSelect);
     session.addEventListener('end', endVrIntro);
 
+    broadcastIntroPhase('video');
     video.muted = false;
     video.currentTime = 0;
     video.play()
