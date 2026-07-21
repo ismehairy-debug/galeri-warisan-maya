@@ -368,6 +368,29 @@
   const specTargetQuat = new THREE.Quaternion();
   let specHasPose = false;
 
+  // Telegram cast-link notifier: posts the spectator link to a Telegram
+  // chat the instant hosting goes live, so booth staff can tap it straight
+  // from Telegram on the TV instead of copying it off the guest's screen.
+  // This is a static site with no backend, so the bot token necessarily
+  // ships in this client-side file -- use a bot dedicated to this alone.
+  // Leave either value blank to disable (the call below then no-ops).
+  const TELEGRAM_BOT_TOKEN = '8811132259:AAENebcbnSZdgSeNx1YAKKV4XcI1ryzjHdU';
+  const TELEGRAM_CHAT_ID = '7635038198'; // @hairiwasme's private chat with the bot
+  let telegramPosted = false;    // one notify per real hosting session
+
+  function postCastLinkToTelegram(link){
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || telegramPosted) return;
+    telegramPosted = true;
+    fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: `🎥 Galeri Warisan Maya -- cast link:\n${link}`
+      })
+    }).catch(() => {}); // best-effort -- never let this block the gallery
+  }
+
   const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   // a standalone headset's own browser (Quest reports OculusBrowser; Pico
   // and Wolvic likewise) -- NOT the same as WebXR support, which desktop
@@ -1223,6 +1246,7 @@
     peerHost = null;
     hostConns = [];
     hostRetries = 0;
+    telegramPosted = false;
     sessionDigits = String(1000 + Math.floor(Math.random() * 9000));
     sessionCode = 'tetamu-' + sessionDigits;
     document.getElementById('guestName').value = '';
@@ -1266,6 +1290,10 @@
     if (peerHost || !sessionCode || typeof Peer === 'undefined') return;
 
     peerHost = new Peer(PEER_PREFIX + sessionCode);
+    // the broker has confirmed this session's peer ID is actually live --
+    // only now is the link guaranteed not to change under an 'unavailable-id'
+    // regeneration, so this is the right moment to notify Telegram
+    peerHost.on('open', () => postCastLinkToTelegram(spectatorLink()));
     peerHost.on('connection', conn => {
       conn.on('open', () => hostConns.push(conn));
       const drop = () => {
