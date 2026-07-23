@@ -194,8 +194,8 @@
     <p class="subtitle">Laporan Proses Penyelidikan &amp; Pembangunan (R&amp;D) — The Living Heritage Gallery</p>
     <div class="meta">
       <span><b>Pasukan</b> DICE 4.0 UniMAP</span>
-      <span><b>Tempoh pembangunan</b> 6–9 Julai 2026</span>
-      <span><b>Sejarah</b> 102 komit</span>
+      <span><b>Tempoh pembangunan</b> 6–23 Julai 2026</span>
+      <span><b>Sejarah</b> 169 komit</span>
       <span><b>Teknologi</b> Three.js r128 + WebXR, satu fail HTML</span>
     </div>
     <hr class="rule"><hr class="rule-thin">
@@ -213,22 +213,27 @@
     diraja ke <strong>Istana Kesultanan Melaka</strong> lengkap dengan balairung seri,
     muzik nobat dan payung kuning.</p>
     <p>Lapan stesen pameran interaktif menghidupkan cabang warisan Melayu — Tarian (Wau
-    Bulan), Alat Muzik (gamelan), Silat, Songket &amp; Batik, Keris &amp; Anyaman, Hidangan
-    Warisan, Pantun &amp; Adat, dan Filem Melayu era Kesultanan Melaka — masing-masing dicetus
-    oleh jarak pelawat dengan audio spatial dan video sebenar. Semua ini dibina dalam
-    <strong>satu fail <code>index.html</code></strong> tanpa alat bina, dan disiarkan melalui
-    GitHub Pages: <a href="https://ismehairy-debug.github.io/Galeri-Warisan-Maya-The-Living-Heritage-Gallery-/">buka galeri</a>.</p>
+    Bulan &amp; Ayam Didik, pelajar UniMAP), Alat Muzik (gamelan), Silat, Songket &amp; Batik,
+    Keris &amp; Anyaman, Hidangan Warisan, Pantun &amp; Adat, dan Filem Melayu era Kesultanan
+    Melaka — masing-masing dicetus oleh jarak pelawat dengan audio spatial dan video sebenar.
+    Kampung sekeliling kini hidup dengan lembu, ayam kampung, kereta lembu, sawah padi dan
+    pedagang NPC berbual, manakala laluan diraja membawa ke <strong>Istana Kesultanan
+    Melaka</strong> lengkap dengan balairung seri, muzik nobat dan payung kuning. Semua ini
+    dibina dalam <strong>satu fail <code>index.html</code></strong> tanpa alat bina, dan
+    disiarkan melalui GitHub Pages: <a href="https://ismehairy-debug.github.io/galeri-warisan-maya/">buka galeri</a>.</p>
     <p>Galeri kini turut menyokong <strong>mod penonton langsung</strong>: tetamu menaip nama
-    dan menerima kod sesi, dan kakitangan boleh melihat pandangan orang-pertama tetamu itu
-    secara langsung pada komputer riba melalui <code>spectator.html</code> — disegerak
-    pelayar-ke-pelayar dengan WebRTC (PeerJS), tanpa sebarang pelayan sendiri.</p>
+    dan skrin butiran memaparkan pautan penonton penuh terus dengan kod QR untuk diimbas —
+    tiada kod perlu ditaip lagi. Kakitangan boleh melihat pandangan orang-pertama tetamu itu
+    secara langsung pada komputer riba, disegerak pelayar-ke-pelayar dengan WebRTC (PeerJS)
+    tanpa sebarang pelayan sendiri, dan pautan siaran itu turut diposkan secara automatik ke
+    Telegram sebaik sahaja penyiaran bermula.</p>
   </section>
 
   <p class="sep">◆ ◆ ◆</p>
 
   <section class="col">
     <h2>Garis Masa R&amp;D</h2>
-    <p class="kicker">6 – 9 Julai 2026 &middot; 102 komit &middot; 8 fasa</p>
+    <p class="kicker">6 – 23 Julai 2026 &middot; 169 komit &middot; 14 fasa</p>
 
     <div class="phase">
       <h3>Fasa 1 — Asas &amp; Struktur Aset</h3>
@@ -371,15 +376,134 @@
         dan gangguan rangkaian), dan berbilang penonton boleh menonton satu tetamu serentak.</li>
       </ul>
     </div>
+
+    <div class="phase">
+      <h3>Fasa 9 — Aliran Lawatan, Kawalan VR &amp; Pautan Penonton</h3>
+      <p class="when">17 Julai, pagi</p>
+      <ul>
+        <li>Kawalan VR diperbetul: <em>thumbstick</em> kanan kini memusing pandangan manakala
+        kiri terus berjalan, memadankan konvensyen tetingkap VR biasa.</li>
+        <li>Aliran lawatan disusun semula — skrin butiran (nama tetamu) muncul dahulu, diikuti
+        video intro, barulah dunia dibuka — supaya urutan terasa lebih semula jadi.</li>
+        <li>Kemasukan kod/PIN penonton digantikan terus dengan <strong>pautan + kod QR</strong>
+        (lihat Fasa 8); pepijat butang MASUK yang mati dibaiki dengan menaikkan fungsi
+        <code>playIntro</code>/<code>resetIntro</code> ke atas panggilan <code>init()</code>.</li>
+        <li>Stesen KRAF, HIDANGAN WARISAN dan FILEM disunyikan (visual sahaja) supaya anak ayam
+        di balai tidak bertindih dengan bunyi lain; muzik balai/istana dinaikkan ke 60%, tanda
+        TIANG SERI dipindah ke hadapan, dan bebola penanda hotspot dibuang.</li>
+        <li>Suara narator selepas video intro dicuba, kemudian <strong>ditarik balik</strong>
+        pada hari yang sama selepas tidak menepati nada yang dikehendaki.</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <h3>Fasa 10 — Kampung Dibina: Rumah, Ternakan &amp; Alam Semula Jadi</h3>
+      <p class="when">17 Julai, tengah hari – petang</p>
+      <ul>
+        <li><strong>Rumah tradisional Melayu</strong> didirikan di kampung sebelah barat laluan
+        masuk, lengkap dengan keterangan sejarahnya sendiri dan tiang pelita di pintu; foto
+        rujukan dipasang pada muka bilik batu.</li>
+        <li>Model Sketchfab sebenar dipasang: <strong>keris glTF</strong> menggantikan foto
+        potongan di stesen KERIS &amp; ANYAMAN, dan wau bulan berbingkai digantung bersama.
+        Kraf beralih sepenuhnya kepada 3D.</li>
+        <li><strong>Haiwan &amp; kenderaan kampung:</strong> kereta lembu ditambah (sempat
+        dipasangkan replika jet Sukhoi Su-30MKM di belakangnya secara eksperimen sebelum
+        dibuang semula), diikuti lembu sebenar, tiga ekor ayam kampung di halaman rumah,
+        gunung berlatar, sawah padi berumput, dan hutan kelapa/pisang/buluh yang menyekat
+        pandangan ke gunung.</li>
+        <li>Kad video (poster) kini memaparkan rakaman cermin di belakang setiap stesen
+        berdiri bebas; swatch fabrik songket &amp; batik turut kelihatan dari belakang.
+        Papan iklan UniMAP ditulis semula mengikut gaya keterangan FCoEE.</li>
+        <li>Kemas kini repo: gambar rujukan longgar dipindah ke <code>assets/images/</code>;
+        pepijat letupan bunyi sejurus selepas MASUK dibaiki dengan memulakan video stesen
+        dalam keadaan senyap.</li>
+        <li><strong>Larian prestasi:</strong> senario berat dinipiskan (decimate) pada
+        penghujung fasa supaya kadar bingkai VR kekal lancar walaupun kampung kini jauh lebih
+        padat dengan objek.</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <h3>Fasa 11 — Papan Keterangan, Panduan Baca &amp; NPC Dalam VR</h3>
+      <p class="when">18 Julai</p>
+      <ul>
+        <li>Pepijat "seret ke belakang" semasa berjalan sambil memusing dalam VR dibaiki.</li>
+        <li>Keterangan setiap stesen kini dipaparkan pada <strong>papan aras mata dalam-dunia</strong>
+        semasa VR, dengan kaki papan (reading stand) di sisi setiap segmen — sudut dan
+        kedudukannya disesuaikan semula selepas sesi pengujian sebenar.</li>
+        <li>Kawalan keris VR, penalaan prestasi desktop, dan kemasukan terus ke VR pada peranti
+        yang menyokongnya (skip terus tanpa skrin desktop dahulu).</li>
+        <li><strong>Sinema intro VR diperkukuh:</strong> skrin ditarik ke ~7.4&nbsp;m dan
+        diapungkan di atas kaca, halo <em>ambilight</em> disegerak dengan filem, pepijat
+        kelipan sebelah mata dibaiki, tanda "skip" dibuang, dan babak imbas kembali ditambah.</li>
+        <li>Butang X pada keris kiri kini keluar dari VR terus ke skrin mula; anak ayam
+        dimainkan lebih kuat &amp; laju sejurus masuk; pautan siaran admin ditambah dengan
+        jeda putih sebelum kampung didedahkan.</li>
+        <li>Sepasang <strong>NPC pedagang</strong> ditambah berdagang di sisi kereta lembu,
+        kemudiannya dipisahkan dan dianimasikan seolah-olah sedang berbual; kos bayang desktop
+        dikurangkan lagi.</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <h3>Fasa 12 — Filem Pendek Digerakkan Dalam VR</h3>
+      <p class="when">19 Julai</p>
+      <ul>
+        <li>Filem pendek intro kini digerakkan dari gelung <code>requestAnimationFrame</code>
+        sesi WebXR sendiri, supaya ia benar-benar dimainkan semasa headset dipakai (bukan hanya
+        pada skrin desktop).</li>
+        <li>Sinema intro VR dikukuhkan lagi: cubaan semula automatik untuk audio yang gagal
+        dimainkan, ruang kosong putih yang lebih rapat (tiada kebocoran cahaya), dan isyarat
+        anak ayam pada saat yang tepat.</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <h3>Fasa 13 — Mod Penonton: Siaran Telegram &amp; Segerak Sepenuhnya</h3>
+      <p class="when">21 Julai</p>
+      <ul>
+        <li>Percubaan mengehadkan hos (host-gating) dan menyegerakkan intro ditarik balik —
+        kembali kepada skrin mula ringkas selepas didapati terlalu rumit berbanding manfaatnya.</li>
+        <li><strong>Pautan siaran diposkan ke Telegram secara automatik</strong> sebaik sahaja
+        penyiaran tetamu bermula, lengkap dengan nama tetamu supaya kakitangan tahu siapa sedang
+        dilawati tanpa perlu bertanya.</li>
+        <li>Video intro dan filem pendek kini disegerak ke skrin penonton (bukan hanya dunia
+        3D), dan kawalan keris VR turut dicerminkan ke sisi penonton.</li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <h3>Fasa 14 — Kandungan TARIAN Dikemas Kini &amp; Bunyi Penonton Diperkukuh</h3>
+      <p class="when">23 Julai</p>
+      <ul>
+        <li>Tab penonton kini memaparkan <strong>sepanduk "ketik untuk aktifkan bunyi"</strong>
+        yang kekal sehingga diketik — memandangkan tab itu sentiasa dibuka melalui pautan/QR
+        dan tidak pernah menerima klik sebenar dalam dokumennya sendiri, ini satu-satunya cara
+        pelayar membenarkan bunyi. Sebaik diketik, muzik latar, nobat, suasana angin/burung dan
+        video stesen kini turut disegerak ke tab penonton, bukan lagi senyap sepenuhnya.</li>
+        <li><strong>Stesen TARIAN dikemas kini</strong> dengan rakaman sebenar pelajar UniMAP:
+        <em>Tarian Wau Bulan</em> dan <em>Tarian Ayam Didik</em> (tarian rakyat asal Kangar,
+        Perlis, tercipta daripada gerakan permainan melaga ayam) — dimainkan silih berganti
+        sebagai satu senarai main pada skrin yang sama, bukan lagi satu klip tunggal bergelung.</li>
+        <li>Skrin TARIAN kini <strong>terus dimainkan tanpa menunggu pelawat menghampiri</strong>
+        (dikecualikan daripada pagar jarak yang mengehadkan stesen video lain), supaya ia
+        sentiasa terasa sebagai pameran hidup sebaik sahaja pelawat masuk ke galeri.</li>
+        <li>Klip mentah ditranskod ke 1280×720 H.264/AAC mengikut piawaian aset sedia ada, dan
+        keterangan stesen ditulis semula berdasarkan penyelidikan sejarah kedua-dua tarian.</li>
+        <li>Pautan GitHub Pages lapuk (nama repo lama, bertukar huruf besar) dibuang daripada
+        README selepas didapati memberi 404 — pautan hidup kini digunakan terus di seluruh
+        laporan ini.</li>
+      </ul>
+    </div>
   </section>
 
   <p class="sep">◆ ◆ ◆</p>
 
   <section class="col">
     <h2>Log Komit Penuh</h2>
-    <p class="kicker">Rekod kronologi — 102 komit</p>
+    <p class="kicker">Rekod kronologi — 169 komit</p>
     <details>
-      <summary>Buka log penuh (6 Julai → 9 Julai 2026)</summary>
+      <summary>Buka log penuh (6 Julai → 23 Julai 2026)</summary>
       <div class="logwrap">
         <table class="log">
           <tbody>
@@ -485,6 +609,73 @@
             <tr><td class="hash">c197827</td><td class="when">08 Jul 09:54</td><td>Realism overhaul: shadows, filmic tone mapping, living kampung animation</td></tr>
             <tr><td class="hash">3836e58</td><td class="when">08 Jul 10:14</td><td>Add self-contained R&amp;D process report (laporan-rnd.html)</td></tr>
             <tr><td class="hash">650bf8f</td><td class="when">09 Jul 11:50</td><td>Add live guest spectator mode via PeerJS (no backend)</td></tr>
+            <tr><td class="hash">57c7a12</td><td class="when">09 Jul 12:05</td><td>Update R&amp;D report: add Fasa 8 (live spectator mode), refresh commit log to 102</td></tr>
+            <tr><td class="hash">e1750fc</td><td class="when">09 Jul 12:13</td><td>Move payung kuning off the Istana facade so the canopy no longer clips the wall</td></tr>
+            <tr><td class="hash">22b4903</td><td class="when">17 Jul 10:22</td><td>VR: right thumbstick now turns the view, left stick keeps walking</td></tr>
+            <tr><td class="hash">6d2bc0e</td><td class="when">17 Jul 10:32</td><td>Reorder visit flow: details screen first, then intro video, then the world</td></tr>
+            <tr><td class="hash">1c10de2</td><td class="when">17 Jul 10:39</td><td>Replace spectator code/PIN entry with a direct link + QR</td></tr>
+            <tr><td class="hash">0fbf7fc</td><td class="when">17 Jul 11:06</td><td>Fix dead MASUK button: hoist playIntro/resetIntro above the init() call</td></tr>
+            <tr><td class="hash">9a8a8ca</td><td class="when">17 Jul 11:20</td><td>Silence the kraf, makanan, and filem stations</td></tr>
+            <tr><td class="hash">57e5692</td><td class="when">17 Jul 12:23</td><td>Raise balai/istana music to 60%, move tiang seri sign to the front, drop hotspot marker balls</td></tr>
+            <tr><td class="hash">22d3b15</td><td class="when">17 Jul 12:41</td><td>Play narrator voice-over after the intro video</td></tr>
+            <tr><td class="hash">b4600dc</td><td class="when">17 Jul 12:46</td><td>Revert "Play narrator voice-over after the intro video"</td></tr>
+            <tr><td class="hash">09165a9</td><td class="when">17 Jul 12:57</td><td>Add rumah tradisional Melayu in the kampung, west of the entrance path</td></tr>
+            <tr><td class="hash">a58653d</td><td class="when">17 Jul 13:12</td><td>Center the spectator QR on the opening screen</td></tr>
+            <tr><td class="hash">ac4527e</td><td class="when">17 Jul 13:15</td><td>Add rumah &amp; Istana descriptions, nobat to 50%, anak ayam through silent exhibits</td></tr>
+            <tr><td class="hash">2a69476</td><td class="when">17 Jul 13:19</td><td>Fix audio blast right after MASUK: prime station videos muted</td></tr>
+            <tr><td class="hash">489557b</td><td class="when">17 Jul 13:22</td><td>Show mirrored footage on the back of free-standing video posters</td></tr>
+            <tr><td class="hash">86c8fde</td><td class="when">17 Jul 13:38</td><td>Show songket &amp; batik fabric swatches from the back of the station</td></tr>
+            <tr><td class="hash">4a504d1</td><td class="when">17 Jul 13:42</td><td>Raise the payung kuning clear of the Istana photos, nobat to 20%, drop in-world spectator link</td></tr>
+            <tr><td class="hash">1724edc</td><td class="when">17 Jul 13:51</td><td>UniMAP billboard: replace bullet lines with an FCoEE-style description</td></tr>
+            <tr><td class="hash">5314b5d</td><td class="when">17 Jul 14:01</td><td>Move loose reference pictures from the repo root into assets/images</td></tr>
+            <tr><td class="hash">3c1fec3</td><td class="when">17 Jul 14:04</td><td>Remove the old root copies of the moved reference pictures</td></tr>
+            <tr><td class="hash">3ec72b2</td><td class="when">17 Jul 14:08</td><td>Wire the Sketchfab keris model into the KERIS &amp; ANYAMAN station</td></tr>
+            <tr><td class="hash">b7c6c87</td><td class="when">17 Jul 14:26</td><td>Load the real keris glTF at the KERIS &amp; ANYAMAN station</td></tr>
+            <tr><td class="hash">9deb3ec</td><td class="when">17 Jul 14:31</td><td>Add kereta lembu (traditional Malay bullock cart) in the kampung</td></tr>
+            <tr><td class="hash">19f2750</td><td class="when">17 Jul 14:37</td><td>Park a Sukhoi Su-30MKM behind the kereta lembu</td></tr>
+            <tr><td class="hash">ecbb7e3</td><td class="when">17 Jul 15:34</td><td>Kampung decoration pass: remove Sukhoi, real lembu, mountains, sawah padi, grove</td></tr>
+            <tr><td class="hash">feabfde</td><td class="when">17 Jul 15:50</td><td>Use all five uploaded Sketchfab models, compacted for the Quest browser</td></tr>
+            <tr><td class="hash">4b2ba97</td><td class="when">17 Jul 15:54</td><td>Add the chicken model: three ayam kampung in the rumah&#x27;s yard</td></tr>
+            <tr><td class="hash">aecc318</td><td class="when">17 Jul 16:04</td><td>All lembu are the real cow model; grass tinted to match the padi; procedural mountains/grove removed</td></tr>
+            <tr><td class="hash">da56e15</td><td class="when">17 Jul 16:13</td><td>Ground the terrain models, grass-fill the sawah, trim a cow, clear the Istana&#x27;s flank</td></tr>
+            <tr><td class="hash">f39140c</td><td class="when">17 Jul 16:24</td><td>Scenery polish: forests screen the mountains, chickens under the house, harness clears the cows</td></tr>
+            <tr><td class="hash">328120d</td><td class="when">17 Jul 16:28</td><td>Hang the framed wau bulan model at the KERIS &amp; ANYAMAN station</td></tr>
+            <tr><td class="hash">70324ec</td><td class="when">17 Jul 16:31</td><td>Pack the horizon with forest cover and fully ground the mountain range</td></tr>
+            <tr><td class="hash">c675478</td><td class="when">17 Jul 16:42</td><td>Kraf goes all-3D, pelita lamp stand at the rumah&#x27;s door, reference photo on its wall</td></tr>
+            <tr><td class="hash">21eae5c</td><td class="when">17 Jul 16:47</td><td>Move the rumah reference photo to the stone room&#x27;s face at eye level</td></tr>
+            <tr><td class="hash">a18feaf</td><td class="when">17 Jul 17:05</td><td>Plant the banana tree model around the kampung; one less cow at the cart</td></tr>
+            <tr><td class="hash">5b26d48</td><td class="when">17 Jul 17:16</td><td>Decimate the heavy scenery for smooth VR framerates</td></tr>
+            <tr><td class="hash">f84b6f0</td><td class="when">18 Jul 18:27</td><td>Fix backward drag when walking and turning at once in VR</td></tr>
+            <tr><td class="hash">8627eb7</td><td class="when">18 Jul 18:32</td><td>Show station descriptions on an eye-level in-world board in VR</td></tr>
+            <tr><td class="hash">16f7c48</td><td class="when">18 Jul 18:43</td><td>Reading stand beside every segment; describe the three bare hotspots</td></tr>
+            <tr><td class="hash">35c6034</td><td class="when">18 Jul 18:50</td><td>Keris VR controllers, desktop perf, and straight-to-VR entry on headsets</td></tr>
+            <tr><td class="hash">c46551d</td><td class="when">18 Jul 18:59</td><td>Angle every reading stand at its exhibit&#x27;&#x27;s viewing spot; VR intro cinema</td></tr>
+            <tr><td class="hash">2175be2</td><td class="when">18 Jul 19:09</td><td>Reposition six reading stands per walkthrough feedback</td></tr>
+            <tr><td class="hash">35e8876</td><td class="when">18 Jul 19:19</td><td>Facing gateway placards, kereta stand beside the lembu, istana no-entry, white-void intro</td></tr>
+            <tr><td class="hash">4b07fc6</td><td class="when">18 Jul 19:24</td><td>Pull the VR intro screen back and float it over glass</td></tr>
+            <tr><td class="hash">97cc1c4</td><td class="when">18 Jul 19:26</td><td>Push the VR intro screen back to ~7.4m and drop the skip sign</td></tr>
+            <tr><td class="hash">0716413</td><td class="when">18 Jul 19:28</td><td>Ambilight halo synced to the intro film</td></tr>
+            <tr><td class="hash">6079c40</td><td class="when">18 Jul 19:33</td><td>Fix one-eye intro judder, retire the logo pop-up, add flashback reveal</td></tr>
+            <tr><td class="hash">058914a</td><td class="when">18 Jul 19:36</td><td>X on the left keris exits VR back to the start screen</td></tr>
+            <tr><td class="hash">53098c3</td><td class="when">18 Jul 19:43</td><td>Anak ayam plays at entry, louder and faster; harden the X-button exit</td></tr>
+            <tr><td class="hash">15d4f42</td><td class="when">18 Jul 19:57</td><td>Admin-only cast link; hold the white beat before the kampung reveal</td></tr>
+            <tr><td class="hash">090cda5</td><td class="when">18 Jul 20:01</td><td>Hide the VR button on devices without VR</td></tr>
+            <tr><td class="hash">cba5335</td><td class="when">18 Jul 20:12</td><td>Merchant NPC pair trading beside the kereta lembu</td></tr>
+            <tr><td class="hash">9ff879b</td><td class="when">18 Jul 20:15</td><td>Cut the remaining desktop shadow cost</td></tr>
+            <tr><td class="hash">2c858df</td><td class="when">18 Jul 20:21</td><td>Split the merchant pair and animate them in conversation</td></tr>
+            <tr><td class="hash">56f9972</td><td class="when">19 Jul 20:56</td><td>l</td></tr>
+            <tr><td class="hash">fe5901f</td><td class="when">19 Jul 21:06</td><td>s</td></tr>
+            <tr><td class="hash">7e23fa3</td><td class="when">19 Jul 21:32</td><td>.</td></tr>
+            <tr><td class="hash">d49c655</td><td class="when">19 Jul 21:50</td><td>a</td></tr>
+            <tr><td class="hash">1339f7b</td><td class="when">19 Jul 22:20</td><td>Drive the VR short film from the XR session&#x27;s rAF so it plays in-headset</td></tr>
+            <tr><td class="hash">45e33c6</td><td class="when">19 Jul 23:44</td><td>Harden the VR intro cinema: audio retries, sealed white void, anak ayam cue</td></tr>
+            <tr><td class="hash">4ed9937</td><td class="when">21 Jul 21:52</td><td>x</td></tr>
+            <tr><td class="hash">3e2fb2a</td><td class="when">21 Jul 22:24</td><td>Revert host-gating and intro-sync experiment, back to plain start screen</td></tr>
+            <tr><td class="hash">e325887</td><td class="when">21 Jul 22:58</td><td>Post the cast link to Telegram the moment hosting goes live</td></tr>
+            <tr><td class="hash">2132bc7</td><td class="when">21 Jul 23:13</td><td>Include guest name in the Telegram cast post; sync intro/film to spectators</td></tr>
+            <tr><td class="hash">d570aac</td><td class="when">21 Jul 23:45</td><td>Mirror the keris VR controllers to spectators too</td></tr>
+            <tr><td class="hash">436ad8b</td><td class="when">23 Jul 17:00</td><td>/</td></tr>
+            <tr><td class="hash">5b412d9</td><td class="when">23 Jul 17:09</td><td>Drop the dead GitHub Pages link and clone URL from README</td></tr>
           </tbody>
         </table>
       </div>
