@@ -24,10 +24,8 @@ past, it lives in the future.
 
 ## Live Demo
 
-🔗 **[Open the gallery](https://ismehairy-debug.github.io/Galeri-Warisan-Maya-The-Living-Heritage-Gallery-/)**
-
 - **Desktop:** click to enable mouse-look, then use WASD to walk
-- **Meta Quest 2 (or any WebXR headset):** open the link above in the built-in browser,
+- **Meta Quest 2 (or any WebXR headset):** open the gallery in the built-in browser,
   tap "Masuk Galeri," then tap "Enter VR"
 
 No app install, no developer mode, no Unity build required — it runs straight from the browser.
@@ -60,14 +58,14 @@ Mentor Akademik: Dr. Mohd Hafiz Ismail, Fakulti Kejuruteraan Elektronik, UniMAP
 No build tools needed:
 
 ```bash
-git clone https://github.com/ismehairy-debug/Galeri-Warisan-Maya-The-Living-Heritage-Gallery-.git
+git clone <this repository's URL>
 cd Galeri-Warisan-Maya-The-Living-Heritage-Gallery-
 # then just open index.html in a browser
 ```
 
 Desktop preview works by double-clicking `index.html` directly. **VR mode requires HTTPS**
-(a secure context) — use the GitHub Pages link above, or serve locally with something like
-`npx serve` and access it over `https://localhost` / an ngrok tunnel if testing VR before pushing.
+(a secure context) — serve locally with something like `npx serve` and access it over
+`https://localhost` / an ngrok tunnel if testing VR before pushing.
 
 ## Roadmap
 
