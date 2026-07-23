@@ -208,6 +208,21 @@
     letter-spacing:2px; color:#f2e2b6; text-shadow:0 2px 8px rgba(0,0,0,.85);
     pointer-events:none;
   }
+  /* persistent "tap for sound" banner on the spectator/cast tab -- this
+     page is always reached via a redirect or QR scan, never a click
+     inside the document itself, so a genuine tap HERE is the only way
+     any browser will ever unlock audio for whoever is watching the cast
+     screen. Stays up (and clickable) until tapped, however far into the
+     visit that happens to be. */
+  #spectateSoundOverlay {
+    position:fixed; left:0; right:0; bottom:0; z-index:40; display:none;
+    align-items:center; justify-content:center;
+    padding:16px 10px; text-align:center; cursor:pointer;
+    font-family: Georgia, serif; font-size:14px; letter-spacing:1.5px;
+    color:#f2e2b6; background:rgba(20,14,6,0.85);
+    border-top:1px solid rgba(242,217,138,0.5);
+    text-shadow:0 2px 8px rgba(0,0,0,.8);
+  }
 </style>
 </head>
 <body>
@@ -263,6 +278,7 @@
 </div>
 
 <div id="spectateStatus"></div>
+<div id="spectateSoundOverlay">🔊 KETIK UNTUK AKTIFKAN BUNYI / TAP TO ENABLE SOUND</div>
 
 <div id="flashFade"></div>
 
@@ -994,12 +1010,7 @@
   function enterWorld(listener){
     document.getElementById('overlay').classList.add('visible');
     if (listener.context.state === 'suspended') listener.context.resume().catch(() => {});
-    audioReady = true;
-    ambienceStarted = true;
-    unmuteStationMedia();
-    startBackgroundMusic();
-    startIstanaMusic();
-    startOutsideAmbience();
+    enterWorldAudio();
     // only works when entry came from a click (Skip); after a natural video
     // end the browser refuses (needs a gesture, and it's a promise rejection
     // rather than a throw), and the existing canvas click handler picks the
@@ -1169,6 +1180,21 @@
       // station (see ensureStationAudio's matching 'silent' skip below)
       if (st.def.key !== 'pakaian') video.muted = false;
     });
+  }
+
+  // ---------- turn on the gallery's own soundscape: background music,
+  // nobat, wind/bird ambience, and station audio/video. Pulled out of
+  // enterWorld() so the spectator side (applyIntroPhase's 'world' branch,
+  // and a late-joining spectator whose FIRST phase message is already
+  // 'world') can turn on the exact same mix the guest hears, instead of
+  // leaving the cast tab permanently silent once inside the gallery. ----
+  function enterWorldAudio(){
+    audioReady = true;
+    ambienceStarted = true;
+    unmuteStationMedia();
+    startBackgroundMusic();
+    startIstanaMusic();
+    startOutsideAmbience();
   }
 
   // ---------- start / audio unlock ----------
@@ -1421,23 +1447,18 @@
     const introScreen = document.getElementById('introScreen');
     const video = document.getElementById('introVideo');
     const filmCanvas = document.getElementById('filmCanvas');
-    const soundHint = document.getElementById('tapForSoundHint');
     const status = document.getElementById('spectateStatus');
 
-    // the spectator's own tab needs its own autoplay-policy gesture,
-    // separate from whatever gesture the guest used on their device -- the
-    // film's music/voice route through this same AudioContext, so a tap
-    // here also wakes it up if the browser left it suspended
-    introScreen.addEventListener('click', () => {
-      video.muted = false;
-      soundHint.style.display = 'none';
-      if (listener.context.state === 'suspended') listener.context.resume().catch(() => {});
-      if (filmAudio){
-        [filmAudio.music, filmAudio.voice].forEach(a => { if (a.paused) a.play().catch(() => {}); });
-      }
-    });
+    // tapping the mirrored view itself also unlocks audio, same as the
+    // persistent spectateSoundOverlay banner (see setupSpectatorMode)
+    introScreen.addEventListener('click', unlockSpectatorAudio);
 
     applyIntroPhase = function(phase, epoch){
+      // shared with the host's own broadcastIntroPhase -- harmless reuse,
+      // since a given tab is only ever host OR spectator, never both.
+      // unlockSpectatorAudio (fired by a real tap, whenever it happens)
+      // reads this to know whether to turn on the world's ambience.
+      introPhase = phase;
       const elapsed = Math.max(0, (Date.now() - (epoch || Date.now())) / 1000);
       if (phase === 'video'){
         status.style.display = 'none';
@@ -1445,11 +1466,13 @@
         stopShortFilm();
         filmCanvas.style.display = 'none';
         video.style.display = '';
-        video.muted = false;
         video.currentTime = elapsed;
+        // this phase message arrives over the network, never from a click
+        // in THIS document, so an unmuted play() is reliably refused until
+        // spectateSoundOverlay's tap unlocks it -- fall back to muted so
+        // the video is at least visibly moving in the meantime
         video.play().catch(() => {
           video.muted = true;
-          soundHint.style.display = 'block';
           video.play().catch(() => {});
         });
       } else if (phase === 'film'){
@@ -1458,20 +1481,67 @@
         video.pause();
         video.style.display = 'none';
         filmCanvas.style.display = 'block';
-        // same nudge startVrIntro's vrStartFilm uses -- a suspended context
-        // would otherwise play the film's Web Audio mix silently
-        if (listener.context.state !== 'running') listener.context.resume().catch(() => {});
         playShortFilm({ startOffset: elapsed, onDone: () => { introScreen.style.display = 'none'; } });
       } else if (phase === 'world'){
         introScreen.style.display = 'none';
-        soundHint.style.display = 'none';
         video.pause();
         stopShortFilm();
+        // the guest is now touring the gallery -- turn on the SAME
+        // background music/nobat/wind ambience and station audio they
+        // hear. Silent until spectateSoundOverlay has actually been
+        // tapped (the AudioContext stays suspended until then), but
+        // everything is primed and ready the instant it is.
+        enterWorldAudio();
       } else {
         // 'idle' -- guest hasn't tapped MASUK yet
         introScreen.style.display = 'none';
       }
     };
+  }
+
+  // One-time real user gesture on the cast tab: this page is always
+  // reached via a redirect or QR scan, never a click inside this document
+  // itself, so nothing here ever earns autoplay-with-sound rights on its
+  // own -- see spectateSoundOverlay in setupSpectatorMode, which is the
+  // one thing on this whole page guaranteed to be an actual tap/click.
+  // Primes everything the same way setupStartScreen's MASUK click does for
+  // the guest's own tab: the AudioContext, the intro video, the film's
+  // tracks, and every station's video.
+  function unlockSpectatorAudio(){
+    if (filmListener && filmListener.context.state === 'suspended') filmListener.context.resume().catch(() => {});
+    unlockStationMedia();
+    // primeFilm() also earns the film's music/voice tracks their play
+    // rights -- do this NOW regardless of which phase we're actually in,
+    // because this tap is the only real gesture this tab will ever get.
+    // Without it, a spectator who taps during the VIDEO phase (the most
+    // likely moment, since the banner is right there on the full-screen
+    // intro) never primes the film tracks at all, and they silently fail
+    // to autoplay once the film phase message arrives later with no
+    // gesture behind it.
+    primeFilm();
+    connectFilmGains();
+    // same muted-play-then-pause trick primeFilm() uses for the film
+    // tracks, applied to the WORLD's own background music -- otherwise a
+    // tap during video/film primes everything EXCEPT anak ayam/nobat
+    // (they haven't been touched yet at that point), and by the time the
+    // 'world' phase message arrives with no gesture behind it, the browser
+    // refuses their first-ever unmuted play() and they never start
+    ['bgMusic', 'istanaMusic'].forEach(id => {
+      const audio = document.getElementById(id);
+      if (!audio) return;
+      audio.muted = true;
+      const p = audio.play();
+      if (p && p.then) p.then(() => { audio.pause(); audio.currentTime = 0; audio.muted = false; }).catch(() => { audio.muted = false; });
+    });
+    const video = document.getElementById('introVideo');
+    video.muted = false;
+    if (video.paused) video.play().catch(() => {});
+    if (filmAudio){
+      [filmAudio.music, filmAudio.voice].forEach(a => { if (a.paused) a.play().catch(() => {}); });
+    }
+    if (introPhase === 'world') enterWorldAudio();
+    const overlay = document.getElementById('spectateSoundOverlay');
+    if (overlay) overlay.style.display = 'none';
   }
 
   // ---------- guest spectator sync: spectator side ----------
@@ -1492,11 +1562,20 @@
     player.rotation.set(0, 0, 0);
     camera.position.set(0, 1.6, 8.6);
 
-    // audioReady gates the proximity video playback in updateFrame; the
-    // station videos are muted until unmuteStationMedia() (never called
-    // here), so this makes videos play silently near the guest's position
-    // while the AudioContext itself stays suspended -- no sound at all.
+    // audioReady also gates the proximity video playback in updateFrame --
+    // set early so station videos are already eligible to play as soon as
+    // the guest's position puts them in range, rather than only once the
+    // 'world' phase message (enterWorldAudio, below) arrives
     audioReady = true;
+
+    // this page is always opened via a redirect/QR scan, so there is no
+    // user gesture anywhere in its load -- every browser here will refuse
+    // unmuted autoplay and keep the AudioContext suspended until someone
+    // actually taps. Show a banner that stays up until that real tap
+    // happens, at whatever point in the visit it happens.
+    const soundOverlay = document.getElementById('spectateSoundOverlay');
+    soundOverlay.style.display = 'flex';
+    soundOverlay.addEventListener('click', unlockSpectatorAudio, { once:true });
 
     const status = document.getElementById('spectateStatus');
     function showStatus(msg){ status.style.display = 'block'; status.textContent = msg; }
@@ -4119,8 +4198,8 @@
   // ---------- stations: the six branches of Warisan Melayu ----------
   function buildStations(){
     const defs = [
-      { key:'tarian', name:'TARIAN', sub:'Tarian Wau Bulan — Pelajar FKTE, UniMAP', color:0xd4a017, pos:[-6,0,-7], freq:220, wave:'sine',
-        desc:'Wau Bulan, the moon kite, is a giant traditional kite from Kelantan, its crescent-shaped tail cut from paper or cloth stretched over a bamboo frame. Traditionally flown after the padi harvest to mark the end of the planting season, competitions judged a kite\'s height, steadiness in the wind and the deep hum of its gangga (drone-string). It remains a proud symbol of Malay craftsmanship, kept alive today through demonstrations such as this one by UniMAP.' },
+      { key:'tarian', name:'TARIAN', sub:'Tarian Wau Bulan & Ayam Didik — Pelajar UniMAP', color:0xd4a017, pos:[-6,0,-7], freq:220, wave:'sine', alwaysPlayVideo:true,
+        desc:'Wau Bulan, the moon kite, is a giant traditional kite from Kelantan, its crescent-shaped tail cut from paper or cloth stretched over a bamboo frame, traditionally flown after the padi harvest to mark the end of the planting season -- competitions judged a kite\'s height, steadiness in the wind and the deep hum of its gangga (drone-string). Ayam Didik grew out of the playful footwork of melaga ayam (traditional Malay cockfighting), created by a group of dancers in Kangar, Perlis and popular today across Perlis, Kedah, Penang and northern Perak; danced in pairs to the gong, gendang and biola of its namesake song, its strutting, courting movements were traditionally staged at harvest time and at weddings. Both remain proud symbols of Malay craftsmanship and custom, kept alive today through demonstrations such as these by UniMAP\'s own students.' },
       { key:'alatmuzik', name:'ALAT MUZIK', sub:'Gamelan Instrument', color:0x2a9d8f, pos:[6,0,-7], audioSrc:'assets/audio/alat_muzik.mp3', audioTrimStart:5, audioTrimEnd:5,
         desc:'The gamelan is a bronze-keyed percussion ensemble with deep roots in the royal courts of the Malay Archipelago, where sets were commissioned by sultans and kept as palace treasures. It accompanied royal ceremonies, wedding processions (persandingan) and court dances, its layered, ringing tones setting the pace for the performers around it.' },
       { key:'silat', name:'SILAT', sub:'Seni Persembahan', color:0xa1273d, pos:[0,0,-8], freq:110, wave:'sawtooth',
@@ -4260,7 +4339,12 @@
   // songket & batik, adat) so they all share one visual frame language ----------
   function buildVideoPosterCard(performer, def, videoSrc, startTime){
     const video = document.createElement('video');
-    video.src = videoSrc;
+    // videoSrc may be an array -- plays each clip once in order, then loops
+    // back to the first, instead of a single clip looping on its own (used
+    // by tarian's wau bulan / ayam didik pair, so only one plays at a time)
+    const playlist = Array.isArray(videoSrc) ? videoSrc : null;
+    let playlistIdx = 0;
+    video.src = playlist ? playlist[0] : videoSrc;
     video.muted = true;
     video.playsInline = true;
     video.preload = 'auto';
@@ -4272,6 +4356,12 @@
       video.addEventListener('loadedmetadata', () => { video.currentTime = startTime; });
       video.addEventListener('ended', () => {
         video.currentTime = startTime;
+        video.play().catch(() => {});
+      });
+    } else if (playlist){
+      video.addEventListener('ended', () => {
+        playlistIdx = (playlistIdx + 1) % playlist.length;
+        video.src = playlist[playlistIdx];
         video.play().catch(() => {});
       });
     } else {
@@ -4607,7 +4697,9 @@
     const partsMat = new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.25, roughness:0.35, metalness:0.4 });
 
     if (def.key === 'tarian'){
-      buildVideoPosterCard(performer, def, 'assets/videos/tarian_clip.mp4');
+      // wau bulan plays first, then ayam didik, then loops back -- see the
+      // playlist branch in buildVideoPosterCard
+      buildVideoPosterCard(performer, def, ['assets/videos/tarian_wau_bulan.mp4', 'assets/videos/tarian_ayam_didik.mp4']);
     } else if (def.key === 'alatmuzik'){
       const gamelan = buildGamelanPlayer();
       performer.add(gamelan);
@@ -5524,12 +5616,15 @@
       // visitor is actually near them -- having every station's video
       // decoding simultaneously for the whole session is what caused
       // iPhone-specific lag (limited concurrent hardware video decoders),
-      // even though it went unnoticed on Android
+      // even though it went unnoticed on Android. tarian is exempted
+      // (alwaysPlayVideo) so its screen keeps performing the wau bulan /
+      // ayam didik playlist continuously, not just when a guest walks up --
+      // requested so it reads as a living exhibit rather than a static frame
       const videoEl = st.performer && st.performer.userData && st.performer.userData.videoEl;
       const videoEl2 = st.performer && st.performer.userData && st.performer.userData.videoEl2;
       [videoEl, videoEl2].forEach(v => {
         if (!v || !audioReady || document.visibilityState !== 'visible') return;
-        if (st.active > 0.05){
+        if (st.active > 0.05 || st.def.alwaysPlayVideo){
           if (v.paused) v.play().catch(() => {});
         } else if (!v.paused){
           v.pause();
