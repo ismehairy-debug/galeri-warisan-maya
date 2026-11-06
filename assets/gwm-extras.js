@@ -760,47 +760,151 @@
     const q = blob(parent, 0, 0, 0, size, alpha); return q;
   }
 
-  // ---------------------------------------------------------------- welcome gate (Jawi + Rumi)
-  // structure lives in the Unity-frame group; the text planes sit directly in the scene (world
-  // frame) so the lettering is never mirrored by the group's z flip.
+  // ---------------------------------------------------------------- welcome board (rustic Malay) + bunga hiasan
+  // Cloth banner with Jawi calligraphy on a bamboo frame, woven trays, blue lanterns, flower beds,
+  // bougainvillea and fairy lights. Structure lives in the Unity-frame group; the lettering planes sit
+  // directly in the scene (world frame) so the text is never mirrored by the group's z flip.
+  const flora = {
+    rnd: null,
+    r(a, b){ return a === undefined ? this.rnd() : a + (b - a) * this.rnd(); },
+    seed(n){ let s = n; this.rnd = () => (s = (s * 16807) % 2147483647) / 2147483647; },
+    init(){
+      if (this.sphere) return;
+      const leafy = (w, len) => { const rings = w.map((x, i) => [len * i / (w.length - 1), x, 0.004]); return loft(rings, 8); };
+      this.monstera = leafy([0.02, 0.20, 0.27, 0.22, 0.10, 0], 0.62);
+      this.banana = leafy([0.02, 0.12, 0.17, 0.18, 0.13, 0.06, 0], 1.3);
+      this.frond = leafy([0.01, 0.05, 0.06, 0.05, 0.03, 0], 0.8);
+      const prof = []; for (let i = 0; i <= 8; i++){ const a = Math.PI * i / 8; prof.push([Math.sin(a) * 0.5, -Math.cos(a) * 0.5]); }
+      this.sphere = lathe(prof, 9);
+      this.cone = lathe([[0, 0], [0.5, 0], [0.3, 0.5], [0, 1]], 8);
+      this.stem = lathe([[0.5, 0], [0.4, 1], [0, 1.01]], 5);
+    },
+    green(){ const t = this.r(); return t < 0.4 ? mat(0.07, 0.24, 0.10, 0.4) : (t < 0.75 ? mat(0.13, 0.38, 0.14, 0.3) : mat(0.24, 0.52, 0.17, 0.25)); },
+    put(parent, geo, m, p, q, s){ const o = new T.Mesh(geo, m); o.position.copy(p); if (q) o.quaternion.copy(q); o.scale.copy(s); parent.add(o); return o; },
+    stemTo(parent, from, to, rad){
+      const d = new T.Vector3().subVectors(to, from), len = d.length(); if (len < 0.001) return;
+      this.put(parent, this.stem, mat(0.15, 0.34, 0.12, 0.3), from, new T.Quaternion().setFromUnitVectors(V(0, 1, 0), d.divideScalar(len)), V(rad * 2, len, rad * 2));
+    },
+    leaf(parent, p, dir, size, kind){
+      const geo = kind === 0 ? this.monstera : (kind === 1 ? this.banana : this.frond);
+      const m = new T.Matrix4().lookAt(dir.clone().normalize(), V(0, 0, 0), V(0, 1, 0));
+      const q = new T.Quaternion().setFromRotationMatrix(m).multiply(new T.Quaternion().setFromAxisAngle(V(0, 0, 1), this.r(-0.3, 0.3)));
+      this.put(parent, geo, this.green(), p, q, V(size, size, size));
+    },
+    anthurium(parent, p, size){
+      const red = mat(0.82, 0.07, 0.10, 0.75), q = new T.Quaternion().setFromEuler(new T.Euler(Math.PI / 2, 0, 0));
+      this.put(parent, this.sphere, red, p, q, V(0.30 * size, 0.06 * size, 0.42 * size));
+      this.put(parent, this.sphere, red, p.clone().add(V(0.03 * size, 0, 0)), new T.Quaternion().setFromEuler(new T.Euler(Math.PI / 2, 0.35, 0)), V(0.24 * size, 0.06 * size, 0.33 * size));
+      this.put(parent, this.cone, mat(0.95, 0.84, 0.42, 0.4), p.clone().add(V(0, 0.01, 0.02)), new T.Quaternion().setFromEuler(new T.Euler(-1.2, 0, 0)), V(0.054 * size, 0.36 * size, 0.054 * size));
+      this.stemTo(parent, p, V(p.x, 0, p.z), 0.007);
+    },
+    rose(parent, p, col, size){
+      const m = mat(col[0], col[1], col[2], 0.55), id = new T.Quaternion();
+      this.put(parent, this.sphere, m, p, id, V(0.10 * size, 0.10 * size, 0.10 * size));
+      this.put(parent, this.sphere, m, p.clone().add(V(0, 0.035 * size, 0)), id, V(0.07 * size, 0.07 * size, 0.07 * size));
+      this.stemTo(parent, p, V(p.x, 0, p.z), 0.006);
+      for (let i = 0; i < 2; i++) this.leaf(parent, p.clone().add(V(0, -0.12, 0)), V(this.r(-1, 1), 0.2, this.r(-1, 1)), 0.18, 2);
+    },
+    heliconia(parent, p, dir, size){
+      const red = mat(0.84, 0.10, 0.09, 0.6), org = mat(0.97, 0.50, 0.12, 0.55), d = dir.clone().normalize();
+      for (let i = 0; i < 6; i++){
+        const pp = p.clone().addScaledVector(d, 0.11 * i * size).add(V(0, 0.02 * i, 0));
+        this.put(parent, this.sphere, i % 2 ? org : red, pp, new T.Quaternion().setFromEuler(new T.Euler(0, i % 2 ? 0.6 : -0.6, 0.6)), V(0.12 * size, 0.06 * size, 0.15 * size));
+      }
+      this.stemTo(parent, p, V(p.x, 0, p.z), 0.012);
+    },
+    bougainvillea(parent, a, b, n){
+      const pink = mat(0.88, 0.18, 0.45, 0.4), mag = mat(0.70, 0.10, 0.45, 0.4);
+      for (let i = 0; i < n; i++){
+        const t = (i + this.r()) / n;
+        const p = new T.Vector3().lerpVectors(a, b, t).add(V(this.r(-0.25, 0.25), this.r(-0.12, 0.12) - Math.sin(t * Math.PI) * 0.15, this.r(-0.2, 0.2)));
+        for (let k = 0; k < 4; k++)
+          this.put(parent, this.sphere, (i + k) % 3 ? pink : mag, p.clone().add(V(this.r(-0.04, 0.04), this.r(-0.03, 0.03), this.r(-0.04, 0.04))), new T.Quaternion().setFromEuler(new T.Euler(this.r(0, 6), this.r(0, 6), this.r(0, 6))), V(0.055, 0.012, 0.055));
+        if (i % 2 === 0) this.leaf(parent, p, V(this.r(-1, 1), this.r(-0.8, 0.1), this.r(-1, 1)), 0.26, 2);
+      }
+    },
+    reeds(parent, p, n){
+      const reed = mat(0.80, 0.68, 0.50, 0.2), tuft = mat(0.66, 0.50, 0.34, 0.2);
+      for (let i = 0; i < n; i++){
+        const b = p.clone().add(V(this.r(-0.35, 0.35), 0, this.r(-0.35, 0.35))), h = this.r(0.7, 1.4);
+        const tip = b.clone().add(V(this.r(-0.18, 0.18), h, this.r(-0.18, 0.18)));
+        this.put(parent, this.stem, reed, b, new T.Quaternion().setFromUnitVectors(V(0, 1, 0), tip.clone().sub(b).normalize()), V(0.012, h, 0.012));
+        this.put(parent, this.sphere, tuft, tip, null, V(0.05, 0.05, 0.16));
+      }
+    },
+    bed(parent, c, radius, leaves, anth, roses, heli, colA, colB){
+      this.init();
+      for (let i = 0; i < leaves; i++){
+        const a = this.r(0, 6.28), d = this.r(0, radius), p = c.clone().add(V(Math.cos(a) * d, 0.05, Math.sin(a) * d));
+        const kind = this.r() < 0.45 ? 0 : (this.r() < 0.6 ? 1 : 2), up = kind === 0 ? this.r(0.25, 0.9) : this.r(0.9, 1.8);
+        this.leaf(parent, p, V(Math.cos(a + this.r(-0.6, 0.6)), up, Math.sin(a + this.r(-0.6, 0.6))), kind === 0 ? this.r(1.0, 1.5) : this.r(0.8, 1.2), kind);
+      }
+      for (let i = 0; i < anth; i++){ const a = this.r(0, 6.28), d = this.r(0.05, radius * 0.9); this.anthurium(parent, c.clone().add(V(Math.cos(a) * d, this.r(0.35, 0.85), Math.sin(a) * d)), this.r(0.9, 1.3)); }
+      for (let i = 0; i < roses; i++){ const a = this.r(0, 6.28), d = this.r(0.05, radius * 0.95); this.rose(parent, c.clone().add(V(Math.cos(a) * d, this.r(0.25, 0.7), Math.sin(a) * d)), this.r() < 0.55 ? colA : colB, this.r(0.9, 1.4)); }
+      for (let i = 0; i < heli; i++){ const a = this.r(0, 6.28), d = this.r(0.1, radius * 0.7); this.heliconia(parent, c.clone().add(V(Math.cos(a) * d, this.r(0.5, 0.9), Math.sin(a) * d)), V(this.r(-0.3, 0.3), 0.8, this.r(-0.5, -0.1)), this.r(0.9, 1.3)); }
+      this.reeds(parent, c.clone().add(V(this.r(-0.2, 0.2), 0, this.r(0.1, 0.4))), 7);
+    },
+    lights(parent, a, b, n, sag, m){
+      for (let i = 0; i <= n; i++){ const t = i / n; this.put(parent, this.sphere, m, new T.Vector3().lerpVectors(a, b, t).add(V(0, -Math.sin(t * Math.PI) * sag, 0)), null, V(0.07, 0.07, 0.07)); }
+    }
+  };
+
+  function lantern(parent, x, y, z, hanging){
+    const blue = mat(0.12, 0.30, 0.66, 0.55, 0.5), glass = new T.MeshStandardMaterial({ color: 0xffe08c, emissive: 0xffb84d, emissiveIntensity: 1.4, roughness: 0.3 });
+    const t = new T.Group(); t.position.set(x, y, z); parent.add(t);
+    cyl(t, blue, 0, 0.02, 0, 0.14, 0.02, 0.14); cyl(t, glass, 0, 0.12, 0, 0.095, 0.095, 0.095);
+    [0, 90, 180, 270].forEach(a => cyl(t, blue, Math.cos(a * Math.PI / 180) * 0.05, 0.12, Math.sin(a * Math.PI / 180) * 0.05, 0.012, 0.10, 0.012));
+    cyl(t, blue, 0, 0.225, 0, 0.12, 0.018, 0.12); part(t, torusGeo(0.045, 0.006, 12, 5), blue, 0, 0.27, 0, 0, 0, Math.PI / 2);
+    if (hanging) cyl(t, mat(0.30, 0.20, 0.10, 0.1), 0, 0.40, 0, 0.012, 0.14, 0.012);
+  }
+
   function buildGate(){
-    const wood = mat(0.30, 0.065, 0.045, 0.6), woodDark = mat(0.17, 0.04, 0.03, 0.5), gold = mat(0.90, 0.72, 0.24, 0.8, 0.85);
+    flora.seed(5); flora.init();
+    const bamboo = mat(0.74, 0.62, 0.34, 0.3), rope = mat(0.30, 0.20, 0.10, 0.1), gold = mat(0.85, 0.66, 0.28, 0.6, 0.6);
     const C = V(11.4, 0, -6.5), g = new T.Group(); g.position.copy(C); g.rotation.y = Math.PI / 2; root.add(g);
-    const post = lathe([[0, 0], [0.150, 0], [0.150, 0.12], [0.095, 0.16], [0.075, 0.30], [0.105, 0.36], [0.070, 0.42], [0.062, 1.30], [0.095, 1.36], [0.062, 1.42], [0.060, 2.50], [0.100, 2.56], [0.060, 2.64], [0.060, 3.30], [0.105, 3.38], [0.070, 3.48], [0, 3.50]], 16);
-    [-2.55, 2.55].forEach(px => {
-      part(g, post, wood, px, 0, 0);
-      [0.38, 1.38, 2.60, 3.40].forEach(ry => part(g, torusGeo(0.083, 0.012, 16, 6), gold, px, ry, 0));
-      sph(g, gold, px, 3.62, 0, 0.20, 0.26, 0.20); box(g, woodDark, px, 0.05, 0, 0.46, 0.10, 0.46);
-      addCircleCol(C.x, C.z - px, 0.2);
-    });
-    const W = 4.9, H = 1.3, Y = 2.75, bt = 0.14;
-    box(g, woodDark, 0, Y, 0, W, H, 0.10);
-    box(g, wood, 0, Y + H / 2, 0, W + 0.1, bt, 0.2); box(g, wood, 0, Y - H / 2, 0, W + 0.1, bt, 0.2);
-    box(g, wood, -W / 2, Y, 0, bt, H + bt, 0.2); box(g, wood, W / 2, Y, 0, bt, H + bt, 0.2);
-    [-0.105, 0.105].forEach(z => { box(g, gold, 0, Y + H / 2 - 0.07, z, W - 0.1, 0.025, 0.02); box(g, gold, 0, Y - H / 2 + 0.07, z, W - 0.1, 0.025, 0.02); });
-    const ros = torusGeo(0.085, 0.016, 16, 7);
-    [-W / 2 - 0.02, W / 2 + 0.02].forEach(cx => [Y - H / 2 - 0.01, Y + H / 2 + 0.01].forEach(cy => [-0.11, 0.11].forEach(z => { part(g, ros, gold, cx, cy, z, Math.PI / 2); sph(g, gold, cx, cy, z * 1.05, 0.09); })));
-    const spike = lathe([[0, 0], [0.09, 0], [0.06, 0.14], [0, 0.34]], 10);
-    for (let i = -10; i <= 10; i++) part(g, spike, i % 2 === 0 ? gold : wood, i * 0.225, Y + H / 2 + 0.07, 0, 0, 0, 0, i === 0 ? 1.7 : 1, i === 0 ? 2.2 : 1 - Math.abs(i) * 0.035, 0.55);
-    part(g, lathe([[0, 0], [0.10, 0], [0.14, 0.08], [0.09, 0.18], [0.06, 0.24], [0.11, 0.32], [0.08, 0.40], [0, 0.44]], 16), gold, 0, Y + H / 2 + 0.60, 0, 0, 0, 0, 1, 1, 0.5);
-    for (let i = -9; i <= 9; i++) sph(g, i % 2 === 0 ? gold : wood, i * 0.25, Y - H / 2 - 0.13, 0, 0.07, 0.10, 0.07);
-    blob(g, -2.55, 0, 0, 0.9, 0.35); blob(g, 2.55, 0, 0, 0.9, 0.35);
-    // plaque beside the mirror (Unity frame: at (-3.95, 0, -10.45), facing +x)
+    const cane = lathe([[0, 0], [0.055, 0], [0.050, 0.78], [0.066, 0.82], [0.050, 0.86], [0.050, 1.58], [0.066, 1.62], [0.050, 1.66], [0.048, 2.38], [0.064, 2.42], [0.048, 2.46], [0.046, 3.10], [0, 3.11]], 10);
+    [-1.55, 1.55].forEach(px => { part(g, cane, bamboo, px, 0, 0); addCircleCol(C.x, C.z - px, 0.12); });
+    cyl(g, bamboo, 0, 2.92, 0, 0.10, 1.95, 0.10, 0, 0, Math.PI / 2); cyl(g, bamboo, 1.0, 2.22, 0, 0.09, 0.95, 0.09, 0, 0, Math.PI / 2);
+    [-1.55, 1.55].forEach(px => [2.92, 2.22].forEach(y => { if (!(y < 2.5 && px < 0)) part(g, torusGeo(0.062, 0.012, 12, 6), rope, px, y, 0); }));
+    const CW = 2.15, CH = CW * 1.15, TOP = 2.86;
+    cyl(g, mat(0.93, 0.90, 0.84, 0.1), -0.05, TOP, 0, 0.07, CW / 2 + 0.03, 0.07, 0, 0, Math.PI / 2);
+    // woven bamboo trays
+    const wtex = new T.TextureLoader().load('assets/images/anyaman.png'); wtex.wrapS = wtex.wrapT = T.RepeatWrapping; wtex.repeat.set(3, 3);
+    const trayM = new T.MeshStandardMaterial({ map: wtex, roughness: 0.8, side: T.DoubleSide });
+    const tray = lathe([[0, 0], [0.38, 0.014], [0.43, 0.034], [0.445, 0.058], [0.415, 0.058], [0.38, 0.040], [0, 0.022]], 28), rim = torusGeo(0.44, 0.011, 28, 6);
+    part(g, tray, trayM, -1.22, 1.30, -0.10, -Math.PI / 2 + 0.10, 0, 0.21); part(g, tray, trayM, 1.12, 2.28, -0.10, -Math.PI / 2 - 0.07, 0, -0.14);
+    part(g, rim, gold, -1.22, 1.30, -0.14, -Math.PI / 2 + 0.10, 0, 0.21); part(g, rim, gold, 1.12, 2.28, -0.14, -Math.PI / 2 - 0.07, 0, -0.14);
+    lantern(g, -1.60, 0, -0.55); lantern(g, -1.15, 0, -0.80); lantern(g, -1.58, 1.80, -0.14, true); lantern(g, 1.60, 1.62, -0.14, true);
+    const log = lathe([[0, 0], [0.20, 0], [0.21, 0.34], [0.17, 0.35], [0, 0.35]], 12), logM = mat(0.36, 0.24, 0.14, 0.1);
+    part(g, log, logM, 0.95, 0, -0.35); part(g, log, logM, -0.55, 0, -0.55, 0, 0, 0, 0.9, 0.7, 0.9);
+    flora.bed(g, V(-1.45, 0, -0.30), 0.85, 22, 6, 7, 2, [0.98, 0.52, 0.14], [0.98, 0.74, 0.55]);
+    flora.bed(g, V(1.50, 0, -0.25), 0.85, 20, 5, 8, 3, [0.98, 0.52, 0.14], [0.99, 0.62, 0.20]);
+    flora.bed(g, V(0, 0, -0.75), 0.55, 10, 2, 4, 0, [0.98, 0.74, 0.55], [0.98, 0.52, 0.14]);
+    flora.bougainvillea(g, V(-1.95, 3.0, -0.05), V(-1.05, 2.15, -0.10), 22); flora.bougainvillea(g, V(-1.9, 3.05, 0.1), V(-0.2, 3.0, 0.05), 10);
+    // fairy lights from the shade tree
+    const glow = new T.MeshBasicMaterial({ color: 0xfff0a8 });
+    const tl = g.worldToLocal(root.localToWorld(V(15.6 - 0.3, 4.5, -6.5 + 0.3)));
+    flora.lights(g, V(-1.55, 3.12, 0), tl.clone().add(V(-0.8, 0.2, 0.5)), 18, 0.6, glow);
+    flora.lights(g, V(1.55, 3.12, 0), tl.clone().add(V(0.9, 0.2, -0.5)), 18, 0.6, glow);
+    flora.lights(g, V(-1.55, 3.12, 0), V(1.55, 3.12, 0), 16, 0.35, glow);
+    blob(g, 0, 0, -0.3, 4.2, 0.28);
+
+    // small Jawi sign beside the mirror (cloth on bamboo), Unity frame (18.5, 0, -6.2) facing west
     const pg = new T.Group(); pg.position.set(18.5, 0, -6.2); pg.rotation.y = Math.PI / 2; root.add(pg);
-    [-0.42, 0.42].forEach(px => { cyl(pg, wood, px, 0.55, 0, 0.07, 0.55, 0.07); sph(pg, gold, px, 1.12, 0, 0.10, 0.12, 0.10); });
-    box(pg, woodDark, 0, 0.98, 0, 1.02, 0.74, 0.05); box(pg, gold, 0, 1.36, 0, 1.06, 0.025, 0.06); box(pg, gold, 0, 0.60, 0, 1.06, 0.025, 0.06);
-    blob(pg, 0, 0, 0, 1.2, 0.35); addCircleCol(18.5, -6.2, 0.5);
-    // lettering planes in the world frame (world z = -unity z)
+    [-0.52, 0.52].forEach(px => cyl(pg, bamboo, px, 0.62, 0, 0.07, 0.62, 0.07)); cyl(pg, bamboo, 0, 1.20, 0, 0.06, 0.58, 0.06, 0, 0, Math.PI / 2);
+    flora.bed(pg, V(0.62, 0, -0.18), 0.32, 7, 2, 3, 0, [0.98, 0.52, 0.14], [0.98, 0.74, 0.55]);
+    lantern(pg, -0.62, 0, -0.22); blob(pg, 0, 0, 0, 1.6, 0.3); addCircleCol(18.5, -6.2, 0.55);
+
+    // lettering planes in the world frame (world z = -unity z); the cloth is slightly lit from the front
     const loader = new T.TextureLoader();
     const plane = (url, w, h, x, y, z, ry) => {
-      const tex = loader.load(url); const m = new T.MeshStandardMaterial({ map: tex, roughness: 0.45, metalness: 0.05 });
+      const m = new T.MeshStandardMaterial({ map: loader.load(url), roughness: 0.9, side: T.FrontSide });
       const q = new T.Mesh(new T.PlaneGeometry(w, h), m); q.position.set(x, y, z); q.rotation.y = ry; scene.add(q); return q;
     };
-    const bw = W - 0.30;
-    plane('assets/images/papan_selamat_datang.png', bw, bw / 4, 11.4 - 0.056, Y, 6.5, -Math.PI / 2);   // faces west, toward the balai
-    plane('assets/images/papan_selamat_datang.png', bw, bw / 4, 11.4 + 0.056, Y, 6.5, Math.PI / 2);    // faces east, toward the tree
-    plane('assets/images/papan_cermin.png', 0.94, 0.66, 18.5 - 0.03, 0.98, 6.2, -Math.PI / 2);
-    plane('assets/images/papan_cermin.png', 0.94, 0.66, 18.5 + 0.03, 0.98, 6.2, Math.PI / 2);
+    plane('assets/images/kain_selamat_datang.png', CW, CH, 11.4 - 0.03, TOP - CH / 2, 6.5 + 0.05, -Math.PI / 2);   // faces west, toward the balai
+    plane('assets/images/kain_selamat_datang.png', CW, CH, 11.4 + 0.03, TOP - CH / 2, 6.5 + 0.05, Math.PI / 2);   // faces east, toward the tree
+    plane('assets/images/papan_cermin.png', 1.0, 0.7, 18.5 - 0.02, 0.84, 6.2, -Math.PI / 2);
+    plane('assets/images/papan_cermin.png', 1.0, 0.7, 18.5 + 0.02, 0.84, 6.2, Math.PI / 2);
   }
 
   // ---------------------------------------------------------------- install
