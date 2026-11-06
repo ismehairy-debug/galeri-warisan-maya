@@ -726,35 +726,92 @@
 
 
 
+  // merges many transformed copies of a geometry into one mesh per material (keeps draw calls low on phones)
+  function merger(){
+    const groups = new Map();
+    return {
+      put(geo, m, x, y, z, q, sx, sy, sz){
+        const mx = new T.Matrix4().compose(V(x, y, z), q || new T.Quaternion(), V(sx, sy, sz));
+        let gr = groups.get(m); if (!gr){ gr = []; groups.set(m, gr); }
+        gr.push([geo, mx]);
+      },
+      flush(parent){
+        groups.forEach((items, m) => {
+          const pos = [], nor = [], uv = [], idx = []; let base = 0;
+          items.forEach(([geo, mx]) => {
+            const p = geo.attributes.position, n = geo.attributes.normal, u = geo.attributes.uv, nm = new T.Matrix3().getNormalMatrix(mx);
+            for (let i = 0; i < p.count; i++){
+              const v = V(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(mx); pos.push(v.x, v.y, v.z);
+              if (n){ const nv = V(n.getX(i), n.getY(i), n.getZ(i)).applyMatrix3(nm).normalize(); nor.push(nv.x, nv.y, nv.z); }
+              if (u) uv.push(u.getX(i), u.getY(i));
+            }
+            if (geo.index) for (let i = 0; i < geo.index.count; i++) idx.push(geo.index.getX(i) + base);
+            else for (let i = 0; i < p.count; i++) idx.push(i + base);
+            base += p.count;
+          });
+          const g = new T.BufferGeometry();
+          g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+          if (nor.length) g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); else g.computeVertexNormals();
+          if (uv.length === pos.length / 3 * 2) g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+          g.setIndex(idx);
+          parent.add(new T.Mesh(g, m));
+        });
+      }
+    };
+  }
+
   // ---------------------------------------------------------------- shade tree (pokok ketapang)
+  // slender barked trunk with buttress roots, six curving forked limbs, canopy of leaf clusters around the tips
   function buildTree(c){
-    let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const g = new T.Group(); g.position.copy(c); root.add(g);
-    const bark = mat(0.30, 0.20, 0.12, 0.12);
-    part(g, lathe([[0, 0], [1.00, 0], [0.78, 0.28], [0.56, 0.85], [0.50, 2.20], [0.54, 3.60], [0.42, 4.30], [0, 4.50]], 14), bark, 0, 0, 0);
-    const limb = lathe([[0.24, 0], [0.17, 0.5], [0.09, 1.0], [0, 1.02]], 8);
+    let seed = 23; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647, rr = (a, b) => a + (b - a) * rnd();
+    const g = new T.Group(); g.position.copy(c); root.add(g); const B = merger();
+    // streaky bark texture
+    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128; const cx = cv.getContext('2d');
+    for (let x = 0; x < 64; x++){
+      const base = 0.55 + 0.35 * Math.abs(Math.sin(x * 0.9 + 1.3)) * Math.abs(Math.cos(x * 0.31));
+      for (let y = 0; y < 128; y += 4){
+        const v = Math.min(1, 0.30 + base * 0.34 + rnd() * 0.18);
+        cx.fillStyle = 'rgb(' + (88 * v * 2 | 0) + ',' + (61 * v * 2 | 0) + ',' + (38 * v * 2 | 0) + ')'; cx.fillRect(x, y, 1, 4);
+      }
+    }
+    const btex = new T.CanvasTexture(cv); btex.wrapS = btex.wrapT = T.RepeatWrapping; btex.repeat.set(3, 2);
+    const bark = new T.MeshStandardMaterial({ map: btex, roughness: 0.9, side: T.DoubleSide });
+    B.put(lathe([[0, 0], [0.78, 0], [0.58, 0.22], [0.44, 0.70], [0.38, 1.40], [0.34, 2.30], [0.35, 3.10], [0.33, 3.60], [0.27, 3.95], [0, 4.05]], 14), bark, 0, 0, 0, null, 1, 1, 1);
+    const seg = lathe([[1, 0], [0.66, 1], [0, 1.01]], 8);
+    const qOf = dir => new T.Quaternion().setFromUnitVectors(V(0, 1, 0), dir.clone().normalize());
     for (let k = 0; k < 6; k++){
-      const a = (k * 60 + rnd() * 24) * Math.PI / 180, dir = V(Math.cos(a), 0.52 + rnd() * 0.2, Math.sin(a)).normalize(), len = 3 + rnd();
-      const m = part(g, limb, bark, 0, 3.55, 0); m.quaternion.setFromUnitVectors(V(0, 1, 0), dir); m.scale.set(1, len, 1);
+      const a = (k * 60 + rr(0, 25)) * Math.PI / 180, dir = V(Math.cos(a), 0.12, Math.sin(a)), len = rr(0.7, 1.1);
+      B.put(seg, bark, Math.cos(a) * 0.35, 0.22, Math.sin(a) * 0.35, qOf(dir), 0.13, len, 0.08);
     }
-    const rootG = lathe([[0.20, 0], [0.10, 0.9], [0, 1.0]], 6);
-    for (let k = 0; k < 5; k++){
-      const a = (k * 72 + 20) * Math.PI / 180, m = part(g, rootG, bark, Math.cos(a) * 0.45, 0.25, Math.sin(a) * 0.45);
-      m.quaternion.setFromUnitVectors(V(0, 1, 0), V(Math.cos(a), 0.35, Math.sin(a)).normalize()); m.scale.set(1.4, 1.6, 1.4);
+    const tips = [];
+    for (let k = 0; k < 6; k++){
+      const a = (k * 60 + rr(-10, 10)) * Math.PI / 180;
+      let p = V(Math.cos(a) * 0.12, 3.35 + rr(0, 0.3), Math.sin(a) * 0.12), dir = V(Math.cos(a) * 0.45, 1, Math.sin(a) * 0.45).normalize(), r = 0.19;
+      for (let s = 0; s < 3; s++){
+        const len = rr(1.0, 1.5); B.put(seg, bark, p.x, p.y, p.z, qOf(dir), r, len, r);
+        p = p.clone().addScaledVector(dir, len); r *= 0.66;
+        dir = dir.clone().add(V(Math.cos(a), 0, Math.sin(a)).multiplyScalar(rr(0.45, 0.7))).add(V(0, rr(-0.15, 0.05), 0)).normalize();
+      }
+      for (let f = 0; f < 2; f++){
+        const fa = a + (f === 0 ? -1 : 1) * rr(0.5, 0.9), fd = V(Math.cos(fa), rr(0.1, 0.45), Math.sin(fa)).normalize(), fl = rr(1.0, 1.6);
+        B.put(seg, bark, p.x, p.y, p.z, qOf(fd), r * 0.9, fl, r * 0.9);
+        tips.push(p.clone().addScaledVector(fd, fl));
+      }
+      tips.push(p.clone());
     }
-    const prof = [[0, -0.18]]; for (let i = 0; i <= 8; i++){ const a = Math.PI * 0.5 * i / 8; prof.push([Math.cos(a) * 0.5, -0.18 + Math.sin(a) * 0.68]); }
-    const blob = lathe(prof, 10);
-    const greens = [mat(0.15, 0.36, 0.12, 0.12), mat(0.22, 0.48, 0.16, 0.12), mat(0.31, 0.60, 0.20, 0.12)];
-    const R = 5.2;
-    for (let i = 0; i < 52; i++){
-      const d = Math.sqrt(rnd()) * R * 0.82, ang = rnd() * Math.PI * 2, t = d / (R * 0.82);
-      let y = 5.6 + 1.7 * (1 - t * t) + rnd() * 0.5;
-      const sx = 2.3 + rnd() * 1.5, sy = 1.1 + rnd() * 0.7;
-      if (y - sy * 0.5 < 4.4) y = 4.4 + sy * 0.5;
-      part(g, blob, greens[y > 6.3 ? 2 : (y > 5.5 ? 1 : 0)], Math.cos(ang) * d, y, Math.sin(ang) * d, 0, rnd() * 6.28, 0, sx, sy, sx * (0.85 + rnd() * 0.3));
-    }
-    blobShadow(g, R * 2.1, 0.30);
-    addCircleCol(c.x, c.z, 0.95);
+    const prof = []; for (let i = 0; i <= 10; i++){ const a = Math.PI * i / 10, y = -Math.cos(a) * 0.5; prof.push([Math.sin(a) * 0.5, y < 0 ? y * 0.7 : y]); }
+    const blobGeo = lathe(prof, 10);
+    const greens = [mat(0.13, 0.32, 0.11, 0.12), mat(0.19, 0.42, 0.14, 0.12), mat(0.27, 0.54, 0.18, 0.12), mat(0.38, 0.64, 0.24, 0.12)];
+    const addBlob = (p, size) => {
+      const y = Math.max(p.y, 4.5 + size * 0.35), h = Math.max(0, Math.min(1, (y - 4.6) / 2.8));
+      const gi = Math.max(0, Math.min(3, Math.floor(h * 4 + rr(-0.6, 0.6))));
+      B.put(blobGeo, greens[gi], p.x, y, p.z, new T.Quaternion().setFromEuler(new T.Euler(rr(-0.14, 0.14), rnd() * 6.28, rr(-0.14, 0.14))), size * rr(1.0, 1.25), size * rr(0.62, 0.85), size * rr(1.0, 1.25));
+    };
+    tips.forEach(t => { for (let i = 0; i < 7; i++) addBlob(t.clone().add(V(rr(-1.5, 1.5), rr(0.1, 1.5), rr(-1.5, 1.5))), rr(1.5, 2.3)); });
+    for (let i = 0; i < 18; i++){ const a = rnd() * 6.28, d = Math.sqrt(rnd()) * 3.0; addBlob(V(Math.cos(a) * d, 6.3 + rr(0, 1.1) * (1 - d / 3.6), Math.sin(a) * d), rr(1.6, 2.4)); }
+    B.flush(g);
+    blob(g, 0, 0, 0, 5.2 * 2.1, 0.30);
+    addCircleCol(c.x, c.z, 0.75);
   }
   function blobShadow(parent, size, alpha){
     const q = blob(parent, 0, 0, 0, size, alpha); return q;
@@ -889,12 +946,6 @@
     flora.lights(g, V(-1.55, 3.12, 0), V(1.55, 3.12, 0), 16, 0.35, glow);
     blob(g, 0, 0, -0.3, 4.2, 0.28);
 
-    // small Jawi sign beside the mirror (cloth on bamboo), Unity frame (18.5, 0, -6.2) facing west
-    const pg = new T.Group(); pg.position.set(18.5, 0, -6.2); pg.rotation.y = Math.PI / 2; root.add(pg);
-    [-0.52, 0.52].forEach(px => cyl(pg, bamboo, px, 0.62, 0, 0.07, 0.62, 0.07)); cyl(pg, bamboo, 0, 1.20, 0, 0.06, 0.58, 0.06, 0, 0, Math.PI / 2);
-    flora.bed(pg, V(0.62, 0, -0.18), 0.32, 7, 2, 3, 0, [0.98, 0.52, 0.14], [0.98, 0.74, 0.55]);
-    lantern(pg, -0.62, 0, -0.22); blob(pg, 0, 0, 0, 1.6, 0.3); addCircleCol(18.5, -6.2, 0.55);
-
     // lettering planes in the world frame (world z = -unity z); the cloth is slightly lit from the front
     const loader = new T.TextureLoader();
     const plane = (url, w, h, x, y, z, ry) => {
@@ -903,8 +954,6 @@
     };
     plane('assets/images/kain_selamat_datang.png', CW, CH, 11.4 - 0.03, TOP - CH / 2, 6.5 + 0.05, -Math.PI / 2);   // faces west, toward the balai
     plane('assets/images/kain_selamat_datang.png', CW, CH, 11.4 + 0.03, TOP - CH / 2, 6.5 + 0.05, Math.PI / 2);   // faces east, toward the tree
-    plane('assets/images/papan_cermin.png', 1.0, 0.7, 18.5 - 0.02, 0.84, 6.2, -Math.PI / 2);
-    plane('assets/images/papan_cermin.png', 1.0, 0.7, 18.5 + 0.02, 0.84, 6.2, Math.PI / 2);
   }
 
   // ---------------------------------------------------------------- install
@@ -933,7 +982,6 @@
     buildGamelan(V(6, 0.40, 7));
     people.forEach(p => addCircleCol(p.root.position.x, p.root.position.z + 0.15, 0.45 * p.s + 0.12));
     buildTree(V(15.6, 0, -6.5));
-    buildMirror();
     buildGate();
     // the modelled gamelan replaces the old flat xylophone-and-figure group
     (o.stations || []).forEach(st => { if (st.def && st.def.key === 'alatmuzik' && st.performer) st.performer.visible = false; });
