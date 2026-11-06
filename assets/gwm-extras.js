@@ -776,13 +776,9 @@
     }
     const btex = new T.CanvasTexture(cv); btex.wrapS = btex.wrapT = T.RepeatWrapping; btex.repeat.set(3, 2);
     const bark = new T.MeshStandardMaterial({ map: btex, roughness: 0.9, side: T.DoubleSide });
-    B.put(lathe([[0, 0], [0.78, 0], [0.58, 0.22], [0.44, 0.70], [0.38, 1.40], [0.34, 2.30], [0.35, 3.10], [0.33, 3.60], [0.27, 3.95], [0, 4.05]], 14), bark, 0, 0, 0, null, 1, 1, 1);
+    B.put(lathe([[0, 0], [0.46, 0], [0.42, 0.25], [0.39, 0.70], [0.38, 1.40], [0.34, 2.30], [0.35, 3.10], [0.33, 3.60], [0.27, 3.95], [0, 4.05]], 14), bark, 0, 0, 0, null, 1, 1, 1);
     const seg = lathe([[1, 0], [0.66, 1], [0, 1.01]], 8);
     const qOf = dir => new T.Quaternion().setFromUnitVectors(V(0, 1, 0), dir.clone().normalize());
-    for (let k = 0; k < 6; k++){
-      const a = (k * 60 + rr(0, 25)) * Math.PI / 180, dir = V(Math.cos(a), 0.12, Math.sin(a)), len = rr(0.7, 1.1);
-      B.put(seg, bark, Math.cos(a) * 0.35, 0.22, Math.sin(a) * 0.35, qOf(dir), 0.13, len, 0.08);
-    }
     const tips = [];
     for (let k = 0; k < 6; k++){
       const a = (k * 60 + rr(-10, 10)) * Math.PI / 180;
@@ -918,9 +914,9 @@
   function buildGate(){
     flora.seed(5); flora.init();
     const bamboo = mat(0.74, 0.62, 0.34, 0.3), rope = mat(0.30, 0.20, 0.10, 0.1), gold = mat(0.85, 0.66, 0.28, 0.6, 0.6);
-    const C = V(11.4, 0, -6.5), g = new T.Group(); g.position.copy(C); g.rotation.y = Math.PI / 2; root.add(g);
+    const C = V(11.4, 0, -6.5), g = new T.Group(); g.position.copy(C); g.rotation.y = -Math.PI / 2; root.add(g);   // faces the tree
     const cane = lathe([[0, 0], [0.055, 0], [0.050, 0.78], [0.066, 0.82], [0.050, 0.86], [0.050, 1.58], [0.066, 1.62], [0.050, 1.66], [0.048, 2.38], [0.064, 2.42], [0.048, 2.46], [0.046, 3.10], [0, 3.11]], 10);
-    [-1.55, 1.55].forEach(px => { part(g, cane, bamboo, px, 0, 0); addCircleCol(C.x, C.z - px, 0.12); });
+    [-1.55, 1.55].forEach(px => { part(g, cane, bamboo, px, 0, 0); addCircleCol(C.x, C.z + px, 0.12); });
     cyl(g, bamboo, 0, 2.92, 0, 0.10, 1.95, 0.10, 0, 0, Math.PI / 2); cyl(g, bamboo, 1.0, 2.22, 0, 0.09, 0.95, 0.09, 0, 0, Math.PI / 2);
     [-1.55, 1.55].forEach(px => [2.92, 2.22].forEach(y => { if (!(y < 2.5 && px < 0)) part(g, torusGeo(0.062, 0.012, 12, 6), rope, px, y, 0); }));
     const CW = 2.15, CH = CW * 1.15, TOP = 2.86;
