@@ -885,17 +885,28 @@
         this.put(parent, this.sphere, tuft, tip, null, V(0.05, 0.05, 0.16));
       }
     },
-    bed(parent, c, radius, leaves, anth, roses, heli, colA, colB){
+    // side = -1 / +1 keeps the bed (and the lean of its leaves) on that side of c, clear of the banner text
+    bed(parent, c, radius, leaves, anth, roses, heli, colA, colB, side){
       this.init();
+      const X = v => side ? Math.abs(v) * side : v;
       for (let i = 0; i < leaves; i++){
-        const a = this.r(0, 6.28), d = this.r(0, radius), p = c.clone().add(V(Math.cos(a) * d, 0.05, Math.sin(a) * d));
+        const a = this.r(0, 6.28), d = this.r(0, radius), p = c.clone().add(V(X(Math.cos(a) * d), 0.05, Math.sin(a) * d));
         const kind = this.r() < 0.45 ? 0 : (this.r() < 0.6 ? 1 : 2), up = kind === 0 ? this.r(0.25, 0.9) : this.r(0.9, 1.8);
-        this.leaf(parent, p, V(Math.cos(a + this.r(-0.6, 0.6)), up, Math.sin(a + this.r(-0.6, 0.6))), kind === 0 ? this.r(1.0, 1.5) : this.r(0.8, 1.2), kind);
+        this.leaf(parent, p, V(X(Math.cos(a + this.r(-0.6, 0.6))), up, Math.sin(a + this.r(-0.6, 0.6))), kind === 0 ? this.r(1.0, 1.5) : this.r(0.8, 1.2), kind);
       }
-      for (let i = 0; i < anth; i++){ const a = this.r(0, 6.28), d = this.r(0.05, radius * 0.9); this.anthurium(parent, c.clone().add(V(Math.cos(a) * d, this.r(0.35, 0.85), Math.sin(a) * d)), this.r(0.9, 1.3)); }
-      for (let i = 0; i < roses; i++){ const a = this.r(0, 6.28), d = this.r(0.05, radius * 0.95); this.rose(parent, c.clone().add(V(Math.cos(a) * d, this.r(0.25, 0.7), Math.sin(a) * d)), this.r() < 0.55 ? colA : colB, this.r(0.9, 1.4)); }
-      for (let i = 0; i < heli; i++){ const a = this.r(0, 6.28), d = this.r(0.1, radius * 0.7); this.heliconia(parent, c.clone().add(V(Math.cos(a) * d, this.r(0.5, 0.9), Math.sin(a) * d)), V(this.r(-0.3, 0.3), 0.8, this.r(-0.5, -0.1)), this.r(0.9, 1.3)); }
-      this.reeds(parent, c.clone().add(V(this.r(-0.2, 0.2), 0, this.r(0.1, 0.4))), 7);
+      for (let i = 0; i < anth; i++){ const a = this.r(0, 6.28), d = this.r(0.05, radius * 0.9); this.anthurium(parent, c.clone().add(V(X(Math.cos(a) * d), this.r(0.35, 0.85), Math.sin(a) * d)), this.r(0.9, 1.3)); }
+      for (let i = 0; i < roses; i++){ const a = this.r(0, 6.28), d = this.r(0.05, radius * 0.95); this.rose(parent, c.clone().add(V(X(Math.cos(a) * d), this.r(0.25, 0.7), Math.sin(a) * d)), this.r() < 0.55 ? colA : colB, this.r(0.9, 1.4)); }
+      for (let i = 0; i < heli; i++){ const a = this.r(0, 6.28), d = this.r(0.1, radius * 0.7); this.heliconia(parent, c.clone().add(V(X(Math.cos(a) * d), this.r(0.5, 0.9), Math.sin(a) * d)), V(X(this.r(-0.3, 0.3)), 0.8, this.r(-0.5, -0.1)), this.r(0.9, 1.3)); }
+      this.reeds(parent, c.clone().add(V(X(this.r(0.1, 0.3)), 0, this.r(0.1, 0.4))), 7);
+    },
+    // a low border of roses and ground leaves, kept under the bottom edge of the banner
+    border(parent, a, b, n, colA, colB){
+      this.init();
+      for (let i = 0; i < n; i++){
+        const p = new T.Vector3().lerpVectors(a, b, (i + this.r(0.2, 0.8)) / n);
+        this.rose(parent, p.clone().add(V(0, this.r(0.12, 0.22), this.r(-0.08, 0.08))), this.r() < 0.5 ? colA : colB, this.r(0.8, 1.1));
+        this.leaf(parent, p.clone().add(V(0, 0.03, 0)), V(this.r(-1, 1), this.r(0.08, 0.18), -1), this.r(0.55, 0.8), 0);
+      }
     },
     lights(parent, a, b, n, sag, m){
       for (let i = 0; i <= n; i++){ const t = i / n; this.put(parent, this.sphere, m, new T.Vector3().lerpVectors(a, b, t).add(V(0, -Math.sin(t * Math.PI) * sag, 0)), null, V(0.07, 0.07, 0.07)); }
@@ -917,7 +928,7 @@
     const C = V(11.4, 0, -6.5), g = new T.Group(); g.position.copy(C); g.rotation.y = -Math.PI / 2; root.add(g);   // faces the tree
     const cane = lathe([[0, 0], [0.055, 0], [0.050, 0.78], [0.066, 0.82], [0.050, 0.86], [0.050, 1.58], [0.066, 1.62], [0.050, 1.66], [0.048, 2.38], [0.064, 2.42], [0.048, 2.46], [0.046, 3.10], [0, 3.11]], 10);
     [-1.55, 1.55].forEach(px => { part(g, cane, bamboo, px, 0, 0); addCircleCol(C.x, C.z + px, 0.12); });
-    cyl(g, bamboo, 0, 2.92, 0, 0.10, 1.95, 0.10, 0, 0, Math.PI / 2); cyl(g, bamboo, 1.0, 2.22, 0, 0.09, 0.95, 0.09, 0, 0, Math.PI / 2);
+    cyl(g, bamboo, 0, 2.92, 0, 0.10, 1.95, 0.10, 0, 0, Math.PI / 2); cyl(g, bamboo, 1.5, 2.22, 0, 0.09, 0.45, 0.09, 0, 0, Math.PI / 2);
     [-1.55, 1.55].forEach(px => [2.92, 2.22].forEach(y => { if (!(y < 2.5 && px < 0)) part(g, torusGeo(0.062, 0.012, 12, 6), rope, px, y, 0); }));
     const CW = 2.15, CH = CW * 1.15, TOP = 2.86;
     cyl(g, mat(0.93, 0.90, 0.84, 0.1), -0.05, TOP, 0, 0.07, CW / 2 + 0.03, 0.07, 0, 0, Math.PI / 2);
@@ -925,21 +936,22 @@
     const wtex = new T.TextureLoader().load('assets/images/anyaman.png'); wtex.wrapS = wtex.wrapT = T.RepeatWrapping; wtex.repeat.set(3, 3);
     const trayM = new T.MeshStandardMaterial({ map: wtex, roughness: 0.8, side: T.DoubleSide });
     const tray = lathe([[0, 0], [0.38, 0.014], [0.43, 0.034], [0.445, 0.058], [0.415, 0.058], [0.38, 0.040], [0, 0.022]], 28), rim = torusGeo(0.44, 0.011, 28, 6);
-    part(g, tray, trayM, -1.22, 1.30, -0.10, -Math.PI / 2 + 0.10, 0, 0.21); part(g, tray, trayM, 1.12, 2.28, -0.10, -Math.PI / 2 - 0.07, 0, -0.14);
-    part(g, rim, gold, -1.22, 1.30, -0.14, -Math.PI / 2 + 0.10, 0, 0.21); part(g, rim, gold, 1.12, 2.28, -0.14, -Math.PI / 2 - 0.07, 0, -0.14);
+    part(g, tray, trayM, -1.45, 1.30, -0.10, -Math.PI / 2 + 0.10, 0, 0.21); part(g, tray, trayM, 1.40, 2.32, -0.10, -Math.PI / 2 - 0.07, 0, -0.14);
+    part(g, rim, gold, -1.45, 1.30, -0.14, -Math.PI / 2 + 0.10, 0, 0.21); part(g, rim, gold, 1.40, 2.32, -0.14, -Math.PI / 2 - 0.07, 0, -0.14);
     lantern(g, -1.60, 0, -0.55); lantern(g, -1.15, 0, -0.80); lantern(g, -1.58, 1.80, -0.14, true); lantern(g, 1.60, 1.62, -0.14, true);
     const log = lathe([[0, 0], [0.20, 0], [0.21, 0.34], [0.17, 0.35], [0, 0.35]], 12), logM = mat(0.36, 0.24, 0.14, 0.1);
     part(g, log, logM, 0.95, 0, -0.35); part(g, log, logM, -0.55, 0, -0.55, 0, 0, 0, 0.9, 0.7, 0.9);
-    flora.bed(g, V(-1.45, 0, -0.30), 0.85, 22, 6, 7, 2, [0.98, 0.52, 0.14], [0.98, 0.74, 0.55]);
-    flora.bed(g, V(1.50, 0, -0.25), 0.85, 20, 5, 8, 3, [0.98, 0.52, 0.14], [0.99, 0.62, 0.20]);
-    flora.bed(g, V(0, 0, -0.75), 0.55, 10, 2, 4, 0, [0.98, 0.74, 0.55], [0.98, 0.52, 0.14]);
-    flora.bougainvillea(g, V(-1.95, 3.0, -0.05), V(-1.05, 2.15, -0.10), 22); flora.bougainvillea(g, V(-1.9, 3.05, 0.1), V(-0.2, 3.0, 0.05), 10);
+    // beds flank the posts and lean outward; only a low border sits in front, under the bottom edge of the cloth
+    flora.bed(g, V(-1.85, 0, -0.25), 0.6, 18, 5, 5, 2, [0.98, 0.52, 0.14], [0.98, 0.74, 0.55], -1);
+    flora.bed(g, V(1.85, 0, -0.20), 0.6, 16, 4, 6, 3, [0.98, 0.52, 0.14], [0.99, 0.62, 0.20], 1);
+    flora.border(g, V(-1.05, 0, -0.42), V(0.95, 0, -0.42), 8, [0.98, 0.74, 0.55], [0.98, 0.52, 0.14]);
+    flora.bougainvillea(g, V(-1.95, 3.0, -0.05), V(-1.45, 1.95, -0.10), 22); flora.bougainvillea(g, V(-1.9, 3.14, 0.08), V(-0.45, 3.14, 0.08), 10);
     // fairy lights from the shade tree
     const glow = new T.MeshBasicMaterial({ color: 0xfff0a8 });
     const tl = g.worldToLocal(root.localToWorld(V(15.6 - 0.3, 4.5, -6.5 + 0.3)));
     flora.lights(g, V(-1.55, 3.12, 0), tl.clone().add(V(-0.8, 0.2, 0.5)), 18, 0.6, glow);
     flora.lights(g, V(1.55, 3.12, 0), tl.clone().add(V(0.9, 0.2, -0.5)), 18, 0.6, glow);
-    flora.lights(g, V(-1.55, 3.12, 0), V(1.55, 3.12, 0), 16, 0.35, glow);
+    flora.lights(g, V(-1.55, 3.12, 0.06), V(1.55, 3.12, 0.06), 16, 0.12, glow);
     blob(g, 0, 0, -0.3, 4.2, 0.28);
 
     // lettering planes in the world frame (world z = -unity z); the cloth is slightly lit from the front
