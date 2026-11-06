@@ -244,7 +244,7 @@
     } else {
       sph(p.head, dark, 0, 0.04 * s, -0.018 * s, 0.215 * s, 0.20 * s, 0.215 * s);
     }
-    p.armL = new Limb(R, topM, sk, s); p.armR = new Limb(R, topM, sk, s);
+    p.armL = new Limb(root, topM, sk, s); p.armR = new Limb(root, topM, sk, s);   // arms are posed in the shared group frame
     p.armL.bl1 = p.armL.l1; p.armL.bl2 = p.armL.l2; p.armR.bl1 = p.armR.l1; p.armR.bl2 = p.armR.l2;
     p.face = function(target){ const d = target.clone().sub(p.root.position); d.y = 0; if (d.lengthSq() > 1e-4) p.root.rotation.y = Math.atan2(d.x, d.z); };
     p.local = v => { p.torso.updateWorldMatrix(true, false); return p.torso.localToWorld(v.clone()); };
@@ -964,6 +964,99 @@
     plane('assets/images/kain_selamat_datang.png', CW, CH, 11.4 + 0.03, TOP - CH / 2, 6.5 + 0.05, Math.PI / 2);   // faces east, toward the tree
   }
 
+  // ---------------------------------------------------------------- wau bulan maker
+  // A craftsman on a mat east of the balai finishing a wau bulan on a bamboo easel; his right hand works
+  // along the paper and dips into the glue shell, two finished wau hang on a rack behind him.
+  const wm = { built: false };
+  const WAU_PATH = [[0.30, 0.50], [0.20, 0.47], [0.12, 0.50], [0.10, 0.58], [0.16, 0.66], [0.24, 0.74], [0.34, 0.80], [0.42, 0.70]];
+  function stick(parent, m, a, b, r){
+    const d = new T.Vector3().subVectors(b, a), len = d.length();
+    const o = new T.Mesh(new T.CylinderGeometry(0.5, 0.5, 2, 8), m);
+    o.position.copy(a).add(b).multiplyScalar(0.5); o.quaternion.setFromUnitVectors(V(0, 1, 0), d.divideScalar(len)); o.scale.set(r * 2, len * 0.5, r * 2);
+    parent.add(o); return o;
+  }
+  const wauTex = {};
+  function wauPlane(parent, tex, pos, euler, width, bow){
+    if (!wauTex[tex]) wauTex[tex] = new T.MeshStandardMaterial({ map: new T.TextureLoader().load('assets/images/' + tex + '.png'), transparent: true, alphaTest: 0.5, side: T.DoubleSide, roughness: 0.8 });
+    const h = width * 1056 / 768;
+    const q = new T.Mesh(new T.PlaneGeometry(1, 1), wauTex[tex]); q.position.copy(pos); q.rotation.set(euler[0], euler[1], euler[2]); q.scale.set(width, h, 1); parent.add(q);
+    parent.updateMatrixWorld(true);
+    const at = (u, v, z) => parent.worldToLocal(q.localToWorld(V(u - 0.5, 0.5 - v, z || 0)));
+    const tas = [mat(0.85, 0.12, 0.12, 0.3), mat(0.98, 0.78, 0.20, 0.3)];
+    [[0.0, 0.12], [1.0, 0.12], [0.03, 0.45], [0.97, 0.45]].forEach(uv => { for (let k = 0; k < 3; k++){ const p = at(uv[0], uv[1] + 0.03 + k * 0.025); sph(parent, tas[k % 2], p.x, p.y, p.z, 0.035, 0.05, 0.035); } });
+    if (bow){
+      const bamboo = mat(0.72, 0.58, 0.30, 0.3);
+      let prev = null;
+      for (let i = 0; i <= 8; i++){
+        const t = i / 8, p = parent.worldToLocal(q.localToWorld(V((t - 0.5) * 0.95, 0.53 + Math.sin(t * Math.PI) * 0.06, -0.02)));
+        if (prev) stick(parent, bamboo, prev, p, 0.008); prev = p;
+      }
+      stick(parent, mat(0.95, 0.95, 0.90, 0.2), parent.worldToLocal(q.localToWorld(V(-0.475, 0.53, -0.02))), parent.worldToLocal(q.localToWorld(V(0.475, 0.53, -0.02))), 0.002);
+    }
+    return q;
+  }
+  function buildWauMaker(easelPos, rackPos, yaw){
+    const bamboo = mat(0.72, 0.58, 0.30, 0.3), Q = new T.Quaternion().setFromAxisAngle(V(0, 1, 0), yaw);
+    const rotate = v => v.clone().applyQuaternion(Q);
+    root.updateMatrixWorld(true);
+    const mc = easelPos.clone().add(rotate(V(0.2, 0, -0.55)));
+    makeMat(root, mc.x, mc.z, 2.4, 2.0, [0.82, 0.66, 0.36], [0.68, 0.50, 0.24], [0.40, 0.22, 0.12]);
+    const easel = new T.Group(); easel.position.copy(easelPos).add(V(0, 0.02, 0)); easel.rotation.y = yaw; root.add(easel); root.updateMatrixWorld(true);
+    stick(easel, bamboo, V(-0.5, 0, -0.10), V(-0.42, 1.75, 0.24), 0.022); stick(easel, bamboo, V(0.5, 0, -0.10), V(0.42, 1.75, 0.24), 0.022);
+    stick(easel, bamboo, V(0, 0, 0.75), V(0, 1.70, 0.24), 0.022); stick(easel, bamboo, V(-0.62, 0.12, -0.07), V(0.62, 0.12, -0.07), 0.018);
+    wm.quad = wauPlane(easel, 'wau_kosong', V(0, 0.12 + 0.89, 0.08), [12 * Math.PI / 180, 0, 0], 1.3, false);
+    const W = (u, v) => easel.worldToLocal(wm.quad.localToWorld(V(u - 0.5, 0.5 - v, -0.012)));
+    stick(easel, bamboo, W(0.5, 0.03), W(0.5, 0.96), 0.008);
+    const wing = [[0.02, 0.14], [0.15, 0.15], [0.30, 0.17], [0.5, 0.18], [0.70, 0.17], [0.85, 0.15], [0.98, 0.14]];
+    for (let i = 1; i < wing.length; i++) stick(easel, bamboo, W(wing[i - 1][0], wing[i - 1][1]), W(wing[i][0], wing[i][1]), 0.006);
+    const moon = [[0.05, 0.50], [0.10, 0.64], [0.22, 0.77], [0.36, 0.86], [0.5, 0.89], [0.64, 0.86], [0.78, 0.77], [0.90, 0.64], [0.95, 0.50]];
+    for (let i = 1; i < moon.length; i++) stick(easel, bamboo, W(moon[i - 1][0], moon[i - 1][1]), W(moon[i][0], moon[i][1]), 0.006);
+    // the craftsman, front-left of the easel and turned toward it
+    const seat = easelPos.clone().add(rotate(V(-0.88, 0.02, -0.42)));
+    wm.p = makePerson('PembuatWau', seat, 1.0, [0.80, 0.74, 0.58], [0.30, 0.20, 0.36], 1, 1, 22);
+    wm.p.face(easelPos);
+    root.updateMatrixWorld(true);
+    const fwd = wm.p.fwd(), rt = wm.p.right();
+    const toolBase = seat.clone().addScaledVector(rt, 0.42).addScaledVector(fwd, 0.18);
+    wm.pot = part(root, lathe([[0, 0], [0.07, 0.01], [0.09, 0.05], [0.085, 0.075], [0.07, 0.075], [0.06, 0.04], [0, 0.03]], 14), mat(0.36, 0.22, 0.12, 0.3), toolBase.x, toolBase.y, toolBase.z);
+    cyl(root, mat(0.95, 0.93, 0.85, 0.6), toolBase.x, toolBase.y + 0.055, toolBase.z, 0.12, 0.004, 0.12);
+    for (let i = 0; i < 6; i++){
+      const a = seat.clone().addScaledVector(rt, -0.5).addScaledVector(fwd, 0.1 + i * 0.03).add(V(0, 0.03, 0));
+      stick(root, bamboo, a, a.clone().add(V(0, 0, 0.9).applyAxisAngle(V(0, 1, 0), yaw + 0.35)), 0.006);
+    }
+    [[0.85, 0.15, 0.15], [0.98, 0.82, 0.20], [0.20, 0.55, 0.30], [0.95, 0.93, 0.86]].forEach((c, i) => {
+      const p = seat.clone().addScaledVector(rt, 0.55).addScaledVector(fwd, -0.25).add(V(0.01 * i, 0.025 + i * 0.004, 0.012 * i));
+      box(root, mat(c[0], c[1], c[2], 0.2), p.x, p.y, p.z, 0.36, 0.004, 0.26, yaw + i * 0.12);
+    });
+    // rack with two finished wau, each with its busur
+    const rack = new T.Group(); rack.position.copy(rackPos); rack.rotation.y = yaw; root.add(rack); root.updateMatrixWorld(true);
+    stick(rack, bamboo, V(-1.35, 0, 0), V(-1.35, 2.9, 0), 0.035); stick(rack, bamboo, V(1.35, 0, 0), V(1.35, 2.9, 0), 0.035);
+    stick(rack, bamboo, V(-1.5, 2.78, 0), V(1.5, 2.78, 0), 0.03);
+    [-0.66, 0.66].forEach(x => {
+      stick(rack, mat(0.30, 0.20, 0.10, 0.1), V(x, 2.78, 0), V(x, 2.42, 0), 0.004);
+      wauPlane(rack, x < 0 ? 'wau_merah' : 'wau_biru', V(x, 2.42 - 0.84, 0), [0, 0, (x < 0 ? 4 : -3) * Math.PI / 180], 1.22, true);
+    });
+    blob(rack, 0, 0, 0, 3.0, 0.25);
+    addCircleCol(easelPos.x, easelPos.z, 0.6); addBoxCol(rackPos.x, rackPos.z, 0.2, 1.45);
+    wm.built = true;
+  }
+  function updateWau(t){
+    if (!wm.built) return;
+    const u = t % 9, p = wm.p;
+    const W = uv => rootLocal(wm.quad.localToWorld(V(uv[0] - 0.5, 0.5 - uv[1], -0.05)));
+    const pot = rootLocal(wm.pot.localToWorld(V(0, 0.07, 0)));
+    let hand;
+    if (u < 5.5){
+      const k = u / 5.5 * (WAU_PATH.length - 1), i = Math.min(WAU_PATH.length - 2, Math.floor(k)), f = k - i;
+      hand = new T.Vector3().lerpVectors(W(WAU_PATH[i]), W(WAU_PATH[i + 1]), smooth(f));
+    } else if (u < 6.5) hand = lerpV(W(WAU_PATH[WAU_PATH.length - 1]), pot.clone().add(V(0, 0.12, 0)), u - 5.5);
+    else if (u < 7.2) hand = pot.clone().add(V(0, 0.12 - 0.10 * Math.sin((u - 6.5) / 0.7 * Math.PI), 0));
+    else hand = lerpV(pot.clone().add(V(0, 0.12, 0)), W(WAU_PATH[0]), (u - 7.2) / 1.8);
+    p.armR.solve(p.shoulder(1), hand, p.poleR());
+    p.armL.solve(p.shoulder(-1), W([0.46, 0.52]).add(V(0, Math.sin(t * 0.9) * 0.01, 0)), p.poleL());
+    p.head.rotation.x += (0.2 - p.head.rotation.x) * 0.08; p.head.rotation.y = Math.sin(t * 0.5) * 0.15;
+  }
+
   // ---------------------------------------------------------------- install
   let addBoxCol = () => {}, addCircleCol = () => {};
   GWMX.install = function(o){
@@ -988,6 +1081,7 @@
     buildCongkak(V(15.3, 0, -2.8));
     buildBatu(V(15.0, 0, -10.2));
     buildGamelan(V(6, 0.40, 7));
+    buildWauMaker(V(13.9, 0, 1.9), V(16.4, 0, 2.2), Math.PI / 2);
     people.forEach(p => addCircleCol(p.root.position.x, p.root.position.z + 0.15, 0.45 * p.s + 0.12));
     buildTree(V(15.6, 0, -6.5));
     buildGate();
@@ -1000,7 +1094,7 @@
     if (!root) return;
     try {
       root.updateMatrixWorld(true);   // IK reads world matrices of the people it poses
-      updateCongkak(t); kids.forEach(k => updateKid(k, t)); updateGamelan(t, dt);
+      updateCongkak(t); kids.forEach(k => updateKid(k, t)); updateGamelan(t, dt); updateWau(t);
       people.forEach(p => { const k = 1 + Math.sin(t * 1.6 + p.root.position.x) * 0.012; p.torso.scale.set(1, k, 1); });
       pollInputs();
       gripsRef.forEach(gp => { const h = gp.children[0] && gp.children[0].userData.hand; if (h){ const st = inputState[h.left ? 'left' : 'right']; h.set(st.t, st.g, st.th); } });
