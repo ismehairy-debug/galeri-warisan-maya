@@ -235,7 +235,7 @@
      MASUK -- that click doubles as the autoplay-policy gesture, so the
      intro can start WITH sound -->
 <div id="introScreen" style="display:none">
-  <video id="introVideo" src="assets/videos/intro_opening.mp4" preload="auto" playsinline></video>
+  <video id="introVideo" src="assets/videos/intro_commercial.mp4" preload="auto" playsinline></video>
   <canvas id="filmCanvas"></canvas>
 </div>
 <div id="tapForSoundHint" style="display:none">🔊 KETIK SKRIN UNTUK BUNYI / TAP SCREEN FOR SOUND</div>
@@ -295,6 +295,7 @@
 <!-- glTF loader (same three r128, global-script build) for the real 3D
      keris exhibit; everything degrades to the photo plaque without it -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="assets/gwm-extras.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <script>
 (function(){
@@ -550,6 +551,9 @@
     renderer.shadowMap.autoUpdate = false;
     renderer.shadowMap.needsUpdate = true;
     buildKerisControllers();
+    // same additions as the Meta Quest app: keris/pelita hands, gamelan, kuih,
+    // villagers at play and the cermin Melayu (see assets/gwm-extras.js)
+    if (window.GWMX) GWMX.install({ scene, camera, renderer, stations, kerisGrips, addCircleCollider, addBoxCollider });
     prevPlayerPos.copy(player.position);
 
     window.addEventListener('resize', onResize);
@@ -2169,7 +2173,7 @@
       const radius = 15 + Math.random()*28;
       // low enough to be visible through the window openings from inside the
       // hall at a normal, level gaze -- the roof blocks anything much higher
-      s.position.set(Math.cos(ang)*radius, 9 + Math.random()*7, Math.sin(ang)*radius);
+      s.position.set(Math.cos(ang)*radius, 23 + s.scale.y*0.5 + Math.random()*6, Math.sin(ang)*radius); // lower edge stays above the balai roof
       s.userData.driftSpeed = 0.4 + Math.random()*0.6;
       scene.add(s);
       clouds.push(s);
@@ -4261,15 +4265,15 @@
         desc:'Wau Bulan, the moon kite, is a giant traditional kite from Kelantan, its crescent-shaped tail cut from paper or cloth stretched over a bamboo frame, traditionally flown after the padi harvest to mark the end of the planting season -- competitions judged a kite\'s height, steadiness in the wind and the deep hum of its gangga (drone-string). Ayam Didik grew out of the playful footwork of melaga ayam (traditional Malay cockfighting), created by a group of dancers in Kangar, Perlis and popular today across Perlis, Kedah, Penang and northern Perak; danced in pairs to the gong, gendang and biola of its namesake song, its strutting, courting movements were traditionally staged at harvest time and at weddings. Both remain proud symbols of Malay craftsmanship and custom, kept alive today through demonstrations such as these by UniMAP\'s own students.' },
       { key:'alatmuzik', name:'ALAT MUZIK', sub:'Gamelan Instrument', color:0x2a9d8f, pos:[6,0,-7], audioSrc:'assets/audio/alat_muzik.mp3', audioTrimStart:5, audioTrimEnd:5,
         desc:'The gamelan is a bronze-keyed percussion ensemble with deep roots in the royal courts of the Malay Archipelago, where sets were commissioned by sultans and kept as palace treasures. It accompanied royal ceremonies, wedding processions (persandingan) and court dances, its layered, ringing tones setting the pace for the performers around it.' },
-      { key:'silat', name:'SILAT', sub:'Seni Persembahan', color:0xa1273d, pos:[0,0,-8], freq:110, wave:'sawtooth',
+      { key:'silat', name:'SILAT', sub:'Seni Persembahan', color:0xa1273d, pos:[0,0,-8], freq:110, wave:'sawtooth', alwaysPlayVideo:true,
         desc:'Silat Melayu is a traditional martial art combining self-defence with spiritual discipline (adab) passed down from teacher to student (guru-anak murid). Beyond combat training, it is performed ceremonially at weddings and cultural festivals, and historically formed part of a warrior\'s preparation alongside the keris.' },
-      { key:'pakaian', name:'SONGKET & BATIK', sub:'Pakaian & Tekstil', color:0xb5892f, pos:[-8,0,-2], silent:true,
+      { key:'pakaian', name:'SONGKET & BATIK', sub:'Pakaian & Tekstil', color:0xb5892f, pos:[-8,0,-2], silent:true, alwaysPlayVideo:true,
         desc:'Songket is a hand-woven brocade with gold or silver thread worked into the fabric on a supplementary weft, historically reserved for royalty and worn at weddings and formal ceremonies for its shimmer and status. Batik, made by wax-resist dyeing, was worn more broadly across daily and festive life throughout the Malay Archipelago.' },
       { key:'kraf', name:'KERIS & ANYAMAN', sub:'Kraf Tangan & Persenjataan', color:0x8a8f99, pos:[-8,0,5], silent:true,
         desc:'The keris is a wavy-bladed dagger carried as part of formal Malay attire (baju Melayu) and regarded as a symbol of status and spiritual power, often passed down as a family heirloom. Anyaman is the everyday craft of weaving pandan, rattan and bamboo into mats, baskets and trays -- humble household items woven by hand in nearly every kampung.' },
       { key:'makanan', name:'HIDANGAN WARISAN', sub:'Makanan Warisan', color:0xc9622a, pos:[8,0,-2], silent:true,
         desc:'Malay heritage dishes such as rendang, nasi lemak and an array of kuih-muih reflect centuries of spice trade with India, China and the Middle East, absorbed into local ingredients and cooking methods. They are served at kenduri (feasts), weddings and Hari Raya celebrations, where cooking and sharing food is itself a communal, festive act.' },
-      { key:'adat', name:'PANTUN & ADAT', sub:'Adat Resam & Kesusasteraan', color:0x6a4fae, pos:[8,0,5], freq:174, wave:'triangle',
+      { key:'adat', name:'PANTUN & ADAT', sub:'Adat Resam & Kesusasteraan', color:0x6a4fae, pos:[8,0,5], freq:174, wave:'triangle', alwaysPlayVideo:true,
         desc:'Pantun is a traditional oral poetry form built from rhyming quatrains, historically used in courtship, ceremonies and everyday social exchange to convey wit and wisdom indirectly. Adat resam refers to the customary practices and unwritten laws -- such as adat perpatih and adat temenggong -- that have long governed Malay social conduct, ceremonies and inheritance.' },
       { key:'filem', name:'FILEM MELAYU', sub:'Zaman Kesultanan Melayu', color:0xc9a227, pos:[0,0,0], silent:true, labelY:2.9,
         desc:'Three Malay films set in the Melaka Sultanate era, arranged left to right in order of release so the story of that world unfolds across the decades: Hang Tuah (1956, dir. Phani Majumdar), Puteri Gunung Ledang (1961, dir. S. Roomai Noor), and Puteri Gunung Ledang (2004, dir. Saw Teong Hin).' },
@@ -4966,35 +4970,47 @@
     player.position.z = headPos.z - dx * sin + dz * cos;
   }
 
-  let vrExitBtnWas = false; // X held last frame -- makes the exit edge-triggered
+  // Staff reset for a new guest: tap A, B, X, Y in that order (each within 4 s of
+  // the last). Same sequence as the Meta Quest app. xr-standard: button 4 = A / X,
+  // button 5 = B / Y (right / left hand).
+  const RESET_ORDER = ['A', 'B', 'X', 'Y'];
+  let resetStep = 0, resetLast = 0;
+  const faceBtnWas = { A: false, B: false, X: false, Y: false };
+  function pollResetSequence(session){
+    const now = performance.now();
+    const down = { A: false, B: false, X: false, Y: false };
+    for (const src of session.inputSources){
+      if (!src.gamepad) continue;
+      const btns = src.gamepad.buttons, left = src.handedness === 'left';
+      if (btns[4] && btns[4].pressed) down[left ? 'X' : 'A'] = true;
+      if (btns[5] && btns[5].pressed) down[left ? 'Y' : 'B'] = true;
+    }
+    let pressed = null;
+    for (const k of RESET_ORDER){ if (down[k] && !faceBtnWas[k]){ pressed = k; break; } }
+    for (const k of RESET_ORDER) faceBtnWas[k] = down[k];
+    if (resetStep > 0 && now - resetLast > 4000) resetStep = 0;
+    if (!pressed) return false;
+    resetStep = (pressed === RESET_ORDER[resetStep]) ? resetStep + 1 : (pressed === 'A' ? 1 : 0);
+    resetLast = now;
+    if (resetStep >= RESET_ORDER.length){ resetStep = 0; return true; }
+    return false;
+  }
+
   function vrMove(dt){
     if (!renderer.xr.isPresenting) return;
     const session = renderer.xr.getSession();
     if (!session) return;
+    if (pollResetSequence(session)){
+      try { resetWorldForNewGuest(); }
+      catch (e) {
+        // whatever else failed, still leave VR so the guest sees the UI
+        const s = renderer.xr.getSession();
+        if (s) s.end().catch(() => {});
+      }
+      return;
+    }
     for (const src of session.inputSources){
       if (!src.gamepad) continue;
-      // X on the left keris (xr-standard button index 4) hands the booth
-      // over: end the VR session and return to the start screen, reset and
-      // ready for the next guest
-      if (src.handedness === 'left'){
-        // X sits at xr-standard index 4, but scan every button past the
-        // reserved trigger/squeeze/pad/stick slots too, in case this
-        // browser exposes the layout differently
-        const btns = src.gamepad.buttons;
-        let pressed = false;
-        for (let b = 4; b < btns.length; b++){ if (btns[b] && btns[b].pressed){ pressed = true; break; } }
-        if (pressed && !vrExitBtnWas){
-          vrExitBtnWas = true;
-          try { resetWorldForNewGuest(); }
-          catch (e) {
-            // whatever else failed, still leave VR so the guest sees the UI
-            const s = renderer.xr.getSession();
-            if (s) s.end().catch(() => {});
-          }
-          return;
-        }
-        vrExitBtnWas = pressed;
-      }
       const axes = src.gamepad.axes;
       const ax = axes.length >= 4 ? axes[2] : axes[0];
       const ay = axes.length >= 4 ? axes[3] : axes[1];
@@ -5457,6 +5473,7 @@
                            // async-loaded world objects, so nothing pierces
                            // the white void (set/cleared in startVrIntro)
   function updateFrame(points, clouds, birds, dt, t){
+    if (window.GWMX) GWMX.update(dt, t);
     if (vrIntroSweep) vrIntroSweep();
     if (vrRevealVeil){
       // a short beat of solid white, then the kampung dissolves in
