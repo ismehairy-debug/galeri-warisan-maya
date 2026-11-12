@@ -29,6 +29,10 @@ villagers, cermin Melayu) lives in `assets/gwm-extras.js`, authored in the Unity
 hooked into `index.html` (`GWMX.install` / `GWMX.update`). The Unity versions are `GWMProc.cs`, `KampungPlay.cs`,
 `KuihDisplay.cs`, `MirrorAvatar.cs`. Keep the two in step when changing either.
 
+Unity only so far (not on the web): the batik painting corner beside the wau maker, `BatikCorner.cs` (added 2026-11-12).
+Guests get a brush in each hand, dip it in a dye bowl and colour a wax-drawn cloth; the dye spreads up to the wax lines.
+Check it headlessly with `-executeMethod GWMPreview.Batik -previewDir <folder>`; `GWMSmokeTest.Run` also paints on it.
+
 ## Rules
 - Raw phone videos must be transcoded to ~720p H.264 before use (see memory).
 - Expand features in Unity first. The web copy is only brought in step when the user asks.
