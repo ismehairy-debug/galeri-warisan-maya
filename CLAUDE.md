@@ -70,6 +70,13 @@ A one-minute teaser is filmed inside the Quest app, in the Unity editor, with no
 - Drafts are 1280x720 with a "DRAF n" tag and go to `GaleriWarisanMaya_VR/Teaser/`. The owner approves a draft before the
   full 1920x1080 export.
 
+### New commercial intro (draft 2026-11-15, not in the app until the owner approves)
+`GaleriWarisanMaya_VR/Teaser/make_intro.py` cuts an 18-second replacement for `intro_commercial.mp4` from the `in_...`
+shots in `GWMTeaser.cs` (film them with `-teaserShots in_board,in_walk,in_tarian,in_gamelan,in_istana,in_congkak,in_wau,in_bloom`).
+Music is the gamelan (`alat_muzik.mp3` from 136.2 s), not the short film's cinematic track; the title lands on the big gong.
+It ends on a white credits card whose wording the owner gave: Sponsored by FCoEE; In collaboration with UniMAP and FCoEE;
+Presented by SEAT Education Academy (logos in `Teaser/logos/`). The final stays 1280x720, a few MB, for the headset.
+
 ## Rules
 - Raw phone videos must be transcoded to ~720p H.264 before use (see memory).
 - Expand features in Unity first. The web copy is only brought in step when the user asks.
