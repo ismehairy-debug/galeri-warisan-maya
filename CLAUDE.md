@@ -23,6 +23,13 @@ projects are native Meta Quest ports of it. All live under `C:\Users\ismeh\Docum
 ## Intro video
 Intro is `intro_commercial.mp4` everywhere (web `assets/videos/`, Unity `StreamingAssets/Videos/`, `introVideoFile` in `IntroDirector.cs` and serialized in `Gallery.unity`). The old `intro_opening.mp4` is deleted.
 
+On flat screens the web shows the intro the way the Quest app does (since 2026-11-14): the video, then the short film, on a
+16:9 screen floating in a white room with a halo tinted by the picture, a shadow and a floor reflection (`#introStage` CSS
+and `setupIntroGlow()` in `index.html`). It is no longer stretched edge to edge.
+
+Testing the web headlessly: every MASUK click starts the cast and sends a Telegram message to the owner
+(`postCastLinkToTelegram`). Block `api.telegram.org` and the PeerJS script in the test browser before clicking it.
+
 ## Web = Quest look-alike (since 2026-11-06)
 On request the website is brought up to date with the Quest app. The new content (the visitor's hands, gamelan, kuih,
 villagers, welcome grove, wau maker, batik corner) lives in `assets/gwm-extras.js`, authored in the Unity frame inside a

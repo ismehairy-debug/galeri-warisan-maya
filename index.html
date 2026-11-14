@@ -152,12 +152,33 @@
   }
   #introScreen {
     position:fixed; inset:0; z-index:30; background:#fff;
-    display:flex; align-items:center; justify-content:center;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
   }
-  #introScreen video { width:100%; height:100%; object-fit:contain; background:#fff; }
+  /* the same cinema as the Meta Quest app: the intro video (and the short
+     film after it) plays on a 16:9 screen floating in a white room, with a
+     soft halo behind it tinted by the picture itself (#introGlow, coloured
+     by setupIntroGlow), a shadow pooled beneath, and a faint reflection in
+     the floor. Edge to edge, the dark commercial clip sat between hard white
+     bars on any window that isn't exactly 16:9 -- a bare strip on a phone. */
+  #introStage {
+    position:relative; width:min(90vw, calc(56vh * 16 / 9)); transform:translateY(-14%);
+  }
+  #introStage::before { content:''; display:block; padding-top:56.25%; }
+  #introStage::after {
+    content:''; position:absolute; left:-6%; right:-6%; top:100%; height:16%; margin-top:1.5%;
+    background:radial-gradient(closest-side, rgba(60,30,10,0.24), rgba(60,30,10,0)); pointer-events:none;
+  }
+  #introGlow {
+    position:absolute; left:50%; top:50%; width:180%; height:205%;
+    transform:translate(-50%,-50%); pointer-events:none;
+  }
+  #introScreen video, #introScreen canvas {
+    position:absolute; left:0; top:0; width:100%; height:100%; object-fit:cover; background:#fff;
+    -webkit-box-reflect: below 19% linear-gradient(rgba(255,255,255,0.22), rgba(255,255,255,0.22));
+  }
   /* the short-film slideshow canvas takes the video's place on the same
      screen once the intro clip ends (display flipped in JS) */
-  #introScreen canvas { width:100%; height:100%; object-fit:contain; background:#fff; display:none; }
+  #introScreen canvas { display:none; }
   /* flashback veil: flashes white as the intro ends, then dissolves to
      reveal the world -- the flat-screen twin of the VR white-veil reveal */
   #flashFade {
@@ -235,8 +256,11 @@
      MASUK -- that click doubles as the autoplay-policy gesture, so the
      intro can start WITH sound -->
 <div id="introScreen" style="display:none">
-  <video id="introVideo" src="assets/videos/intro_commercial.mp4" preload="auto" playsinline></video>
-  <canvas id="filmCanvas"></canvas>
+  <div id="introStage">
+    <div id="introGlow"></div>
+    <video id="introVideo" src="assets/videos/intro_commercial.mp4" preload="auto" playsinline></video>
+    <canvas id="filmCanvas"></canvas>
+  </div>
 </div>
 <div id="tapForSoundHint" style="display:none">🔊 KETIK SKRIN UNTUK BUNYI / TAP SCREEN FOR SOUND</div>
 <div id="introControls" style="display:none">
@@ -569,6 +593,7 @@
     });
     document.addEventListener('mousemove', onMouseMove);
 
+    setupIntroGlow();
     if (SPECTATE_ID){
       // spectator: the intro video/canvas element is reused (not stripped)
       // so the spectator can replay the SAME intro, synced to the guest's
@@ -602,6 +627,59 @@
     video.addEventListener('canplay', hideLoading, { once:true });
     video.addEventListener('error', hideLoading, { once:true });
     setTimeout(hideLoading, 6000); // fallback if the video stalls
+  }
+
+  // ---------- intro cinema halo (flat screens) ----------
+  // The Meta Quest app shows the intro on a screen floating in a white room
+  // with a soft halo behind it, tinted by the picture itself. The flat intro
+  // overlay is laid out the same way in CSS (#introStage); this keeps its
+  // halo the colour of whatever is on the screen -- the video, then the short
+  // film's canvas -- with the same sampling as the VR cinema's ambilight in
+  // startVrIntro: a tiny frame average, lifted toward a vivid version of the
+  // same hue, eased so the halo glides instead of stepping.
+  function setupIntroGlow(){
+    const introScreen = document.getElementById('introScreen');
+    const video = document.getElementById('introVideo');
+    const filmCanvas = document.getElementById('filmCanvas');
+    const glow = document.getElementById('introGlow');
+    if (!glow) return;
+    const sample = document.createElement('canvas');
+    sample.width = 16; sample.height = 9;
+    const sctx = sample.getContext('2d', { willReadFrequently: true });
+    const cur = [255, 255, 255], target = [255, 255, 255];
+    function paint(){
+      const c = cur.map(v => Math.round(v)).join(',');
+      glow.style.background = `radial-gradient(closest-side, rgba(${c},0.85) 16%, rgba(${c},0.35) 65%, rgba(${c},0) 100%)`;
+    }
+    paint();
+    setInterval(() => {
+      if (introScreen.style.display === 'none'){
+        // not showing: next time the halo starts from white, not from the last film frame
+        cur[0] = cur[1] = cur[2] = target[0] = target[1] = target[2] = 255;
+        return;
+      }
+      try {
+        const film = filmCanvas.style.display === 'block';
+        if (!film && (video.readyState < 2 || video.seeking)) return;
+        sctx.drawImage(film ? filmCanvas : video, 0, 0, 16, 9);
+        const d = sctx.getImageData(0, 0, 16, 9).data;
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < d.length; i += 4){ r += d[i]; g += d[i+1]; b += d[i+2]; }
+        const n = d.length/4;
+        r /= n; g /= n; b /= n;
+        // an all-black read-back is a frame the browser has not handed over
+        // yet (seen on phones as the film canvas takes the screen), never the
+        // picture itself -- a black halo on the white room would be a stain
+        if (Math.max(r, g, b) < 8) return;
+        const lift = 215 / Math.max(r, g, b, 1);
+        target[0] = Math.min(255, r*lift); target[1] = Math.min(255, g*lift); target[2] = Math.min(255, b*lift);
+      } catch (e) { /* frame not samplable yet -- keep the last colour */ }
+    }, 600);
+    setInterval(() => {
+      if (introScreen.style.display === 'none') return;
+      for (let i = 0; i < 3; i++) cur[i] += (target[i] - cur[i]) * 0.1;
+      paint();
+    }, 60);
   }
 
   // ---------- intro video + short film ----------
