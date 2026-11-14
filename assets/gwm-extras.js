@@ -1,8 +1,8 @@
 /* ------------------------------------------------------------------
    GWM extras -- the same additions made to the Meta Quest (Unity) app, so the
-   website matches it: new keris (in its sarung) + pelita for the VR hands,
-   modelled gamelan, kuih display, villagers playing congkak and batu seremban,
-   and the cermin Melayu that shows visitors in full Malay attire.
+   website matches it: the visitor's own hands in VR, modelled gamelan, kuih
+   display, villagers playing congkak and batu seremban, the welcome grove, the
+   wau bulan maker, and the batik corner where visitors colour a cloth.
 
    Everything is authored in the Unity app's coordinate frame (x right, y up,
    z north) inside one group that is mirrored on z, which is exactly the
@@ -163,8 +163,9 @@
   const inputState = { left: { t: 0, g: 0, th: 0 }, right: { t: 0, g: 0, th: 0 } };
   const handModels = [];
   const FANG = [[85, 95, 65], [88, 98, 68], [90, 98, 66], [92, 96, 62]];
+  const HAND_TILT = 0.31;   // how the hand model sits on the controller; the batik brush is held relative to it
   function buildHand(left, sleeve){
-    const g = new T.Group(); g.rotation.x = 0.31;
+    const g = new T.Group(); g.rotation.x = HAND_TILT;
     const skin = mat(0.84, 0.62, 0.45, 0.35), black = mat(0.035, 0.035, 0.045, 0.5), gold = mat(0.90, 0.72, 0.24, 0.8, 0.85);
     const sg = left ? -1 : 1;              // fingers fold toward the palm side (-x for the right hand)
     sph(g, skin, 0, 0, -0.032, 0.036, 0.090, 0.100); sph(g, skin, -sg * 0.004 * -1, -0.002, -0.002, 0.040, 0.074, 0.060);
@@ -1057,10 +1058,464 @@
     p.head.rotation.x += (0.2 - p.head.rotation.x) * 0.08; p.head.rotation.y = Math.sin(t * 0.5) * 0.15;
   }
 
+  // ---------------------------------------------------------------- sudut batik
+  // Beside the wau maker: a cloth stretched on a wooden pemidang with its motif already drawn in wax.
+  // In VR a brush appears in each hand: dip it in a bowl to take up that dye, touch the cloth and the dye
+  // spreads up to the wax lines; holding still lets it soak further, and the water bowl washes colour
+  // off. On a flat screen the centre of the view (or a finger) is the brush: hold on the cloth to paint,
+  // click a bowl to change dye. A finished cloth hangs behind as an example.
+  // Same build and the same dye engine as BatikCorner.cs in the Quest app. The wax lines are not redrawn
+  // here: they are loaded from batik_lilin.png, which the Quest app exports (GWMPreview.Batik), so the
+  // two cloths are identical line for line. batik_siap.png is the finished cloth from the same export.
+  const BW = 768, BH = 480, B_AVG = 8;   // cloth pixels; typical wicking cost of one pixel
+  const DYES = [[255, 252, 244], [212, 38, 52], [236, 84, 150], [244, 130, 32], [250, 205, 48], [44, 158, 84], [26, 170, 176], [34, 96, 196], [134, 58, 168]];
+  const WAX_RGB = [204, 150, 64];
+  const B_WATER = 0, B_MERAH = 1, B_BIRU = 7, BOWL_DYE = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+  const B_OFF = [1, -1, BW, -BW, BW + 1, BW - 1, -BW + 1, -BW - 1], B_OFA = [0, 0, 0, 0, 1, -1, 1, -1], B_OFB = [0, 0, 0, 0, BW, BW, -BW, -BW];
+  function bHash(x, y){
+    let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+    return ((h ^ (h >>> 16)) & 0xffff) / 65535;
+  }
+  function bNoise(x, y){
+    const xi = Math.floor(x), yi = Math.floor(y); let fx = x - xi, fy = y - yi;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+    const a = bHash(xi, yi), b = bHash(xi + 1, yi), c = bHash(xi, yi + 1), d = bHash(xi + 1, yi + 1);
+    const lo = a + (b - a) * fx, hi = c + (d - c) * fx;
+    return lo + (hi - lo) * fy;
+  }
+
+  // The cloth: dye wicks outward from wherever the brush touches until it meets a wax line.
+  function BatikCanvas(){
+    const n = BW * BH;
+    this.wax = new Uint8Array(n);      // wax coverage; a barrier to dye from 128 up
+    this.wall = new Uint8Array(n);     // wax barrier, or the outermost ring of pixels
+    this.cost = new Uint8Array(n);     // how slowly dye wicks through this pixel
+    this.grain = new Uint8Array(n);    // weave of the cloth
+    this.dye = new Uint8Array(n);      // index into DYES
+    this.reach = new Int16Array(n);    // how much further the dye could still travel when it got here
+    this.px = new Uint8Array(n * 4);
+    this.queue = new Int32Array(n); this.qHead = 0; this.qCount = 0;
+    this.dirty = false; this.lastUpload = 0; this.ready = false;
+    for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++){
+      const i = y * BW + x;
+      this.cost[i] = 5 + 7 * (0.65 * bNoise(x / 13, y / 13) + 0.35 * bNoise(x / 4.5 + 31, y / 4.5 + 17));
+      this.grain[i] = 255 - (x % 3 === 0 ? 5 : 0) - (y % 3 === 0 ? 5 : 0) - Math.floor(bHash(x + 91, y + 17) * 5);
+    }
+    const gl2 = !!(renderer && renderer.capabilities && renderer.capabilities.isWebGL2);   // mipmaps on a non-power-of-two texture need WebGL2
+    this.tex = new T.DataTexture(this.px, BW, BH, T.RGBAFormat);
+    this.tex.encoding = T.sRGBEncoding; this.tex.magFilter = T.LinearFilter;
+    this.tex.minFilter = gl2 ? T.LinearMipmapLinearFilter : T.LinearFilter; this.tex.generateMipmaps = gl2; this.tex.anisotropy = 4;
+    this.setWax(null);
+  }
+  BatikCanvas.prototype.setWax = function(w){
+    if (w) this.wax.set(w);
+    for (let i = 0; i < this.wall.length; i++){
+      const x = i % BW, y = (i / BW) | 0;
+      this.wall[i] = (this.wax[i] >= 128 || x === 0 || y === 0 || x === BW - 1 || y === BH - 1) ? 1 : 0;
+    }
+    this.clear();
+  };
+  BatikCanvas.prototype.shade = function(i){
+    const d = this.dye[i], D = DYES[d];
+    let r = D[0], g = D[1], b = D[2];
+    if (d !== 0){
+      // thinner where the dye only just arrived, and a little uneven like real cloth
+      let e = this.reach[i] * 2; if (e > 80) e = 80;
+      const k = 176 + e - (this.cost[i] - 5) * 3, c0 = DYES[0];
+      r = (c0[0] * (256 - k) + r * k) >> 8; g = (c0[1] * (256 - k) + g * k) >> 8; b = (c0[2] * (256 - k) + b * k) >> 8;
+    }
+    const gr = this.grain[i];
+    r = (r * gr / 255) | 0; g = (g * gr / 255) | 0; b = (b * gr / 255) | 0;
+    const a = this.wax[i];
+    if (a > 0){ r = ((r * (255 - a) + WAX_RGB[0] * a) / 255) | 0; g = ((g * (255 - a) + WAX_RGB[1] * a) / 255) | 0; b = ((b * (255 - a) + WAX_RGB[2] * a) / 255) | 0; }
+    const o = i * 4, p = this.px;
+    p[o] = r; p[o + 1] = g; p[o + 2] = b; p[o + 3] = 255;
+  };
+  // put dye c on the cloth at pixel (fx, fy); it then wicks outward as far as budget allows
+  BatikCanvas.prototype.dab = function(fx, fy, c, budget){
+    const x = fx | 0, y = fy | 0;
+    if (x < 1 || y < 1 || x >= BW - 1 || y >= BH - 1) return;
+    let i = y * BW + x;
+    if (this.wall[i]){   // the brush landed on a wax line: the dye goes to the nearest open cloth
+      let best = -1, bd = 1e9;
+      for (let oy = -4; oy <= 4; oy++) for (let ox = -4; ox <= 4; ox++){
+        const xx = x + ox, yy = y + oy;
+        if (xx < 1 || yy < 1 || xx >= BW - 1 || yy >= BH - 1) continue;
+        const j = yy * BW + xx, dd = ox * ox + oy * oy;
+        if (!this.wall[j] && dd < bd){ bd = dd; best = j; }
+      }
+      if (best < 0) return;
+      i = best;
+    }
+    if (this.dye[i] === c && this.reach[i] >= budget) return;
+    this.dye[i] = c; this.reach[i] = budget; this.shade(i);
+    if (this.qCount < this.queue.length){ this.queue[(this.qHead + this.qCount) % this.queue.length] = i; this.qCount++; }
+    this.dirty = true;
+  };
+  // the brush moved from a to b (pixels) while touching the cloth
+  BatikCanvas.prototype.stroke = function(ax, ay, bx, by, c, radius){
+    const budget = Math.max(1, Math.min(32000, Math.round(radius * B_AVG)));
+    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 3));
+    for (let k = 1; k <= n; k++){ const u = k / n; this.dab(ax + (bx - ax) * u, ay + (by - ay) * u, c, budget); }
+  };
+  BatikCanvas.prototype.step = function(pops){
+    const q = this.queue, len = q.length, wall = this.wall, dye = this.dye, reach = this.reach, cost = this.cost;
+    if (pops > this.qCount) pops = this.qCount;
+    for (; pops > 0; pops--){
+      const i = q[this.qHead]; this.qHead = (this.qHead + 1) % len; this.qCount--;
+      const r = reach[i], c = dye[i];
+      if (r <= 0) continue;
+      for (let k = 0; k < 8; k++){
+        const j = i + B_OFF[k];
+        if (wall[j]) continue;
+        if (k >= 4 && (wall[i + B_OFA[k]] || wall[i + B_OFB[k]])) continue;   // never squeeze diagonally past wax
+        const nb = r - (k < 4 ? cost[j] : (cost[j] * 7 / 5) | 0);
+        if (nb <= 0 || (dye[j] === c && reach[j] >= nb)) continue;
+        dye[j] = c; reach[j] = nb; this.shade(j);
+        if (this.qCount < len){ q[(this.qHead + this.qCount) % len] = j; this.qCount++; }
+      }
+      this.dirty = true;
+    }
+  };
+  // every frame: let the dye creep a little further and refresh the texture
+  BatikCanvas.prototype.tick = function(now){
+    if (this.qCount > 0) this.step(Math.min(40000, Math.max(6000, (this.qCount / 4) | 0)));
+    if (this.dirty && now - this.lastUpload > 0.02){ this.lastUpload = now; this.dirty = false; this.tex.needsUpdate = true; }
+  };
+  BatikCanvas.prototype.flush = function(){
+    while (this.qCount > 0) this.step(this.qCount);
+    this.dirty = false; this.tex.needsUpdate = true;
+  };
+  // a fresh cloth: wax lines only
+  BatikCanvas.prototype.clear = function(){
+    this.dye.fill(0); this.reach.fill(0); this.qHead = this.qCount = 0;
+    for (let i = 0; i < this.dye.length; i++) this.shade(i);
+    this.dirty = false; this.tex.needsUpdate = true;
+  };
+
+  const bk = { built: false, brushes: [], bowls: [], pickables: [], painted: false, lastPaint: -999, near: false, out: [], outTimer: 0, log: [], pending: [] };
+  const ptr = { down: false, press: false, touch: null, x: 0, y: 0, mode: '' };   // the mouse button or the painting finger
+  bk.ptr = ptr;
+  let SPECT = false;   // spectator tabs only watch: the guest's strokes arrive as messages
+  const D2R = Math.PI / 180;
+  const _eye = new T.Vector3(), _tip = new T.Vector3(), _bv = new T.Vector3(), _bq = new T.Quaternion(), _ndc = new T.Vector2();
+  const bRay = new T.Raycaster();
+
+  function setDye(b, dye){
+    b.dye = dye;
+    if (dye === B_WATER) b.bristle.color.setRGB(0.78, 0.88, 0.94);
+    else b.bristle.color.setRGB(DYES[dye][0] / 255, DYES[dye][1] / 255, DYES[dye][2] / 255);
+    b.bristle.color.convertSRGBToLinear();
+  }
+  // the brush is modelled pointing along -z (three's controller forward), tip 0.195 ahead of the hand
+  function buildBrush(home){
+    const b = { root: new T.Group(), home, dye: home, touching: false, last: new T.Vector2(), dwell: 0, k: 0, show: 0, buzz: 0, sent: null, skipped: null };
+    cyl(b.root, mat(0.62, 0.44, 0.22, 0.4), 0, 0, -0.03, 0.017, 0.095, 0.017, Math.PI / 2);
+    cyl(b.root, mat(0.86, 0.64, 0.20, 0.8, 0.85), 0, 0, -0.133, 0.022, 0.011, 0.022, Math.PI / 2);
+    b.bristle = new T.MeshStandardMaterial({ roughness: 0.75, side: T.DoubleSide });
+    part(b.root, lathe([[0, 0], [0.011, 0], [0.0155, 0.016], [0.011, 0.038], [0, 0.055]], 12), b.bristle, 0, 0, -0.142, -Math.PI / 2);
+    b.tip = new T.Object3D(); b.tip.position.set(0, 0, -0.195); b.root.add(b.tip);
+    setDye(b, home);
+    return b;
+  }
+  // a brush for this controller, held the way the Quest app holds it relative to the hand; hidden until the guest is at the frame
+  function attachBrush(gp, left){
+    const b = buildBrush(left ? B_BIRU : B_MERAH);
+    b.grip = gp; b.holder = new T.Group(); b.holder.rotation.x = HAND_TILT; b.holder.visible = false;
+    b.root.position.set(0, -0.0021, -0.0322); b.root.rotation.x = -22 * D2R;
+    b.holder.add(b.root); gp.add(b.holder); gp.userData.batikBrush = b;
+    bk.brushes.push(b);
+  }
+
+  function buildBatik(pos, yaw){
+    const CW = 1.4, CH = CW * BH / BW, TILT = 15 * D2R, CLOTH_Y = 0.88, LEDGE_Y = 0.70, LEDGE_Z = -0.15, RIM = 0.052;
+    const wood = mat(0.44, 0.25, 0.11, 0.35), woodDark = mat(0.26, 0.13, 0.06, 0.4), bamboo = mat(0.72, 0.58, 0.30, 0.3);
+    const rope = mat(0.30, 0.20, 0.10, 0.1), ceramic = mat(0.93, 0.92, 0.88, 0.65);
+    const loader = new T.TextureLoader();
+    const g = new T.Group(); g.position.copy(pos); g.rotation.y = yaw; root.add(g); bk.g = g;
+    makeMat(g, 0, -0.45, 2.5, 1.9, [0.80, 0.66, 0.38], [0.64, 0.48, 0.24], [0.42, 0.20, 0.13]);
+    blob(g, 0, 0.022, 0.30, 2.3, 0.30);
+
+    // ---- pemidang: the cloth stretched on a wooden frame that leans back like an easel
+    const up = V(0, Math.cos(TILT), Math.sin(TILT)), back = V(0, -Math.sin(TILT), Math.cos(TILT));
+    const P = (along, side, behind) => V(side, CLOTH_Y, 0).addScaledVector(up, along).addScaledVector(back, behind);
+    bk.canvas = new BatikCanvas();
+    const cloth = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshStandardMaterial({ map: bk.canvas.tex, roughness: 0.95, side: T.DoubleSide }));
+    cloth.position.copy(P(CH * 0.5, 0, 0)); cloth.rotation.x = TILT; cloth.scale.set(CW, CH, 1); g.add(cloth);
+    bk.cloth = cloth; bk.pickables.push(cloth);
+    const hx = CW * 0.5 + 0.05;
+    const bar = (p, sx, sy, sz) => { box(g, wood, p.x, p.y, p.z, sx, sy, sz).rotation.x = TILT; };
+    bar(P(-0.03, 0, 0.028), CW + 0.16, 0.06, 0.04); bar(P(CH + 0.03, 0, 0.028), CW + 0.16, 0.06, 0.04);
+    [-1, 1].forEach(sx => {
+      bar(P(CH * 0.5, sx * hx, 0.028), 0.06, CH + 0.12, 0.04);
+      for (let k = 0; k < 6; k++){   // cord lacing the cloth to the frame
+        const a = P(CH * (0.08 + k * 0.168), sx * CW * 0.5, 0);
+        stick(g, rope, a.clone().addScaledVector(back, -0.004), a.clone().add(V(sx * 0.05, 0, 0)).addScaledVector(back, 0.01), 0.004);
+      }
+      stick(g, wood, V(sx * hx, 0, 0.03), V(sx * hx, CLOTH_Y - 0.02, 0.03), 0.028);                                   // front leg
+      stick(g, wood, P(CH + 0.03, sx * hx, 0.05), V(sx * hx, 0, 0.80), 0.026);                                        // back strut
+      stick(g, woodDark, V(sx * hx, 0.34, 0.03), V(sx * hx, 0.34, 0.69), 0.018);                                      // side brace
+      stick(g, wood, V(sx * (hx + 0.01), 0, LEDGE_Z - 0.10), V(sx * (hx + 0.01), LEDGE_Y - 0.03, LEDGE_Z - 0.10), 0.022);   // ledge post
+      stick(g, woodDark, V(sx * hx, LEDGE_Y - 0.06, LEDGE_Z - 0.10), V(sx * hx, LEDGE_Y - 0.06, 0.03), 0.016);
+    });
+    for (let k = 0; k < 8; k++) [-0.004, CH + 0.004].forEach(e => {
+      const a = P(e, -CW * 0.5 + CW * (0.07 + k * 0.123), 0);
+      stick(g, rope, a.clone().addScaledVector(back, -0.004), a.clone().addScaledVector(up, e < 0.1 ? -0.03 : 0.03).addScaledVector(back, 0.01), 0.004);
+    });
+    stick(g, woodDark, V(-hx, 0.90, 0.545), V(hx, 0.90, 0.545), 0.018);
+
+    // ---- the ledge of dye bowls under the cloth: eight dyes and a bowl of water
+    box(g, wood, 0, LEDGE_Y - 0.02, LEDGE_Z, CW + 0.26, 0.04, 0.27); box(g, woodDark, 0, LEDGE_Y + 0.008, LEDGE_Z - 0.128, CW + 0.26, 0.018, 0.014);
+    const bowlGeo = lathe([[0, 0], [0.036, 0], [0.052, 0.016], [0.060, RIM], [0.054, RIM], [0.045, 0.020], [0, 0.014]], 20);
+    BOWL_DYE.forEach((d, i) => {
+      const x = -0.66 + i * 0.165, bowl = { x, y: LEDGE_Y + RIM, z: LEDGE_Z, dye: d };
+      const col = d === B_WATER ? new T.Color(0.62, 0.82, 0.92) : new T.Color(DYES[d][0] / 255, DYES[d][1] / 255, DYES[d][2] / 255);
+      if (d !== B_WATER) col.multiplyScalar(0.8);   // deep, like dye standing in a bowl; the open sky would otherwise wash it pale
+      const dm = new T.MeshStandardMaterial({ color: col.convertSRGBToLinear(), roughness: 0.9, side: T.DoubleSide });
+      [part(g, bowlGeo, ceramic, x, LEDGE_Y, LEDGE_Z), cyl(g, dm, x, LEDGE_Y + RIM - 0.012, LEDGE_Z, 0.102, 0.002, 0.102)].forEach(m => { m.userData.bowl = bowl; bk.pickables.push(m); });
+      bk.bowls.push(bowl);
+    });
+
+    // ---- papan arahan (how to paint), on the far side so people walking up from the entrance can read it
+    const sign = new T.Group(); sign.position.set(-1.48, 0, -0.05); sign.rotation.order = 'YXZ'; sign.rotation.set(5 * D2R, -30 * D2R, 0); g.add(sign);
+    [-0.36, 0.36].forEach(sx => stick(sign, bamboo, V(sx, 0, 0.03), V(sx, 1.86, 0.03), 0.022));
+    box(sign, woodDark, 0, 1.36, 0, 0.96, 0.96, 0.03);
+    const signTex = loader.load('assets/images/papan_batik.png'); signTex.encoding = T.sRGBEncoding; signTex.anisotropy = 4;
+    add(sign, new T.Mesh(new T.PlaneGeometry(0.90, 0.90), new T.MeshStandardMaterial({ map: signTex, roughness: 0.9, side: T.DoubleSide })), 0, 1.36, -0.017);
+    blob(sign, 0, 0, 0, 1.1, 0.25);
+
+    // ---- ampaian: a finished cloth hung high behind the frame as an example
+    const line = new T.Group(); line.position.set(0, 0, 1.20); g.add(line);
+    [-1.02, 1.02].forEach(sx => stick(line, bamboo, V(sx, 0, 0), V(sx, 2.78, 0), 0.035));
+    stick(line, bamboo, V(-1.16, 2.62, 0), V(1.16, 2.62, 0), 0.028);
+    [-1.02, 1.02].forEach(sx => part(line, torusGeo(0.042, 0.010, 12, 6), rope, sx, 2.62, 0, 0, 0, Math.PI / 2));
+    bk.swing = new T.Group(); bk.swing.position.set(0, 2.60, 0); line.add(bk.swing);
+    const SW = 1.72, SH = SW * BH / BW;
+    const doneTex = loader.load('assets/images/batik_siap.png'); doneTex.encoding = T.sRGBEncoding; doneTex.anisotropy = 4;
+    add(bk.swing, new T.Mesh(new T.PlaneGeometry(SW, SH), new T.MeshStandardMaterial({ map: doneTex, roughness: 0.95, side: T.DoubleSide })), 0, -0.02 - SH * 0.5, -0.012);
+    cyl(bk.swing, mat(0.95, 0.93, 0.88, 0.05), 0, 0.02, 0, 0.068, SW * 0.5, 0.068, 0, 0, Math.PI / 2);
+    blob(line, 0, 0, 0, 2.6, 0.22);
+
+    // ---- walking: around the frame, never through the hanging cloth or the board
+    root.updateMatrixWorld(true);
+    const col = (x, z, r) => { const w = rootLocal(g.localToWorld(V(x, 0, z))); addCircleCol(w.x, w.z, r); };
+    [-0.56, 0, 0.56].forEach(x => col(x, 0.40, 0.42));
+    [-1.02, -0.51, 0, 0.51, 1.02].forEach(x => col(x, 1.20, 0.26));
+    col(-1.48, -0.05, 0.42);
+
+    // ---- the wax lines, exactly as the Quest app drew them
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = BW; c.height = BH;
+        const cx = c.getContext('2d'); cx.drawImage(img, 0, 0, BW, BH);
+        const d = cx.getImageData(0, 0, BW, BH).data, w = new Uint8Array(BW * BH);
+        for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) w[(BH - 1 - y) * BW + x] = d[(y * BW + x) * 4];   // image rows run top down, the cloth bottom up
+        bk.canvas.setWax(w);
+      } catch (e){ console.warn('batik wax map unreadable, the cloth stays plain:', e); }
+      batikReady();
+    };
+    img.onerror = batikReady;
+    img.src = 'assets/images/batik_lilin.png';
+
+    // ---- brushes: one per VR hand, and one for the mouse or a finger on flat screens
+    gripsRef.forEach((gp, i) => attachBrush(gp, i === 1));
+    bk.flat = buildBrush(B_MERAH); bk.flat.root.visible = false; bk.flat.root.scale.setScalar(1.6); scene.add(bk.flat.root);
+    if (!SPECT) installBatikInput();
+    bk.built = true;
+  }
+  function batikReady(){
+    bk.canvas.ready = true;
+    const p = bk.pending; bk.pending = [];
+    p.forEach(s => bk.canvas.stroke(s[0], s[1], s[2], s[3], s[4], s[5]));
+    if (p.length) bk.canvas.flush();
+  }
+
+  // what the view centre, the mouse or a finger is pointing at: the cloth, a bowl, or nothing within reach
+  function batikPick(cx, cy){
+    const r = renderer.domElement.getBoundingClientRect();
+    _ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    bRay.setFromCamera(_ndc, camera); bRay.far = 3.2;
+    const hit = bRay.intersectObjects(bk.pickables, false)[0];
+    if (!hit) return null;
+    return hit.object === bk.cloth ? { kind: 'cloth', point: hit.point, uv: hit.uv } : { kind: 'bowl', point: hit.point, bowl: hit.object.userData.bowl };
+  }
+  function installBatikInput(){
+    const el = renderer.domElement;
+    document.addEventListener('mousedown', e => { if (e.button === 0 && e.target === el){ ptr.down = true; ptr.press = true; ptr.x = e.clientX; ptr.y = e.clientY; } });
+    document.addEventListener('mouseup', e => { if (e.button === 0 && ptr.touch === null) ptr.down = false; });
+    document.addEventListener('mousemove', e => { if (ptr.touch === null){ ptr.x = e.clientX; ptr.y = e.clientY; } });
+    // a finger that lands on the cloth or a bowl paints; it must not also turn the view (index.html's drag-to-look)
+    document.addEventListener('touchstart', e => {
+      if (!bk.near || ptr.touch !== null || renderer.xr.isPresenting) return;
+      for (const tc of e.changedTouches){
+        if (tc.target !== el || !batikPick(tc.clientX, tc.clientY)) continue;
+        ptr.touch = tc.identifier; ptr.x = tc.clientX; ptr.y = tc.clientY; ptr.down = true; ptr.press = true;
+        e.stopImmediatePropagation(); e.preventDefault();
+        break;
+      }
+    }, { capture: true, passive: false });
+    document.addEventListener('touchmove', e => {
+      for (const tc of e.changedTouches) if (tc.identifier === ptr.touch){ ptr.x = tc.clientX; ptr.y = tc.clientY; e.preventDefault(); }
+    }, { capture: true, passive: false });
+    ['touchend', 'touchcancel'].forEach(ev => document.addEventListener(ev, e => {
+      for (const tc of e.changedTouches) if (tc.identifier === ptr.touch){ ptr.touch = null; ptr.down = false; }
+    }, true));
+    const touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    const h = document.createElement('div'); h.id = 'batikHint';
+    h.style.cssText = 'position:fixed;left:' + (touch ? 'calc(50% + 60px)' : '50%') + ';bottom:' + (touch ? 10 : 28) + 'px;transform:translateX(-50%);z-index:11;' +
+      'padding:' + (touch ? '6px 14px' : '9px 20px') + ';border-radius:14px;background:rgba(20,14,6,0.74);color:#f2e2b6;border:1px solid rgba(242,217,138,0.6);' +
+      'font-family:Georgia,serif;font-size:' + (touch ? 11.5 : 13) + 'px;line-height:1.5;letter-spacing:.4px;text-align:center;pointer-events:none;opacity:0;' +
+      'transition:opacity .5s;width:max-content;max-width:' + (touch ? 62 : 92) + 'vw';
+    h.innerHTML = touch
+      ? '<b>SENTUH</b> kain untuk mewarna &nbsp;·&nbsp; sentuh mangkuk untuk tukar warna<br><i>Touch the cloth to paint · tap a bowl to change colour</i>'
+      : '<b>KLIK &amp; TAHAN</b> pada kain untuk mewarna &nbsp;·&nbsp; klik mangkuk untuk tukar warna<br><i>Hold the mouse on the cloth to paint · click a bowl to change colour</i>';
+    document.body.appendChild(h); bk.hint = h; bk.touchUi = touch;
+  }
+
+  // a soft "plop" as the brush goes into a bowl
+  function plop(){
+    try {
+      const ctx = T.AudioContext.getContext(); if (!ctx || ctx.state !== 'running') return;
+      const o = ctx.createOscillator(), gn = ctx.createGain(), t0 = ctx.currentTime;
+      o.type = 'sine'; o.frequency.setValueAtTime(320, t0); o.frequency.linearRampToValueAtTime(1216, t0 + 0.16);
+      gn.gain.setValueAtTime(0.0001, t0); gn.gain.linearRampToValueAtTime(0.3, t0 + 0.004); gn.gain.exponentialRampToValueAtTime(0.004, t0 + 0.16);
+      o.connect(gn); gn.connect(ctx.destination); o.start(t0); o.stop(t0 + 0.17);
+    } catch (e){}
+  }
+  function buzz(b, amp, ms){
+    const sess = renderer.xr.getSession && renderer.xr.getSession(); if (!sess) return;
+    const hand = b.grip && b.grip.userData.hand;
+    for (const src of sess.inputSources){
+      if (!src.gamepad || (hand && src.handedness !== hand)) continue;
+      const a = src.gamepad.hapticActuators && src.gamepad.hapticActuators[0];
+      if (a && a.pulse){ const p = a.pulse(amp, ms); if (p && p.catch) p.catch(() => {}); }
+    }
+  }
+
+  // strokes are also handed to index.html (GWMX.onBatik) so spectators see the guest paint; holding still
+  // grows the same spot every frame, so only every few steps of that growth is passed on
+  function emitStroke(s){ bk.out.push(s); if (bk.log.length < 40000) bk.log.push(s); }
+  function shareStroke(b, s){
+    if (SPECT) return;
+    const same = b.sent && b.sent[2] === s[2] && b.sent[3] === s[3] && b.sent[4] === s[4] && s[5] < b.sent[5] + 4;
+    if (same){ b.skipped = s; return; }
+    if (b.skipped) emitStroke(b.skipped);   // the furthest the held spot soaked before the brush moved on
+    b.sent = s; b.skipped = null;
+    emitStroke(s);
+  }
+  function endStroke(b){
+    if (b.skipped) emitStroke(b.skipped);
+    b.skipped = null; b.sent = null;
+  }
+  // one frame of a brush: on the cloth at pixel (px, py), or lifted
+  function paintStep(b, touch, px, py, dt, t){
+    if (!touch){ if (b.touching) endStroke(b); b.touching = false; b.dwell = 0; return; }
+    let moved = b.touching ? Math.hypot(px - b.last.x, py - b.last.y) : 0;
+    if (moved > 220){ endStroke(b); b.touching = false; moved = 0; }   // a jump is a new touch, not a stroke
+    b.dwell = moved < 50 * dt ? Math.min(1.8, b.dwell + dt) : Math.max(0, b.dwell - dt * 3);
+    let k = Math.min(1, b.dwell / 1.8); k = k * k * (3 - 2 * k); b.k = k;
+    const s = [Math.round(b.touching ? b.last.x : px), Math.round(b.touching ? b.last.y : py), Math.round(px), Math.round(py), b.dye, Math.round(15 + 115 * k)];   // a held brush soaks a whole petal or leaf
+    bk.canvas.stroke(s[0], s[1], s[2], s[3], s[4], s[5]);
+    shareStroke(b, s);
+    b.last.set(px, py); b.touching = true; bk.painted = true; bk.lastPaint = t;
+  }
+  // a fresh cloth and clean brushes for the next guest
+  function resetBatik(tell){
+    if (!bk.built) return;
+    bk.canvas.clear(); bk.painted = false; bk.out = []; bk.log = []; bk.pending = [];
+    bk.brushes.concat([bk.flat]).forEach(b => { setDye(b, b.home); b.touching = false; b.dwell = 0; b.sent = b.skipped = null; });
+    if (tell && GWMX.onBatik) GWMX.onBatik({ type: 'batik', clear: 1 });
+  }
+  GWMX.resetBatik = () => resetBatik(false);
+  // what a spectator who joins late needs to catch up: everything painted since the cloth was last fresh
+  GWMX.batikState = () => {
+    const msgs = [{ type: 'batik', clear: 1 }];
+    for (let i = 0; i < bk.log.length; i += 200) msgs.push({ type: 'batik', s: bk.log.slice(i, i + 200) });
+    return msgs;
+  };
+  GWMX.applyBatik = msg => {
+    if (!bk.built || !msg) return;
+    if (msg.clear){ bk.canvas.clear(); bk.pending = []; }
+    if (!Array.isArray(msg.s)) return;
+    if (!bk.canvas.ready){ msg.s.forEach(s => bk.pending.push(s)); return; }
+    msg.s.forEach(s => { if (Array.isArray(s) && s.length >= 6) bk.canvas.stroke(s[0], s[1], s[2], s[3], s[4], s[5]); });
+    if (msg.s.length > 40) bk.canvas.flush();   // a catch-up batch: settle it at once
+  };
+
+  function updateBatik(dt, t){
+    if (!bk.built) return;
+    const cv = bk.canvas, xr = renderer.xr.isPresenting;
+    bk.swing.rotation.x = (Math.sin(t * 0.9) * 1.5 + Math.sin(t * 0.37) * 0.8) * D2R;
+    camera.getWorldPosition(_eye);
+    const h = bk.g.worldToLocal(_bv.copy(_eye)), d = Math.hypot(h.x, h.z + 0.5);
+    bk.near = d < 2.6;
+    // nobody has painted for a while and nobody is around: put up a fresh cloth
+    if (!SPECT && bk.painted && d > 6 && t - bk.lastPaint > 150) resetBatik(true);
+
+    // ---- VR: a brush in each hand
+    bk.brushes.forEach(b => {
+      const want = (bk.near && b.grip.visible && (xr || SPECT)) ? 1 : 0;
+      b.show += Math.max(-dt * 4, Math.min(dt * 4, want - b.show));
+      const s = b.show * b.show * (3 - 2 * b.show);
+      b.holder.visible = s > 0.001; b.root.scale.setScalar(Math.max(s, 0.001));
+      if (!xr || SPECT || b.show < 0.99 || !cv.ready){ paintStep(b, false, 0, 0, dt, t); return; }
+      b.tip.getWorldPosition(_tip);
+      const f = bk.g.worldToLocal(_bv.copy(_tip));
+      for (const bowl of bk.bowls){   // dip the brush into a bowl to take up that dye
+        const dx = f.x - bowl.x, dz = f.z - bowl.z, dy = f.y - bowl.y;
+        if (dx * dx + dz * dz > 0.058 * 0.058 || dy > 0.03 || dy < -0.06) continue;
+        if (b.dye !== bowl.dye){ setDye(b, bowl.dye); buzz(b, 0.55, 50); plop(); }
+        break;
+      }
+      const l = bk.cloth.worldToLocal(_bv.copy(_tip));   // touch the cloth: the dye goes on and spreads
+      const touch = Math.abs(l.x) <= 0.5 && Math.abs(l.y) <= 0.5 && l.z > -0.015 && l.z < 0.10;
+      paintStep(b, touch, (l.x + 0.5) * BW, (l.y + 0.5) * BH, dt, t);
+      if (touch){ b.buzz -= dt; if (b.buzz <= 0){ b.buzz = 0.07; buzz(b, 0.10 + 0.10 * b.k, 60); } }
+    });
+
+    // ---- flat screens: the view centre (mouse-look), the mouse, or a finger is the brush
+    const fb = bk.flat;
+    let hit = null;
+    const flat = !xr && !SPECT && bk.near && cv.ready;
+    if (flat && (ptr.touch !== null || !bk.touchUi || ptr.down)){
+      const locked = document.pointerLockElement === renderer.domElement, r = renderer.domElement.getBoundingClientRect();
+      hit = locked && ptr.touch === null ? batikPick(r.left + r.width / 2, r.top + r.height / 2) : batikPick(ptr.x, ptr.y);
+    }
+    if (ptr.press){
+      ptr.press = false; ptr.mode = hit ? hit.kind : '';
+      if (hit && hit.kind === 'bowl' && fb.dye !== hit.bowl.dye){ setDye(fb, hit.bowl.dye); plop(); }
+    }
+    const painting = !!hit && hit.kind === 'cloth' && ptr.down && ptr.mode === 'cloth';
+    paintStep(fb, painting, painting ? hit.uv.x * BW : 0, painting ? hit.uv.y * BH : 0, dt, t);
+    fb.root.visible = !!hit;
+    if (hit){   // the brush comes in from the lower right of the view; its tip hovers over the spot, and touches it while painting
+      camera.getWorldQuaternion(_bq);
+      const toEye = _eye.clone().sub(hit.point).normalize();
+      const dir = toEye.clone().multiplyScalar(0.55).addScaledVector(V(1, 0, 0).applyQuaternion(_bq), 0.5).addScaledVector(V(0, 1, 0).applyQuaternion(_bq), -0.45).normalize();
+      fb.root.quaternion.setFromUnitVectors(V(0, 0, -1), dir.clone().negate());
+      fb.root.position.copy(hit.point).addScaledVector(toEye, painting ? 0.004 : 0.04).addScaledVector(dir, 0.195 * 1.6);
+    }
+    // how to paint, shown for a few seconds each time the guest walks up, then out of the way
+    bk.hintT = flat ? (bk.hintT || 0) + dt : 0;
+    if (bk.hint) bk.hint.style.opacity = flat && bk.hintT < 8 && !ptr.down ? '1' : '0';
+
+    // ---- pass the new strokes on to spectators, about 15 times a second
+    bk.outTimer += dt;
+    if (bk.out.length && bk.outTimer > 0.066){
+      bk.outTimer = 0;
+      if (GWMX.onBatik) GWMX.onBatik({ type: 'batik', s: bk.out });
+      bk.out = [];
+    }
+    cv.tick(t);
+  }
+
   // ---------------------------------------------------------------- install
   let addBoxCol = () => {}, addCircleCol = () => {};
   GWMX.install = function(o){
     scene = o.scene; camera = o.camera; renderer = o.renderer; gripsRef = o.kerisGrips || [];
+    SPECT = !!o.spectator;
     if (o.addBoxCollider) addBoxCol = (x, z, hw, hd) => o.addBoxCollider(x, -z, hw, hd);
     if (o.addCircleCollider) addCircleCol = (x, z, r) => o.addCircleCollider(x, -z, r);
     root = new T.Group(); root.scale.set(1, 1, -1); scene.add(root);   // Unity frame -> three.js (z mirrored)
@@ -1074,6 +1529,9 @@
         gp.userData.hand = hand;
         while (gp.children.length) gp.remove(gp.children[0]);
         gp.add(buildHand(hand === 'left', true));
+        // the batik brush stays with the controller: red in the right hand, blue in the left, as in the Quest app
+        const b = gp.userData.batikBrush;
+        if (b){ gp.add(b.holder); b.home = hand === 'left' ? B_BIRU : B_MERAH; setDye(b, b.home); }
       });
     });
 
@@ -1082,6 +1540,7 @@
     buildBatu(V(15.0, 0, -10.2));
     buildGamelan(V(6, 0.40, 7));
     buildWauMaker(V(13.9, 0, 1.9), V(16.4, 0, 2.2), Math.PI / 2);
+    buildBatik(V(13.7, 0, 5.7), Math.PI / 2);   // beside him: guests colour a cloth already drawn in wax
     people.forEach(p => addCircleCol(p.root.position.x, p.root.position.z + 0.15, 0.45 * p.s + 0.12));
     buildTree(V(15.6, 0, -6.5));
     buildGate();
@@ -1090,6 +1549,8 @@
   };
 
   GWMX._mir = mir;
+  GWMX._batik = bk;   // for checking the corner from the browser console or a headless test
+  GWMX._view = () => ({ camera, renderer, scene });
   GWMX.update = function(dt, t){
     if (!root) return;
     try {
@@ -1106,6 +1567,7 @@
       handModels.forEach(h => h.update(dt));
       updaters.forEach(f => f(dt, t));
       updateMirror(dt, t);
+      updateBatik(dt, t);
     } catch (e){ console.error('GWMX frame error (recovered):', e); }
   };
 })();

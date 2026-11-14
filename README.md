@@ -30,6 +30,17 @@ past, it lives in the future.
 
 No app install, no developer mode, no Unity build required — it runs straight from the browser.
 
+### Sudut batik / Batik corner
+
+Outside the balai, on the east side beside the wau bulan maker, visitors can colour a batik cloth
+whose motif is already drawn in wax. The dye spreads through the cloth and stops at the wax lines,
+as in real hand-painted batik (batik lukis); holding still lets it soak further.
+
+- **Desktop:** look at the cloth and hold the mouse button to paint; click a bowl to change colour
+- **Phone / tablet:** touch the cloth to paint; tap a bowl to change colour
+- **VR headset:** a brush appears in each hand; dip it in a bowl, then touch the cloth
+- The bowl of water washes colour away
+
 ## Project Status
 
 🚧 **Prototype stage.** The current build uses placeholder geometric "performers" and

@@ -24,14 +24,25 @@ projects are native Meta Quest ports of it. All live under `C:\Users\ismeh\Docum
 Intro is `intro_commercial.mp4` everywhere (web `assets/videos/`, Unity `StreamingAssets/Videos/`, `introVideoFile` in `IntroDirector.cs` and serialized in `Gallery.unity`). The old `intro_opening.mp4` is deleted.
 
 ## Web = Quest look-alike (since 2026-11-06)
-On request the website is brought up to date with the Quest app. The new content (keris/pelita hands, gamelan, kuih,
-villagers, cermin Melayu) lives in `assets/gwm-extras.js`, authored in the Unity frame inside a z-mirrored group and
-hooked into `index.html` (`GWMX.install` / `GWMX.update`). The Unity versions are `GWMProc.cs`, `KampungPlay.cs`,
-`KuihDisplay.cs`, `MirrorAvatar.cs`. Keep the two in step when changing either.
+On request the website is brought up to date with the Quest app. The new content (the visitor's hands, gamelan, kuih,
+villagers, welcome grove, wau maker, batik corner) lives in `assets/gwm-extras.js`, authored in the Unity frame inside a
+z-mirrored group and hooked into `index.html` (`GWMX.install` / `GWMX.update`). The Unity versions are `GWMProc.cs`,
+`KampungPlay.cs`, `KuihDisplay.cs`, `MirrorAvatar.cs`, `BatikCorner.cs`. Keep the two in step when changing either.
 
-Unity only so far (not on the web): the batik painting corner beside the wau maker, `BatikCorner.cs` (added 2026-11-12).
-Guests get a brush in each hand, dip it in a dye bowl and colour a wax-drawn cloth; the dye spreads up to the wax lines.
-Check it headlessly with `-executeMethod GWMPreview.Batik -previewDir <folder>`; `GWMSmokeTest.Run` also paints on it.
+### Batik painting corner (Unity 2026-11-12, web 2026-11-14)
+Beside the wau maker. Guests dip a brush in a dye bowl and colour a wax-drawn cloth; the dye spreads up to the wax lines.
+- Unity: `BatikCorner.cs` (class `BatikCanvas` draws the motif and runs the dye). Check it headlessly with
+  `-executeMethod GWMPreview.Batik -previewDir <folder>`; `GWMSmokeTest.Run` also paints on it.
+- Web: the "sudut batik" section of `assets/gwm-extras.js`, same build and same dye engine. The web does NOT redraw the
+  motif: it loads the wax lines from `assets/images/batik_lilin.png` and shows `assets/images/batik_siap.png` as the
+  finished example. Both come out of `GWMPreview.Batik` (`batik_wax.png`, `batik_cloth_finished.png`), so after changing
+  the motif in Unity, re-run it and copy the two files over (`papan_batik.png` is the sign, the same file as Unity's).
+- Web only: on a flat screen the view centre (mouse-look), the mouse or a finger is the brush, and bowls are clicked.
+  Strokes are sent to spectators (`GWMX.onBatik` / `GWMX.applyBatik` / `GWMX.batikState`, hooked in `index.html`).
+
+### Plants
+`scatterVegetation()` in `index.html` no longer scatters at random: the loose palms, banana plants and bamboo stand at the
+positions the Unity scene was exported with, so the two match and nothing can land on the exhibits east of the balai.
 
 ## Rules
 - Raw phone videos must be transcoded to ~720p H.264 before use (see memory).

@@ -551,9 +551,13 @@
     renderer.shadowMap.autoUpdate = false;
     renderer.shadowMap.needsUpdate = true;
     buildKerisControllers();
-    // same additions as the Meta Quest app: keris/pelita hands, gamelan, kuih,
-    // villagers at play and the cermin Melayu (see assets/gwm-extras.js)
-    if (window.GWMX) GWMX.install({ scene, camera, renderer, stations, kerisGrips, addCircleCollider, addBoxCollider });
+    // same additions as the Meta Quest app: the visitor's hands, gamelan, kuih,
+    // villagers at play, the wau maker and the batik corner (see assets/gwm-extras.js)
+    if (window.GWMX){
+      GWMX.install({ scene, camera, renderer, stations, kerisGrips, addCircleCollider, addBoxCollider, spectator: !!SPECTATE_ID });
+      // what the guest paints on the batik cloth goes to every spectator, so the cast shows it too
+      GWMX.onBatik = msg => { for (const c of hostConns){ if (c.open) c.send(msg); } };
+    }
     prevPlayerPos.copy(player.position);
 
     window.addEventListener('resize', onResize);
@@ -1295,6 +1299,9 @@
     alphaOffset = null;
     gyroYawOffset = 0; gyroPitchOffset = 0;
 
+    // a fresh batik cloth and clean brushes, as on the Quest app's reset
+    if (window.GWMX && GWMX.resetBatik) GWMX.resetBatik();
+
     // fresh spectator link -- the old one dies with the old guest
     if (peerHost){ try { peerHost.destroy(); } catch (e) {} }
     peerHost = null;
@@ -1357,6 +1364,8 @@
         // is in the intro (or that they're already touring) right away,
         // not wait for the next natural phase change
         sendIntroPhase([conn]);
+        // ...and what is already painted on the batik cloth
+        if (window.GWMX && GWMX.batikState){ for (const m of GWMX.batikState()) conn.send(m); }
       });
       // admin-triggered remote reset from the spectate view (see the
       // spectateResetBtn handler) -- same effect as pressing "TETAMU BARU"
@@ -1607,6 +1616,7 @@
         // broadcastIntroPhase/sendIntroPhase on the host side
         if (d && typeof d === 'object' && !Array.isArray(d)){
           if (d.type === 'phase') applyIntroPhase(d.phase, d.epoch);
+          else if (d.type === 'batik' && window.GWMX && GWMX.applyBatik) GWMX.applyBatik(d); // the guest's brush strokes
           return;
         }
         if (!Array.isArray(d) || d.length < 7) return;
@@ -3299,21 +3309,20 @@
   }
 
   function scatterVegetation(){
-    const halfW = ROOM.width/2, halfD = ROOM.depth/2;
-    for (let i=0;i<18;i++){
-      const angle = Math.random()*Math.PI*2;
-      const radius = Math.max(halfW,halfD) + 4 + Math.random()*20;
-      const x = Math.cos(angle)*radius, z = Math.sin(angle)*radius;
-      if (Math.abs(x) < 4 && z > 0) continue; // keep the entrance approach clear
-      if (Math.abs(x) < 9 && Math.abs(z - 24) < 7) continue; // keep the Istana Melaka's footprint clear
-      if (x > -29 && x < -11 && z > 9 && z < 21) continue; // keep the rumah's yard + grove behind it clear
-      if (x > 9.5 && x < 16.5 && z > 12 && z < 18) continue; // keep the kereta lembu's spot clear
-      if (x > -35 && x < -15 && z > -8 && z < 12) continue; // keep the sawah padi flats clear
-      const r = Math.random();
-      if (r < 0.4) buildCoconutPalm(x,z);
-      else if (r < 0.7) buildBananaPlant(x,z);
-      else buildBambooCluster(x,z);
-    }
+    // The kampung's loose palms, banana plants and bamboo stand exactly where
+    // they stand in the Meta Quest app. They used to be scattered at random on
+    // every page load (the Quest app was exported from one such load), which
+    // could drop a bamboo clump into the batik corner, the wau maker's mat or
+    // the children's games east of the balai.
+    [
+      ['banana', 26.434, 11.344], ['palm', -1.502, -17.792], ['palm', 30.330, 7.175], ['palm', 21.108, -9.883],
+      ['palm', 23.476, -9.300], ['banana', 4.830, -21.629], ['palm', 27.410, 1.583], ['banana', -10.939, 30.939],
+      ['bamboo', -5.467, -26.193], ['palm', -3.571, -28.509], ['banana', -10.003, 30.974],
+    ].forEach(([kind, x, z]) => {
+      if (kind === 'palm') buildCoconutPalm(x, z);
+      else if (kind === 'banana') buildBananaPlant(x, z);
+      else buildBambooCluster(x, z);
+    });
     buildKampungHut(-24, -8);
     buildKampungHut(22, -14);
     buildAdBillboard(6, 13, {
