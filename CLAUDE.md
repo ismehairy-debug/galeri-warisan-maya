@@ -59,6 +59,17 @@ Beside the wau maker. Guests dip a brush in a dye bowl and colour a wax-drawn cl
 `scatterVegetation()` in `index.html` no longer scatters at random: the loose palms, banana plants and bamboo stand at the
 positions the Unity scene was exported with, so the two match and nothing can land on the exhibits east of the balai.
 
+## Teaser film (2026-11-15)
+A one-minute teaser is filmed inside the Quest app, in the Unity editor, with no headset:
+- `Assets/GWM/Editor/GWMTeaser.cs` (`-executeMethod GWMTeaser.Run -teaserDir <folder> -teaserSize 1920x1080`, no `-quit`)
+  enters the world and flies the visitor's camera through a list of shots, saving every frame at a fixed 30 fps. It also
+  paints at the batik corner. `-teaserEvery 30` gives a quick framing check; `-teaserShots a,b` refilms only those shots.
+- `GaleriWarisanMaya_VR/Teaser/make_teaser.py --frames <folder> --out <file.mp4> [--draft]` cuts the frames on the bar
+  lines of the music (the cinematic track in `Assets/GWM/Audio`, 88 bpm), grades them, and adds the title, captions and
+  end card (both taken from `welcome_panel.png`). The cut list and the caption wording are at the top of that file.
+- Drafts are 1280x720 with a "DRAF n" tag and go to `GaleriWarisanMaya_VR/Teaser/`. The owner approves a draft before the
+  full 1920x1080 export.
+
 ## Rules
 - Raw phone videos must be transcoded to ~720p H.264 before use (see memory).
 - Expand features in Unity first. The web copy is only brought in step when the user asks.
