@@ -36,6 +36,14 @@ villagers, welcome grove, wau maker, batik corner) lives in `assets/gwm-extras.j
 z-mirrored group and hooked into `index.html` (`GWMX.install` / `GWMX.update`). The Unity versions are `GWMProc.cs`,
 `KampungPlay.cs`, `KuihDisplay.cs`, `MirrorAvatar.cs`, `BatikCorner.cs`. Keep the two in step when changing either.
 
+### No hand models in the Quest app (2026-11-14)
+The owner had the visitor's hand models taken out of the Quest app: the batik brush did not sit in the modelled hand.
+`VRRig` no longer builds `GWMHand` on the controllers, and the brush now lies on the controller's aim pose
+(`VRRig.leftAim` / `rightAim`, bound to `pointerPosition` / `pointerRotation`; with no controller, as in the editor, the
+aim is worked out from the grip). Do not put hands back. `GWMHand` stays in `GWMProc.cs` because the mirror reflection
+(`MirrorAvatar.cs`) still uses it. The web in VR mode still draws the hands and holds the brush in them: it was not
+changed (web frozen), so here the two differ on purpose.
+
 ### Batik painting corner (Unity 2026-11-12, web 2026-11-14)
 Beside the wau maker. Guests dip a brush in a dye bowl and colour a wax-drawn cloth; the dye spreads up to the wax lines.
 - Unity: `BatikCorner.cs` (class `BatikCanvas` draws the motif and runs the dye). Check it headlessly with
