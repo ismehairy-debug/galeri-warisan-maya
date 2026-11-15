@@ -69,6 +69,11 @@ A one-minute teaser is filmed inside the Quest app, in the Unity editor, with no
   end card (both taken from `welcome_panel.png`). The cut list and the caption wording are at the top of that file.
 - Drafts are 1280x720 with a "DRAF n" tag and go to `GaleriWarisanMaya_VR/Teaser/`. The owner approves a draft before the
   full 1920x1080 export.
+- Exported 2026-11-15 as `Teaser/Galeri_Warisan_Maya_teaser.mp4` (60 s, 1920x1080). Credits as the owner asked: it opens
+  on a white card "In collaboration with" FCoEE and UniMAP, and ends "Presented by STEAM Education Academy" with that
+  logo (`Teaser/logos/`). The presenter is STEAM Education Academy; the app itself is still named STEAM EduAction.
+- Filming 1080p takes about 7 minutes and 1 GB of frames; film it in two runs of `-teaserShots` (a tool call is cut off
+  at 10 minutes, and background runs die with the session). The C: drive had only 3 GB free on 2026-11-15.
 
 ### New commercial intro (draft 2026-11-15, not in the app until the owner approves)
 `GaleriWarisanMaya_VR/Teaser/make_intro.py` cuts an 18-second replacement for `intro_commercial.mp4` from the `in_...`
@@ -76,6 +81,8 @@ shots in `GWMTeaser.cs` (film them with `-teaserShots in_board,in_walk,in_tarian
 Music is the gamelan (`alat_muzik.mp3` from 136.2 s), not the short film's cinematic track; the title lands on the big gong.
 It ends on a white credits card whose wording the owner gave: Sponsored by FCoEE; In collaboration with UniMAP and FCoEE;
 Presented by SEAT Education Academy (logos in `Teaser/logos/`). The final stays 1280x720, a few MB, for the headset.
+`intro_DRAF1.mp4` still says "SEAT": the owner has since said the presenter is STEAM Education Academy and supplied its
+logo, so correct the card before any export, and ask whether the intro should carry the teaser's credits instead.
 
 ## Rules
 - Raw phone videos must be transcoded to ~720p H.264 before use (see memory).
