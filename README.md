@@ -54,9 +54,10 @@ the next milestone — see Roadmap below.
 |---|---|
 | Anas Zuhairi bin Zullkeffle | Ketua Pasukan |
 | Ahmad Haziq bin Ariff | Ahli Pasukan |
-| Muhammad Afifi bin Muhd Shukri | Ahli Pasukan |
+| Muhammad Afifi bin Mohd Shukri | Ahli Pasukan |
+| Baraah Ali Omar Balagem | Ahli Pasukan |
 
-Mentor Akademik: Dr. Mohd Hafiz Ismail, Fakulti Kejuruteraan Elektronik, UniMAP
+Mentor Akademik: Dr. Mohd Hafiz bin Ismail, Fakulti Kejuruteraan Elektronik, UniMAP
 
 ## Tech Stack
 
