@@ -44,8 +44,12 @@ aim is worked out from the grip). Do not put hands back. `GWMHand` stays in `GWM
 (`MirrorAvatar.cs`) still uses it. The web in VR mode still draws the hands and holds the brush in them: it was not
 changed (web frozen), so here the two differ on purpose.
 
-### Play activities, Unity only (2026-11-21)
-Added to the Quest app on request; the web does NOT have them (web frozen). Details in `GaleriWarisanMaya_VR/README.md`.
+### Play activities and the FCoEE gallery: Quest app and web (2026-11-21)
+Added to the Quest app first, then brought to the web the same day on the owner's request (web = Quest look-alike again). Web files:
+`assets/gwm-play.js` (voices, kuih, wau paint + fly), `assets/gwm-fcoee.js` (the hall, frames, the film screen, the news panel),
+`assets/fcoee/` (copied from the Unity project by `tools/sync_fcoee_web.py`, which also writes `manifest.json`). Not ported to the web:
+the 169 cm eye level in VR. The web film is a 480p copy (`assets/fcoee/wajah_filem_pendek_480p.mp4`, 54 MB; the Quest one is 720p);
+never commit the 890 MB original `assets/videos/UNIMAP_FULLSHORTFILM_FINALVIDEO.mp4`. Details in `GaleriWarisanMaya_VR/README.md`.
 - Wau bulan: `WauPlay.cs`. The craftsman's wau on the easel can be painted (colour pots on a table right of the easel) and flown
   (grip at the wau launches it on a string held in that hand; trigger winds in; let go and it soars away).
 - Kuih: `KuihDisplay.cs`. Grab with grip or trigger (at or pointing at it), bring to the mouth, three bites.
@@ -54,14 +58,16 @@ Added to the Quest app on request; the web does NOT have them (web frozen). Deta
 - Eye level: every guest is raised or lowered to the eye height of a 169 cm person as the world opens (`VRRig.AutoEyeHeight`).
 - Instruction boards `papan_wau.png` and `papan_kuih.png` come from `Teaser/make_signs.py`.
 - Offline check: `-executeMethod GWMPreview.Play -previewDir <folder>` (images and the voice WAVs).
-- Not yet tried with the headset on (2026-11-21): the grab distances, the kite's feel and how the voices sound.
+- Not yet tried with the headset on (2026-11-21): the grab distances, the kite's feel and how the voices sound. The web was checked headlessly
+(Playwright + Edge, see the harness idea in the 'Testing the web headlessly' note above: block Telegram and PeerJS).
 
 ### FCoEE company gallery, Unity only (2026-11-21)
-A hall east of the kampung (door facing the balai): `FcoeeGallery.cs`, `FcoeeScreen.cs`, tools in `GaleriWarisanMaya_VR/Tools/`, details in
-that project's README. Short film WAJAH (poster + full film on a screen) and an animation wall (placeholders until the owner uploads
+A hall east of the kampung (door facing the balai): Unity `FcoeeGallery.cs`, `FcoeeScreen.cs`, tools in `GaleriWarisanMaya_VR/Tools/`; web
+`assets/gwm-fcoee.js`. Details in that project's README. Short film WAJAH (poster + full film on a screen) and an animation wall (placeholders until the owner uploads
 the animation video and poster). The keratan akhbar in Malay and Jawi (frames 21, 23) is waiting for the text of the HEPA UniMAP
 Facebook post: Facebook blocks automated reading, so ask the owner to paste it, then fill `Tools/news.json` and run `make_news.py`.
-Not yet tried with the headset on (2026-11-21).
+Not yet tried with the headset on (2026-11-21). The web has the same hall and a BERITA panel (the owner's Facebook embed + the clippings once
+they exist: `photo_21.png` Malay, `photo_23.png` Jawi in `assets/fcoee/wall/`, then re-run `tools/sync_fcoee_web.py`).
 
 ### Batik painting corner (Unity 2026-11-12, web 2026-11-14)
 Beside the wau maker. Guests dip a brush in a dye bowl and colour a wax-drawn cloth; the dye spreads up to the wax lines.

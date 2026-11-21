@@ -1,0 +1,52 @@
+{
+ "photos": {
+  "10": "wall/photo_10.png",
+  "11": "wall/photo_11.jpg",
+  "12": "wall/photo_12.png",
+  "13": "wall/photo_13.png",
+  "14": "wall/photo_14.png",
+  "30": "wall/photo_30.png"
+ },
+ "captions": {
+  "11": "caption/caption_11.png",
+  "12": "caption/caption_12.png",
+  "14": "caption/caption_14.png",
+  "30": "caption/caption_30.png"
+ },
+ "placeholders": {
+  "1": "wall_placeholder/slot_01.png",
+  "2": "wall_placeholder/slot_02.png",
+  "3": "wall_placeholder/slot_03.png",
+  "4": "wall_placeholder/slot_04.png",
+  "5": "wall_placeholder/slot_05.png",
+  "6": "wall_placeholder/slot_06.png",
+  "7": "wall_placeholder/slot_07.png",
+  "8": "wall_placeholder/slot_08.png",
+  "9": "wall_placeholder/slot_09.png",
+  "10": "wall_placeholder/slot_10.png",
+  "11": "wall_placeholder/slot_11.png",
+  "12": "wall_placeholder/slot_12.png",
+  "13": "wall_placeholder/slot_13.png",
+  "14": "wall_placeholder/slot_14.png",
+  "15": "wall_placeholder/slot_15.png",
+  "16": "wall_placeholder/slot_16.png",
+  "17": "wall_placeholder/slot_17.png",
+  "18": "wall_placeholder/slot_18.png",
+  "19": "wall_placeholder/slot_19.png",
+  "20": "wall_placeholder/slot_20.png",
+  "21": "wall_placeholder/slot_21.png",
+  "22": "wall_placeholder/slot_22.png",
+  "23": "wall_placeholder/slot_23.png",
+  "24": "wall_placeholder/slot_24.png",
+  "25": "wall_placeholder/slot_25.png",
+  "26": "wall_placeholder/slot_26.png",
+  "27": "wall_placeholder/slot_27.png",
+  "28": "wall_placeholder/slot_28.png",
+  "29": "wall_placeholder/slot_29.png",
+  "30": "wall_placeholder/slot_30.png",
+  "31": "wall_placeholder/slot_31.png"
+ },
+ "films": {
+  "12": "wajah_filem_pendek_480p.mp4"
+ }
+}

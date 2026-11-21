@@ -1,0 +1,11 @@
+Model Information:
+* title:	art gallery
+* source:	https://sketchfab.com/3d-models/art-gallery-2e6d4107088145149825b4f22fc8b2ad
+* author:	chibi chan (https://sketchfab.com/chibi_chan)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "art gallery" (https://sketchfab.com/3d-models/art-gallery-2e6d4107088145149825b4f22fc8b2ad) by chibi chan (https://sketchfab.com/chibi_chan) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

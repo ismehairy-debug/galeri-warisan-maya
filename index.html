@@ -325,7 +325,10 @@
 (function(){
 
   /* ------------------------------------------------------------------
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
      GALERI WARISAN MAYA — WebXR prototype
+<script src="assets/gwm-play.js"></script>
+<script src="assets/gwm-fcoee.js"></script>
      This is a placeholder / proof-of-concept, not the final asset set.
      To upgrade toward the final build:
        - Swap the abstract geometric "performers" below for real 3D
@@ -1385,6 +1388,7 @@
     peerHost = null;
     hostConns = [];
     hostRetries = 0;
+    if (window.GWMX && GWMX.resetPlay) GWMX.resetPlay();   // the wau paper, the kuih, any kite in the air
     telegramPosted = false;
     introPhase = 'idle';
     introPhaseEpoch = 0;
@@ -5189,7 +5193,7 @@
   }
 
   function clampToRoom(){
-    const m = 40;
+    const m = (window.GWMX && GWMX.worldLimit) || 40;   // the FCoEE gallery widens the old 40 m square (and keeps guests inside the mountains)
     player.position.x = Math.max(-m, Math.min(m, player.position.x));
     player.position.z = Math.max(-m, Math.min(m, player.position.z));
     resolveCollisions();
@@ -5198,6 +5202,8 @@
   // ---------- push the player back out of any obstacle they've walked into
   // (ground-plane only -- ignores height entirely, which is fine since
   // nothing in the scene is walkable underneath) ----------
+    const R = window.GWMX && GWMX.worldRadius, rr = Math.hypot(player.position.x, player.position.z);
+    if (R && rr > R){ player.position.x *= R / rr; player.position.z *= R / rr; }
   function resolveCollisions(){
     for (const c of colliders){
       const dx = player.position.x - c.x;

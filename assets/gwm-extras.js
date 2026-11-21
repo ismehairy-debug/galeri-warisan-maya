@@ -317,6 +317,13 @@
     const idx = [own * 8 + 2, own * 8 + 3, own * 8 + 4, own * 8 + 5, own * 8 + 6, aActive ? 7 : 15, far * 8 + 6, far * 8 + 5];
     const stops = idx.map(holeWorld);
     const T0 = 0.8, STEP = 0.46, T1 = T0 + STEP * 8;
+    // the last seed is down: the child cheers, the player who just finished laughs, the other joins in
+    const cev = Math.floor((t - T1) / CYC);
+    if (cg.ev === undefined) cg.ev = cev;
+    else if (cev !== cg.ev){
+      cg.ev = cev;
+      if (GWMX.say){ GWMX.say(cg.kid, 'cheer', 0.05); if (Math.random() < 0.75) GWMX.say(act, 'laugh', 0.35); if (Math.random() < 0.40) GWMX.say(idle, 'laugh', 0.70); }
+    }
     const rest = act.rest(1); let hand, carried = 0;
     if (u < T0){ hand = lerpV(rest, stops[0].clone().add(V(0, 0.02, 0)), u / T0); carried = Math.max(0, Math.min(1, (u - T0 * 0.6) / (T0 * 0.4))); seeds.forEach(s => s.scale.setScalar(0.0001)); }
     else if (u < T1){
@@ -371,6 +378,12 @@
   }
   function updateKid(k, t){
     const CY = 4.2, u = (t + k.phase) % CY, p = k.p;
+    // the catch (u 1.7) and the moment all stones are in hand (u 2.4) set the children off
+    if (k.lastU !== undefined && GWMX.say){
+      if (k.lastU < 1.7 && u >= 1.7){ if (Math.random() < 0.30) GWMX.say(p, 'cheer', 0.05); else if (Math.random() < 0.40) GWMX.say(p, 'laugh', 0.05); }
+      if (k.lastU < 2.4 && u >= 2.4) kids.forEach(o => { if (o !== k && Math.random() < 0.25) GWMX.say(o.p, Math.random() < 0.5 ? 'giggle' : 'cheer', 0.2 + Math.random() * 0.4); });
+    }
+    k.lastU = u;
     const up = V(0, 1, 0), fwd = p.fwd();
     const G = k.homeA.clone().add(V(0, 0.012, 0)), G2 = k.homeB.clone().add(V(0, 0.012, 0));
     const rest = p.rest(1), hover = k.pile.clone().addScaledVector(up, 0.20).addScaledVector(fwd, -0.05);
@@ -483,7 +496,7 @@
   function aim(obj, dir){ obj.quaternion.setFromUnitVectors(V(0, 0, 1), dir); }
 
   // ---------------------------------------------------------------- kuih
-  const kuih = { tray: null };
+  const kuih = { tray: null, items: [] };
   function buildKuih(c){
     const holder = new T.Group(); holder.position.copy(c); root.add(holder);
     const tray = new T.Group(); holder.add(tray); kuih.tray = tray;
@@ -492,7 +505,7 @@
     part(tray, torusGeo(0.905, 0.012, 36, 6), rattanDark, 0, 0.05, 0);
     part(tray, lathe([[0, 0.034], [0.84, 0.036], [0.86, 0.040], [0, 0.040]], 36), leaf, 0, 0, 0);
     const R = 0.60;
-    const place = (i, fn) => { const a = i * 60 * Math.PI / 180, g = new T.Group(); g.position.set(Math.cos(a) * R, 0.04, Math.sin(a) * R); g.rotation.y = (-i * 60 + 90) * Math.PI / 180; tray.add(g); fn(g); };
+    const place = (i, fn) => { const a = i * 60 * Math.PI / 180, g = new T.Group(); g.position.set(Math.cos(a) * R, 0.04, Math.sin(a) * R); g.rotation.y = (-i * 60 + 90) * Math.PI / 180; tray.add(g); kuih.items.push(g); fn(g); };
     // kuih lapis
     place(0, g => {
       const L = [[0.95, 0.42, 0.55], [0.98, 0.93, 0.80], [0.62, 0.78, 0.35], [0.98, 0.93, 0.80]];
@@ -1002,7 +1015,7 @@
     root.updateMatrixWorld(true);
     const mc = easelPos.clone().add(rotate(V(0.2, 0, -0.55)));
     makeMat(root, mc.x, mc.z, 2.4, 2.0, [0.82, 0.66, 0.36], [0.68, 0.50, 0.24], [0.40, 0.22, 0.12]);
-    const easel = new T.Group(); easel.position.copy(easelPos).add(V(0, 0.02, 0)); easel.rotation.y = yaw; root.add(easel); root.updateMatrixWorld(true);
+    const easel = new T.Group(); easel.position.copy(easelPos).add(V(0, 0.02, 0)); easel.rotation.y = yaw; root.add(easel); root.updateMatrixWorld(true); wm.easel = easel;
     stick(easel, bamboo, V(-0.5, 0, -0.10), V(-0.42, 1.75, 0.24), 0.022); stick(easel, bamboo, V(0.5, 0, -0.10), V(0.42, 1.75, 0.24), 0.022);
     stick(easel, bamboo, V(0, 0, 0.75), V(0, 1.70, 0.24), 0.022); stick(easel, bamboo, V(-0.62, 0.12, -0.07), V(0.62, 0.12, -0.07), 0.018);
     wm.quad = wauPlane(easel, 'wau_kosong', V(0, 0.12 + 0.89, 0.08), [12 * Math.PI / 180, 0, 0], 1.3, false);
@@ -1546,6 +1559,12 @@
     buildGate();
     // the modelled gamelan replaces the old flat xylophone-and-figure group
     (o.stations || []).forEach(st => { if (st.def && st.def.key === 'alatmuzik' && st.performer) st.performer.visible = false; });
+    // the things added after the batik corner (play activities, the FCoEE gallery) live in their own files and use these
+    GWMX.api = { T, root, scene, camera, renderer, mat, box, sph, cyl, part, lathe, torusGeo, stick, blob, V, smooth, lerpV, add, makeMat,
+      people, kids, cg, kuih, wm, bk, ptr, inputState, gripsRef, updaters, rootLocal, addBoxCol, addCircleCol, buildBrush, setDye, plop, buzz,
+      DYES, B_WATER, B_MERAH, B_BIRU, SPECT, D2R, HAND_TILT };
+    if (GWMX.installPlay) GWMX.installPlay(o);
+    if (GWMX.installFcoee) GWMX.installFcoee(o);
   };
 
   GWMX._mir = mir;
@@ -1567,6 +1586,8 @@
       handModels.forEach(h => h.update(dt));
       updaters.forEach(f => f(dt, t));
       updateMirror(dt, t);
+      if (GWMX.updatePlay) GWMX.updatePlay(dt, t);
+      if (GWMX.updateFcoee) GWMX.updateFcoee(dt, t);
       updateBatik(dt, t);
     } catch (e){ console.error('GWMX frame error (recovered):', e); }
   };
