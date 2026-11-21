@@ -44,6 +44,18 @@ aim is worked out from the grip). Do not put hands back. `GWMHand` stays in `GWM
 (`MirrorAvatar.cs`) still uses it. The web in VR mode still draws the hands and holds the brush in them: it was not
 changed (web frozen), so here the two differ on purpose.
 
+### Play activities, Unity only (2026-11-21)
+Added to the Quest app on request; the web does NOT have them (web frozen). Details in `GaleriWarisanMaya_VR/README.md`.
+- Wau bulan: `WauPlay.cs`. The craftsman's wau on the easel can be painted (colour pots on a table right of the easel) and flown
+  (grip at the wau launches it on a string held in that hand; trigger winds in; let go and it soars away).
+- Kuih: `KuihDisplay.cs`. Grab with grip or trigger (at or pointing at it), bring to the mouth, three bites.
+- Children: `KidsVoice.cs` builds laughter, giggles and "yeay" cheers in code (no recordings); `KampungPlay.cs` triggers them
+  from the congkak and batu seremban animations. A WAV in `Assets/GWM/Resources` named `kids_laugh_0` etc. overrides a clip.
+- Eye level: every guest is raised or lowered to the eye height of a 169 cm person as the world opens (`VRRig.AutoEyeHeight`).
+- Instruction boards `papan_wau.png` and `papan_kuih.png` come from `Teaser/make_signs.py`.
+- Offline check: `-executeMethod GWMPreview.Play -previewDir <folder>` (images and the voice WAVs).
+- Not yet tried with the headset on (2026-11-21): the grab distances, the kite's feel and how the voices sound.
+
 ### Batik painting corner (Unity 2026-11-12, web 2026-11-14)
 Beside the wau maker. Guests dip a brush in a dye bowl and colour a wax-drawn cloth; the dye spreads up to the wax lines.
 - Unity: `BatikCorner.cs` (class `BatikCanvas` draws the motif and runs the dye). Check it headlessly with
