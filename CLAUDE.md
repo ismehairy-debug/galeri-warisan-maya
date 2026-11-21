@@ -56,6 +56,13 @@ Added to the Quest app on request; the web does NOT have them (web frozen). Deta
 - Offline check: `-executeMethod GWMPreview.Play -previewDir <folder>` (images and the voice WAVs).
 - Not yet tried with the headset on (2026-11-21): the grab distances, the kite's feel and how the voices sound.
 
+### FCoEE company gallery, Unity only (2026-11-21)
+A hall east of the kampung (door facing the balai): `FcoeeGallery.cs`, `FcoeeScreen.cs`, tools in `GaleriWarisanMaya_VR/Tools/`, details in
+that project's README. Short film WAJAH (poster + full film on a screen) and an animation wall (placeholders until the owner uploads
+the animation video and poster). The keratan akhbar in Malay and Jawi (frames 21, 23) is waiting for the text of the HEPA UniMAP
+Facebook post: Facebook blocks automated reading, so ask the owner to paste it, then fill `Tools/news.json` and run `make_news.py`.
+Not yet tried with the headset on (2026-11-21).
+
 ### Batik painting corner (Unity 2026-11-12, web 2026-11-14)
 Beside the wau maker. Guests dip a brush in a dye bowl and colour a wax-drawn cloth; the dye spreads up to the wax lines.
 - Unity: `BatikCorner.cs` (class `BatikCanvas` draws the motif and runs the dye). Check it headlessly with
